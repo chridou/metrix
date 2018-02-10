@@ -23,23 +23,23 @@ impl<T> Observation<T> {
     }
 }
 
-pub trait SendsObservations<T> {
+pub trait CollectsObservations<T> {
     /// Send an observation for recording
-    fn send(&self, observation: Observation<T>);
+    fn collect(&self, observation: Observation<T>);
 
     /// Observed `n` occurences at time `t`
     fn observed(&self, id: T, n: u64, t: Instant) {
-        self.send(Observation::Observed(id, n, t))
+        self.collect(Observation::Observed(id, n, t))
     }
 
     /// Observed one occurence at time `t`
     fn observed_one(&self, id: T, t: Instant) {
-        self.send(Observation::ObservedOne(id, t))
+        self.collect(Observation::ObservedOne(id, t))
     }
 
     /// Observed one occurence with value `v` at time `t`
     fn observed_one_value(&self, id: T, v: u64, t: Instant) {
-        self.send(Observation::ObservedOneValue(id, v, t))
+        self.collect(Observation::ObservedOneValue(id, v, t))
     }
 
     /// Observed `n` occurences at now.
@@ -59,23 +59,23 @@ pub trait SendsObservations<T> {
 }
 
 #[derive(Clone)]
-pub struct ObservationsSender<T> {
+pub struct ObservationsCollector<T> {
     sender: mpsc::Sender<Observation<T>>,
 }
 
-impl<T> ObservationsSender<T>
+impl<T> ObservationsCollector<T>
 where
     T: Display + Eq + Send + 'static,
 {
-    pub fn synced(&self) -> ObservationsSenderSync<T> {
-        ObservationsSenderSync {
+    pub fn synced(&self) -> ObservationsCollectorSync<T> {
+        ObservationsCollectorSync {
             sender: Arc::new(Mutex::new(self.sender.clone())),
         }
     }
 }
 
-impl<T> SendsObservations<T> for ObservationsSender<T> {
-    fn send(&self, observation: Observation<T>) {
+impl<T> CollectsObservations<T> for ObservationsCollector<T> {
+    fn collect(&self, observation: Observation<T>) {
         if let Err(_err) = self.sender.send(observation) {
             // maybe log...
         }
@@ -88,18 +88,18 @@ impl<T> SendsObservations<T> for ObservationsSender<T> {
 /// struct wraps the `Sender` in an `Arc<Mutex<_>>` so that
 /// it can be shared between threads.
 #[derive(Clone)]
-pub struct ObservationsSenderSync<T> {
+pub struct ObservationsCollectorSync<T> {
     sender: Arc<Mutex<mpsc::Sender<Observation<T>>>>,
 }
 
-impl<T> ObservationsSenderSync<T>
+impl<T> ObservationsCollectorSync<T>
 where
     T: Display + Eq + Send + 'static,
 {
 }
 
-impl<T> SendsObservations<T> for ObservationsSenderSync<T> {
-    fn send(&self, observation: Observation<T>) {
+impl<T> CollectsObservations<T> for ObservationsCollectorSync<T> {
+    fn collect(&self, observation: Observation<T>) {
         if let Err(_err) = self.sender.lock().unwrap().send(observation) {
             // maybe log...
         }
