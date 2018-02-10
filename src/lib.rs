@@ -24,35 +24,47 @@ impl<T> Observation<T> {
 }
 
 pub trait CollectsObservations<T> {
-    /// Send an observation for recording
+    /// Collect an observation.
     fn collect(&self, observation: Observation<T>);
 
     /// Observed `n` occurences at time `t`
+    ///
+    /// Convinience method. Simply calls `collect`
     fn observed(&self, id: T, n: u64, t: Instant) {
         self.collect(Observation::Observed(id, n, t))
     }
 
     /// Observed one occurence at time `t`
+    ///
+    /// Convinience method. Simply calls `collect`
     fn observed_one(&self, id: T, t: Instant) {
         self.collect(Observation::ObservedOne(id, t))
     }
 
     /// Observed one occurence with value `v` at time `t`
+    ///
+    /// Convinience method. Simply calls `collect`
     fn observed_one_value(&self, id: T, v: u64, t: Instant) {
         self.collect(Observation::ObservedOneValue(id, v, t))
     }
 
     /// Observed `n` occurences at now.
+    ///
+    /// Convinience method. Simply calls `collect`
     fn observed_now(&self, id: T, n: u64) {
         self.observed(id, n, Instant::now())
     }
 
     /// Observed one occurence now
+    ///
+    /// Convinience method. Simply calls `collect`
     fn observed_one_now(&self, id: T) {
         self.observed_one(id, Instant::now())
     }
 
     /// Observed one occurence with value `v`now
+    ///
+    /// Convinience method. Simply calls `collect`
     fn observed_one_value_now(&self, id: T, v: u64) {
         self.observed_one_value(id, v, Instant::now())
     }
