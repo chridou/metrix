@@ -20,12 +20,22 @@ impl<T> From<Observation<T>> for Update {
     }
 }
 
+impl<'a, T> From<&'a Observation<T>> for Update {
+    fn from(obs: &'a Observation<T>) -> Update {
+        match *obs {
+            Observation::Observed(_, n, t) => Update::Observations(n, t),
+            Observation::ObservedOne(_, t) => Update::Observation(t),
+            Observation::ObservedOneValue(_, v, t) => Update::ObservationWithValue(v, t),
+        }
+    }
+}
+
 /// Something that can react on `Observation<L>`s.
 ///
 /// You can use this to implement your own Metrics.
 pub trait HandlesObservations {
     type Label;
-    fn handle_observation(&mut self, observation: Observation<Self::Label>);
+    fn handle_observation(&mut self, observation: &Observation<Self::Label>);
     fn name(&self) -> &str;
 }
 
@@ -41,7 +51,7 @@ pub struct Cockpit<L> {
 
 impl<L> Cockpit<L>
 where
-    L: Sized + Display + Clone + Eq,
+    L: Display + Clone + Eq,
 {
     pub fn new<N: Into<String>>(name: N) -> Cockpit<L> {
         Cockpit {
@@ -72,11 +82,11 @@ where
 
 impl<L> HandlesObservations for Cockpit<L>
 where
-    L: Sized + Clone + Eq,
+    L: Clone + Eq,
 {
     type Label = L;
 
-    fn handle_observation(&mut self, observation: Observation<Self::Label>) {
+    fn handle_observation(&mut self, observation: &Observation<Self::Label>) {
         if let Some(&mut (_, ref mut panel)) =
             self.panels.iter_mut().find(|p| &p.0 == observation.label())
         {

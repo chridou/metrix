@@ -48,7 +48,7 @@ impl<L> TelemetryReceiver<L> {
 
 impl<L> ReceivesTelemetryData for TelemetryReceiver<L>
 where
-    L: Sized + Clone + Eq,
+    L: Clone + Eq,
 {
     type Label = L;
 
@@ -71,10 +71,10 @@ where
                 Ok(TelemetryMessage::Observation(obs)) => {
                     self.cockpits
                         .iter_mut()
-                        .for_each(|c| c.handle_observation(obs.clone()));
+                        .for_each(|c| c.handle_observation(&obs));
                     self.handlers
                         .iter_mut()
-                        .for_each(|h| h.handle_observation(obs.clone()));
+                        .for_each(|h| h.handle_observation(&obs));
                 }
                 Ok(TelemetryMessage::AddCockpit(c)) => self.cockpits.push(c),
                 Ok(TelemetryMessage::AddHandler(h)) => self.handlers.push(h),
