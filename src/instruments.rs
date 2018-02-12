@@ -71,8 +71,8 @@ impl<'a, T> From<&'a Observation<T>> for Update {
 pub trait HandlesObservations: Send + 'static {
     type Label: Send + 'static;
     fn handle_observation(&mut self, observation: &Observation<Self::Label>);
-    fn name(&self) -> &str;
-    fn snapshot(&self) -> CockpitSnapshot;
+    fn name(&self) -> Option<&str>;
+    fn snapshot(&self) -> MetricsSnapshot;
 }
 
 /// A cockpit groups panels.
@@ -81,7 +81,7 @@ pub trait HandlesObservations: Send + 'static {
 /// Since the Cockpit is generic over its label you can
 /// use an enum as a label for grouping panels easily.
 pub struct Cockpit<L> {
-    name: String,
+    name: Option<String>,
     panels: Vec<(L, Panel)>,
     value_scaling: Option<ValueScaling>,
 }
@@ -90,12 +90,34 @@ impl<L> Cockpit<L>
 where
     L: Display + Clone + Eq + Send + 'static,
 {
-    pub fn new<N: Into<String>>(name: N, value_scaling: Option<ValueScaling>) -> Cockpit<L> {
+    pub fn new<T: Into<String>>(
+        name: Option<T>,
+        value_scaling: Option<ValueScaling>,
+    ) -> Cockpit<L> {
         Cockpit {
-            name: name.into(),
+            name: name.map(Into::into),
             panels: Vec::new(),
             value_scaling,
         }
+    }
+
+    pub fn new_with_name<T: Into<String>>(
+        name: T,
+        value_scaling: Option<ValueScaling>,
+    ) -> Cockpit<L> {
+        Cockpit::new(Some(name.into()), value_scaling)
+    }
+
+    pub fn with_name<T: Into<String>>(&mut self, name: T) {
+        self.name = Some(name.into())
+    }
+
+    pub fn with_value_scaling(&mut self, value_scaling: ValueScaling) {
+        self.value_scaling = Some(value_scaling)
+    }
+
+    pub fn new_without_name(value_scaling: Option<ValueScaling>) -> Cockpit<L> {
+        Cockpit::new::<String>(None, value_scaling)
     }
 
     pub fn add_panel(&mut self, label: L, panel: Panel) -> bool {
@@ -105,6 +127,15 @@ where
             self.panels.push((label, panel));
             true
         }
+    }
+}
+
+impl<L> Default for Cockpit<L>
+where
+    L: Display + Clone + Eq + Send + 'static,
+{
+    fn default() -> Cockpit<L> {
+        Cockpit::new::<String>(None, None)
     }
 }
 
@@ -130,18 +161,20 @@ where
         }
     }
 
-    fn snapshot(&self) -> CockpitSnapshot {
-        CockpitSnapshot {
-            name: self.name.clone(),
-            panels: self.panels
-                .iter()
-                .map(|&(ref l, ref p)| (l.to_string(), p.snapshot()))
-                .collect(),
+    fn snapshot(&self) -> MetricsSnapshot {
+        let panels: Vec<_> = self.panels
+            .iter()
+            .map(|&(ref l, ref p)| (l.to_string(), p.snapshot()))
+            .collect();
+        if let Some(ref name) = self.name {
+            MetricsSnapshot::NamedGroup(name.clone(), vec![MetricsSnapshot::Panels(panels)])
+        } else {
+            MetricsSnapshot::Panels(panels)
         }
     }
 
-    fn name(&self) -> &str {
-        &self.name
+    fn name(&self) -> Option<&str> {
+        self.name.as_ref().map(|n| &**n)
     }
 }
 
@@ -159,10 +192,10 @@ pub trait Updates {
 /// want to add a counter and a meter and a histogram
 /// to track latencies.
 pub struct Panel {
-    counter: Option<Counter>,
-    gauge: Option<Gauge>,
-    meter: Option<Meter>,
-    histogram: Option<Histogram>,
+    pub counter: Option<Counter>,
+    pub gauge: Option<Gauge>,
+    pub meter: Option<Meter>,
+    pub histogram: Option<Histogram>,
 }
 
 impl Panel {
@@ -238,11 +271,12 @@ impl Counter {
         &self.name
     }
 
-    pub fn snapshot(&self) -> CounterSnapshot {
-        CounterSnapshot {
-            name: self.name.clone(),
-            count: self.count,
-        }
+    pub fn set_name<T: Into<String>>(&mut self, name: T) {
+        self.name = name.into();
+    }
+
+    pub fn snapshot(&self) -> (String, CounterSnapshot) {
+        (self.name.clone(), CounterSnapshot { count: self.count })
     }
 }
 
@@ -278,11 +312,8 @@ impl Gauge {
         &self.name
     }
 
-    pub fn snapshot(&self) -> GaugeSnapshot {
-        GaugeSnapshot {
-            name: self.name.clone(),
-            value: self.value,
-        }
+    pub fn snapshot(&self) -> (String, GaugeSnapshot) {
+        (self.name.clone(), GaugeSnapshot { value: self.value })
     }
 }
 
@@ -315,18 +346,34 @@ impl Meter {
         &self.name
     }
 
-    pub fn snapshot(&self) -> MeterSnapshot {
+    pub fn set_name<T: Into<String>>(&mut self, name: T) {
+        self.name = name.into();
+    }
+
+    pub fn snapshot(&self) -> (String, MeterSnapshot) {
         if self.last_tick.elapsed() >= Duration::from_secs(5) {
             self.inner_meter.tick()
         }
 
         let snapshot = self.inner_meter.snapshot();
 
-        MeterSnapshot {
-            name: self.name.clone(),
-            count: snapshot.count as u64,
-            one_minute_rate: snapshot.rates[0],
-        }
+        (
+            self.name.clone(),
+            MeterSnapshot {
+                one_minute: MeterRate {
+                    count: snapshot.count as u64,
+                    rate: snapshot.rates[0],
+                },
+                five_minutes: MeterRate {
+                    count: snapshot.count as u64,
+                    rate: snapshot.rates[1],
+                },
+                fifteen_minutes: MeterRate {
+                    count: snapshot.count as u64,
+                    rate: snapshot.rates[2],
+                },
+            },
+        )
     }
 }
 
@@ -365,7 +412,11 @@ impl Histogram {
         &self.name
     }
 
-    pub fn snapshot(&self) -> HistogramSnapshot {
+    pub fn set_name<T: Into<String>>(&mut self, name: T) {
+        self.name = name.into();
+    }
+
+    pub fn snapshot(&self) -> (String, HistogramSnapshot) {
         let snapshot = self.inner_histogram.snapshot();
 
         let quantiles = vec![
@@ -374,15 +425,17 @@ impl Histogram {
             (99u16, snapshot.value(0.99)),
             (999u16, snapshot.value(0.999)),
         ];
-        HistogramSnapshot {
-            name: self.name.clone(),
-            min: snapshot.min(),
-            max: snapshot.max(),
-            mean: snapshot.mean(),
-            stddev: snapshot.stddev(),
-            count: snapshot.count(),
-            quantiles: quantiles,
-        }
+        (
+            self.name.clone(),
+            HistogramSnapshot {
+                min: snapshot.min(),
+                max: snapshot.max(),
+                mean: snapshot.mean(),
+                stddev: snapshot.stddev(),
+                count: snapshot.count(),
+                quantiles: quantiles,
+            },
+        )
     }
 }
 

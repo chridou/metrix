@@ -1,18 +1,18 @@
 extern crate exponential_decay_histogram;
-extern crate metrics;
 #[macro_use]
-extern crate serde;
+extern crate json;
+extern crate metrics;
 
 use std::sync::{Arc, Mutex};
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
 
-use telemetry_receiver::TelemetryMessage;
-use instruments::{Cockpit, HandlesObservations};
+use processor::TelemetryMessage;
+use instruments::{Cockpit, HandlesObservations, Panel};
 
 pub mod instruments;
 pub mod snapshot;
-pub mod telemetry_receiver;
+pub mod processor;
 pub mod driver;
 
 /// An observation that has been made
@@ -114,8 +114,9 @@ pub trait TransmitsTelemetryData<L> {
         self.observed_duration(label, duration, Instant::now());
     }
 
-    fn add_handler(&mut self, handler: Box<HandlesObservations<Label = L>>);
-    fn add_cockpit(&mut self, cockpit: Cockpit<L>);
+    fn add_handler(&self, handler: Box<HandlesObservations<Label = L>>);
+    fn add_cockpit(&self, cockpit: Cockpit<L>);
+    fn add_panel_to_cockpit(&self, cockpit_name: String, label: L, panel: Panel);
 }
 
 /// Transmits `Observation`s to the backend
@@ -142,14 +143,24 @@ impl<L> TransmitsTelemetryData<L> for TelemetryTransmitter<L> {
         }
     }
 
-    fn add_handler(&mut self, handler: Box<HandlesObservations<Label = L>>) {
+    fn add_handler(&self, handler: Box<HandlesObservations<Label = L>>) {
         if let Err(_err) = self.sender.send(TelemetryMessage::AddHandler(handler)) {
             // maybe log...
         }
     }
 
-    fn add_cockpit(&mut self, cockpit: Cockpit<L>) {
+    fn add_cockpit(&self, cockpit: Cockpit<L>) {
         if let Err(_err) = self.sender.send(TelemetryMessage::AddCockpit(cockpit)) {
+            // maybe log...
+        }
+    }
+
+    fn add_panel_to_cockpit(&self, cockpit_name: String, label: L, panel: Panel) {
+        if let Err(_err) = self.sender.send(TelemetryMessage::AddPanel {
+            cockpit_name,
+            label,
+            panel,
+        }) {
             // maybe log...
         }
     }
@@ -184,7 +195,7 @@ impl<L> TransmitsTelemetryData<L> for TelemetryTransmitterSync<L> {
         }
     }
 
-    fn add_handler(&mut self, handler: Box<HandlesObservations<Label = L>>) {
+    fn add_handler(&self, handler: Box<HandlesObservations<Label = L>>) {
         if let Err(_err) = self.sender
             .lock()
             .unwrap()
@@ -194,12 +205,25 @@ impl<L> TransmitsTelemetryData<L> for TelemetryTransmitterSync<L> {
         }
     }
 
-    fn add_cockpit(&mut self, cockpit: Cockpit<L>) {
+    fn add_cockpit(&self, cockpit: Cockpit<L>) {
         if let Err(_err) = self.sender
             .lock()
             .unwrap()
             .send(TelemetryMessage::AddCockpit(cockpit))
         {
+            // maybe log...
+        }
+    }
+
+    fn add_panel_to_cockpit(&self, cockpit_name: String, label: L, panel: Panel) {
+        if let Err(_err) = self.sender
+            .lock()
+            .unwrap()
+            .send(TelemetryMessage::AddPanel {
+                cockpit_name,
+                label,
+                panel,
+            }) {
             // maybe log...
         }
     }

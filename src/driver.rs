@@ -3,50 +3,65 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread;
 use std::time::{Duration, Instant};
 
-use telemetry_receiver::{AcceptsSendableReceiver, ReceivesTelemetryData,
-                         SendableReceivesTelemetryData};
-use snapshot::TelemetrySnapshot;
+use processor::{AggregatesProcessors, ProcessesTelemetryMessages};
+use snapshot::MetricsSnapshot;
 
 pub struct TelemetryDriver {
-    receivers: Arc<Mutex<Vec<(String, SendableReceivesTelemetryData)>>>,
+    processors: Arc<Mutex<Vec<Box<ProcessesTelemetryMessages>>>>,
     is_running: Arc<AtomicBool>,
+    name: Option<String>,
 }
 
-impl ReceivesTelemetryData for TelemetryDriver {
+impl TelemetryDriver {
+    pub fn set_name<T: Into<String>>(&mut self, name: T) {
+        self.name = Some(name.into())
+    }
+}
+
+impl ProcessesTelemetryMessages for TelemetryDriver {
     /// Receive and handle pending operations
-    fn receive(&mut self, _max: u64) -> u64 {
+    fn process(&mut self, _max: u64) -> u64 {
         0
     }
 
-    fn snapshot(&self) -> TelemetrySnapshot {
-        let mut collected = Vec::new();
-        let receivers = self.receivers.lock().unwrap();
+    fn snapshot(&self) -> MetricsSnapshot {
+        let processors = self.processors.lock().unwrap();
+        let mut collected = Vec::with_capacity(processors.len());
 
-        for &(ref name, ref receiver) in receivers.iter() {
-            let snapshot = receiver.snapshot();
-            collected.push((name.clone(), snapshot));
+        for processor in processors.iter() {
+            let snapshot = processor.snapshot();
+            collected.push(snapshot);
         }
 
-        TelemetrySnapshot::Group(collected)
+        if let Some(ref name) = self.name {
+            MetricsSnapshot::NamedGroup(name.clone(), collected)
+        } else {
+            MetricsSnapshot::UnnamedGroup(collected)
+        }
+    }
+
+    fn name(&self) -> Option<&str> {
+        self.name.as_ref().map(|n| &**n)
     }
 }
 
 impl Default for TelemetryDriver {
     fn default() -> TelemetryDriver {
         let driver = TelemetryDriver {
+            name: None,
             is_running: Arc::new(AtomicBool::new(true)),
-            receivers: Arc::new(Mutex::new(Vec::new())),
+            processors: Arc::new(Mutex::new(Vec::new())),
         };
 
-        start_telemetry_loop(driver.receivers.clone(), driver.is_running.clone());
+        start_telemetry_loop(driver.processors.clone(), driver.is_running.clone());
 
         driver
     }
 }
 
-impl AcceptsSendableReceiver for TelemetryDriver {
-    fn register_receiver<T: Into<String>>(&self, name: T, receiver: SendableReceivesTelemetryData) {
-        self.receivers.lock().unwrap().push((name.into(), receiver));
+impl AggregatesProcessors for TelemetryDriver {
+    fn add_processor(&mut self, processor: Box<ProcessesTelemetryMessages>) {
+        self.processors.lock().unwrap().push(processor);
     }
 }
 
@@ -57,14 +72,14 @@ impl Drop for TelemetryDriver {
 }
 
 fn start_telemetry_loop(
-    receivers: Arc<Mutex<Vec<(String, SendableReceivesTelemetryData)>>>,
+    processors: Arc<Mutex<Vec<Box<ProcessesTelemetryMessages>>>>,
     is_running: Arc<AtomicBool>,
 ) {
-    thread::spawn(move || telemetry_loop(&receivers, &is_running));
+    thread::spawn(move || telemetry_loop(&processors, &is_running));
 }
 
 fn telemetry_loop(
-    receivers: &Mutex<Vec<(String, SendableReceivesTelemetryData)>>,
+    processors: &Mutex<Vec<Box<ProcessesTelemetryMessages>>>,
     is_running: &AtomicBool,
 ) {
     loop {
@@ -73,7 +88,7 @@ fn telemetry_loop(
         }
 
         let started = Instant::now();
-        do_a_run(receivers);
+        do_a_run(processors);
         let finished = Instant::now();
         let elapsed = finished - started;
         if elapsed < Duration::from_millis(5) {
@@ -82,10 +97,10 @@ fn telemetry_loop(
     }
 }
 
-fn do_a_run(receivers: &Mutex<Vec<(String, SendableReceivesTelemetryData)>>) {
-    let mut receivers = receivers.lock().unwrap();
+fn do_a_run(processors: &Mutex<Vec<Box<ProcessesTelemetryMessages>>>) {
+    let mut processors = processors.lock().unwrap();
 
-    for &mut (_, ref mut receiver) in receivers.iter_mut() {
-        let _ = receiver.receive(1000);
+    for processor in processors.iter_mut() {
+        let _ = processor.process(1000);
     }
 }
