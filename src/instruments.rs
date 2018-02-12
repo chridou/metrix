@@ -49,8 +49,8 @@ impl<'a, T> From<&'a Observation<T>> for Update {
 /// the `Label` is the type of the label.
 ///
 /// You can use this to implement your own Metrics.
-pub trait HandlesObservations {
-    type Label;
+pub trait HandlesObservations: Send + 'static {
+    type Label: Send + 'static;
     fn handle_observation(&mut self, observation: &Observation<Self::Label>);
     fn name(&self) -> &str;
     fn snapshot(&self) -> CockpitSnapshot;
@@ -68,7 +68,7 @@ pub struct Cockpit<L> {
 
 impl<L> Cockpit<L>
 where
-    L: Display + Clone + Eq,
+    L: Display + Clone + Eq + Send + 'static,
 {
     pub fn new<N: Into<String>>(name: N) -> Cockpit<L> {
         Cockpit {
@@ -89,7 +89,7 @@ where
 
 impl<L> HandlesObservations for Cockpit<L>
 where
-    L: Clone + Display + Eq,
+    L: Clone + Display + Eq + Send + 'static,
 {
     type Label = L;
 

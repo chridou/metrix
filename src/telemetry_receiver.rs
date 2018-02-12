@@ -6,7 +6,7 @@ use {Observation, TelemetryTransmitter};
 use instruments::{Cockpit, HandlesObservations};
 use snapshot::TelemetrySnapshot;
 
-pub type SendableReceivesTelemetryData = Box<ReceivesTelemetryData + Send + 'static>;
+pub type SendableReceivesTelemetryData = Box<ReceivesTelemetryData>;
 
 pub trait AcceptsSendableReceiver {
     fn register_receiver<T: Into<String>>(&self, name: T, receiver: SendableReceivesTelemetryData);
@@ -23,7 +23,7 @@ pub enum TelemetryMessage<L> {
 }
 
 /// Can receive telemtry data also give snapshots
-pub trait ReceivesTelemetryData {
+pub trait ReceivesTelemetryData: Send + 'static {
     /// Receive and handle pending operations
     fn receive(&mut self, max: u64) -> u64;
 
@@ -37,7 +37,10 @@ pub struct TelemetryReceiver<L> {
     receiver: mpsc::Receiver<TelemetryMessage<L>>,
 }
 
-impl<L> TelemetryReceiver<L> {
+impl<L> TelemetryReceiver<L>
+where
+    L: Clone + Display + Eq + Send + 'static,
+{
     pub fn new() -> (TelemetryTransmitter<L>, TelemetryReceiver<L>) {
         let (tx, rx) = mpsc::channel();
 
