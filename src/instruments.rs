@@ -1,5 +1,8 @@
-use std::time::Instant;
+use std::time::{Duration, Instant};
 use std::fmt::Display;
+
+use exponential_decay_histogram::ExponentialDecayHistogram;
+use metrics::metrics::{Meter as MMeter, StdMeter};
 
 use Observation;
 use snapshot::*;
@@ -31,7 +34,7 @@ impl<T> From<Observation<T>> for Update {
 impl<'a, T> From<&'a Observation<T>> for Update {
     fn from(obs: &'a Observation<T>) -> Update {
         match *obs {
-           Observation::Observed {
+            Observation::Observed {
                 count, timestamp, ..
             } => Update::Observations(count, timestamp),
             Observation::ObservedOne { timestamp, .. } => Update::Observation(timestamp),
@@ -42,13 +45,15 @@ impl<'a, T> From<&'a Observation<T>> for Update {
     }
 }
 
-/// Something that can react on `Observation<L>`s.
+/// Something that can react on `Observation`s where
+/// the `Label` is the type of the label.
 ///
 /// You can use this to implement your own Metrics.
 pub trait HandlesObservations {
     type Label;
     fn handle_observation(&mut self, observation: &Observation<Self::Label>);
     fn name(&self) -> &str;
+    fn snapshot(&self) -> CockpitSnapshot;
 }
 
 /// A cockpit groups panels.
@@ -80,21 +85,11 @@ where
             true
         }
     }
-
-    pub fn snapshot(&self) -> CockpitSnapshot {
-        CockpitSnapshot {
-            name: self.name.clone(),
-            panels: self.panels
-                .iter()
-                .map(|&(ref l, ref p)| (l.to_string(), p.snapshot()))
-                .collect(),
-        }
-    }
 }
 
 impl<L> HandlesObservations for Cockpit<L>
 where
-    L: Clone + Eq,
+    L: Clone + Display + Eq,
 {
     type Label = L;
 
@@ -103,6 +98,16 @@ where
             self.panels.iter_mut().find(|p| &p.0 == observation.label())
         {
             panel.update(&observation.into())
+        }
+    }
+
+    fn snapshot(&self) -> CockpitSnapshot {
+        CockpitSnapshot {
+            name: self.name.clone(),
+            panels: self.panels
+                .iter()
+                .map(|&(ref l, ref p)| (l.to_string(), p.snapshot()))
+                .collect(),
         }
     }
 
@@ -170,6 +175,7 @@ impl Updates for Panel {
     }
 }
 
+/// A simple ever increasing counter
 pub struct Counter {
     name: String,
     count: u64,
@@ -198,6 +204,7 @@ impl Counter {
     pub fn snapshot(&self) -> CounterSnapshot {
         CounterSnapshot {
             name: self.name.clone(),
+            count: self.count,
         }
     }
 }
@@ -212,6 +219,7 @@ impl Updates for Counter {
     }
 }
 
+/// Simply returns the value that has been observed last.
 pub struct Gauge {
     name: String,
     value: u64,
@@ -236,6 +244,7 @@ impl Gauge {
     pub fn snapshot(&self) -> GaugeSnapshot {
         GaugeSnapshot {
             name: self.name.clone(),
+            value: self.value,
         }
     }
 }
@@ -249,13 +258,20 @@ impl Updates for Gauge {
     }
 }
 
+/// For measuring rates, e.g. request/s
 pub struct Meter {
     name: String,
+    last_tick: Instant,
+    inner_meter: StdMeter,
 }
 
 impl Meter {
     pub fn new_with_defaults<T: Into<String>>(name: T) -> Meter {
-        Meter { name: name.into() }
+        Meter {
+            name: name.into(),
+            last_tick: Instant::now(),
+            inner_meter: StdMeter::default(),
+        }
     }
 
     pub fn name(&self) -> &str {
@@ -263,23 +279,49 @@ impl Meter {
     }
 
     pub fn snapshot(&self) -> MeterSnapshot {
+        if self.last_tick.elapsed() >= Duration::from_secs(5) {
+            self.inner_meter.tick()
+        }
+
+        let snapshot = self.inner_meter.snapshot();
+
         MeterSnapshot {
             name: self.name.clone(),
+            count: snapshot.count as u64,
+            one_minute_rate: snapshot.rates[0],
         }
     }
 }
 
 impl Updates for Meter {
-    fn update(&mut self, _with: &Update) {}
+    fn update(&mut self, with: &Update) {
+        if self.last_tick.elapsed() >= Duration::from_secs(5) {
+            self.inner_meter.tick()
+        }
+
+        match *with {
+            Update::ObservationWithValue(_, _) => self.inner_meter.mark(1),
+            Update::Observations(n, _) => self.inner_meter.mark(n as i64),
+            _ => (),
+        }
+    }
 }
 
+/// For tracking values. E.g. request latencies
 pub struct Histogram {
+    inner_histogram: ExponentialDecayHistogram,
     name: String,
+    last_update: Instant,
 }
 
 impl Histogram {
     pub fn new_with_defaults<T: Into<String>>(name: T) -> Histogram {
-        Histogram { name: name.into() }
+        let inner_histogram = ExponentialDecayHistogram::new();
+        Histogram {
+            name: name.into(),
+            inner_histogram,
+            last_update: Instant::now(),
+        }
     }
 
     pub fn name(&self) -> &str {
@@ -287,12 +329,37 @@ impl Histogram {
     }
 
     pub fn snapshot(&self) -> HistogramSnapshot {
+        let snapshot = self.inner_histogram.snapshot();
+
+        let quantiles = vec![
+            (50u16, snapshot.value(0.5)),
+            (75u16, snapshot.value(0.75)),
+            (99u16, snapshot.value(0.99)),
+            (999u16, snapshot.value(0.999)),
+        ];
         HistogramSnapshot {
             name: self.name.clone(),
+            min: snapshot.min(),
+            max: snapshot.max(),
+            mean: snapshot.mean(),
+            stddev: snapshot.stddev(),
+            count: snapshot.count(),
+            quantiles: quantiles,
         }
     }
 }
 
 impl Updates for Histogram {
-    fn update(&mut self, _with: &Update) {}
+    fn update(&mut self, with: &Update) {
+        match *with {
+            Update::ObservationWithValue(v, t) => if t > self.last_update {
+                self.inner_histogram.update_at(t, v as i64);
+                self.last_update = t
+            } else {
+                self.inner_histogram.update(v as i64);
+                self.last_update = Instant::now();
+            },
+            _ => (),
+        }
+    }
 }

@@ -11,3 +11,6 @@ repository = "https://github.com/chridou/metrix"
 keywords = ["metrics", "monitoring"]
 
 [dependencies]
+exponential-decay-histogram = "0.1.0"
+metrics = "0.2.0"
+serde = { version = "1.0", features = ["derive"]}
