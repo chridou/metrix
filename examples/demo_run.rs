@@ -167,5 +167,5 @@ fn main() {
 
     let snapshot = driver.snapshot();
 
-    println!("{:#?}", snapshot);
+    println!("{}", snapshot.to_json_pretty(4));
 }

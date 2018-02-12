@@ -8,6 +8,18 @@ pub enum MetricsSnapshot {
 }
 
 impl MetricsSnapshot {
+    pub fn condensed(self) -> CondensedMetrics {
+        unimplemented!()
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum CondensedMetrics {
+    Panels(Vec<(String, PanelSnapshot)>),
+    Group(Vec<(String, CondensedMetrics)>),
+}
+
+impl CondensedMetrics {
     pub fn to_json(&self) -> String {
         stringify(self.to_json_value())
     }
@@ -18,6 +30,15 @@ impl MetricsSnapshot {
 
     fn to_json_value(&self) -> JsonValue {
         let mut data = JsonValue::new_object();
+
+        match *self {
+            CondensedMetrics::Panels(ref items) => for &(ref n, ref p) in items {
+                data[n] = p.to_json_value();
+            },
+            CondensedMetrics::Group(ref items) => for &(ref n, ref p) in items {
+                data[n] = p.to_json_value();
+            },
+        }
 
         data
     }
