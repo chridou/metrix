@@ -1,6 +1,13 @@
 [package]
 name = "metrix"
 version = "0.1.0"
-authors = ["chridou <chridou@users.noreply.github.com>"]
+authors = ["Christian Douven <chridou@users.noreply.github.com>"]
+readme = "README.md"
+license = "Apache-2.0/MIT"
+description = "metrics for application monitoring"
+documentation = "https://docs.rs/metrix"
+homepage = "https://github.com/chridou/metrix"
+repository = "https://github.com/chridou/metrix"
+keywords = ["metrics", "monitoring"]
 
 [dependencies]

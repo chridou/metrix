@@ -4,18 +4,26 @@ use std::fmt::Display;
 use Observation;
 use snapshot::*;
 
+/// An update instruction for an instrument
 pub enum Update {
+    /// Many observations ithout a value at a given time
     Observations(u64, Instant),
+    /// One observation without a value at a given time
     Observation(Instant),
+    /// One observation with a value at a given time
     ObservationWithValue(u64, Instant),
 }
 
 impl<T> From<Observation<T>> for Update {
     fn from(obs: Observation<T>) -> Update {
         match obs {
-            Observation::Observed(_, n, t) => Update::Observations(n, t),
-            Observation::ObservedOne(_, t) => Update::Observation(t),
-            Observation::ObservedOneValue(_, v, t) => Update::ObservationWithValue(v, t),
+            Observation::Observed {
+                count, timestamp, ..
+            } => Update::Observations(count, timestamp),
+            Observation::ObservedOne { timestamp, .. } => Update::Observation(timestamp),
+            Observation::ObservedOneValue {
+                value, timestamp, ..
+            } => Update::ObservationWithValue(value, timestamp),
         }
     }
 }
@@ -23,9 +31,13 @@ impl<T> From<Observation<T>> for Update {
 impl<'a, T> From<&'a Observation<T>> for Update {
     fn from(obs: &'a Observation<T>) -> Update {
         match *obs {
-            Observation::Observed(_, n, t) => Update::Observations(n, t),
-            Observation::ObservedOne(_, t) => Update::Observation(t),
-            Observation::ObservedOneValue(_, v, t) => Update::ObservationWithValue(v, t),
+           Observation::Observed {
+                count, timestamp, ..
+            } => Update::Observations(count, timestamp),
+            Observation::ObservedOne { timestamp, .. } => Update::Observation(timestamp),
+            Observation::ObservedOneValue {
+                value, timestamp, ..
+            } => Update::ObservationWithValue(value, timestamp),
         }
     }
 }
