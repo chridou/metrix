@@ -145,6 +145,14 @@ impl Panel {
         self.gauge = Some(gauge);
     }
 
+    pub fn add_meter(&mut self, meter: Meter) {
+        self.meter = Some(meter);
+    }
+
+    pub fn add_histogram(&mut self, histogram: Histogram) {
+        self.histogram = Some(histogram);
+    }
+
     pub fn snapshot(&self) -> PanelSnapshot {
         PanelSnapshot {
             counter: self.counter.as_ref().map(|x| x.snapshot()),

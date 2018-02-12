@@ -1,6 +1,11 @@
 extern crate metrix;
 
+use std::thread;
+use std::time::{Duration, Instant};
+
 use metrix::TelemetryTransmitterSync;
+use metrix::TransmitsTelemetryData;
+use metrix::telemetry_receiver::ReceivesTelemetryData;
 use metrix::telemetry_receiver::{AcceptsSendableReceiver, TelemetryReceiver};
 use metrix::instruments::*;
 use metrix::driver::*;
@@ -28,12 +33,16 @@ fn create_metrics(
 ) {
     let mut requests_panel = Panel::default();
     requests_panel.add_counter(Counter::new_with_defaults("num_requests"));
+    requests_panel.add_gauge(Gauge::new_with_defaults("last_vaue"));
+    requests_panel.add_meter(Meter::new_with_defaults("request_per_second"));
+    requests_panel.add_histogram(Histogram::new_with_defaults("th_values"));
 
     let mut cockpit = Cockpit::new(name);
     cockpit.add_panel(MetricsLabel::Request, requests_panel);
 
-    let (tx, rx) = TelemetryReceiver::new();
+    let (tx, mut rx) = TelemetryReceiver::new();
 
+    rx.add_cockpit(cockpit);
     (tx.synced(), rx)
 }
 
@@ -42,5 +51,23 @@ fn main() {
 
     let (telemetry_tx, telemetry_rx) = create_metrics("hallo");
 
-    driver.register_receiver("jjj", Box::new(telemetry_rx));
+    driver.register_receiver("demo", Box::new(telemetry_rx));
+
+    let start = Instant::now();
+
+    let handle = thread::spawn(move || {
+        for n in 0..1_000_000 {
+            telemetry_tx.observed_one_value_now(MetricsLabel::Request, n);
+        }
+    });
+
+    handle.join().unwrap();
+
+    println!("{:?}", start.elapsed());
+
+    thread::sleep(Duration::from_secs(5));
+
+    let snapshot = driver.snapshot();
+
+    println!("{:#?}", snapshot);
 }

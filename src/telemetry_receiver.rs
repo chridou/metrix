@@ -55,11 +55,11 @@ where
         (transmitter, receiver)
     }
 
-    fn add_handler(&mut self, handler: Box<HandlesObservations<Label = L>>) {
+    pub fn add_handler(&mut self, handler: Box<HandlesObservations<Label = L>>) {
         self.handlers.push(handler);
     }
 
-    fn add_cockpit(&mut self, cockpit: Cockpit<L>) {
+    pub fn add_cockpit(&mut self, cockpit: Cockpit<L>) {
         self.cockpits.push(cockpit)
     }
 }
