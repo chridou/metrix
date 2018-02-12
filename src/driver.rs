@@ -1,6 +1,7 @@
 use std::sync::{Arc, Mutex};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread;
+use std::time::{Duration, Instant};
 
 use telemetry_receiver::{AcceptsSendableReceiver, ReceivesTelemetryData,
                          SendableReceivesTelemetryData};
@@ -87,7 +88,13 @@ fn telemetry_loop(
             break;
         }
 
+        let started = Instant::now();
         do_a_run(receivers);
+        let finished = Instant::now();
+        let elapsed = finished - started;
+        if elapsed < Duration::from_millis(5) {
+            thread::sleep(Duration::from_millis(5) - elapsed)
+        }
     }
 }
 

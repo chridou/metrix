@@ -188,5 +188,3 @@ impl<L> TransmitsTelemetryData<L> for TelemetryTransmitterSync<L> {
         }
     }
 }
-
-pub struct MetrixReactor {}
