@@ -33,11 +33,11 @@ fn create_metrics(
 ) {
     let mut requests_panel = Panel::default();
     requests_panel.add_counter(Counter::new_with_defaults("num_requests"));
-    requests_panel.add_gauge(Gauge::new_with_defaults("last_vaue"));
+    requests_panel.add_gauge(Gauge::new_with_defaults("last_value"));
     requests_panel.add_meter(Meter::new_with_defaults("request_per_second"));
-    requests_panel.add_histogram(Histogram::new_with_defaults("th_values"));
+    requests_panel.add_histogram(Histogram::new_with_defaults("the_latency"));
 
-    let mut cockpit = Cockpit::new(name);
+    let mut cockpit = Cockpit::new(name, Some(ValueScaling::NanosToMicros));
     cockpit.add_panel(MetricsLabel::Request, requests_panel);
 
     let (tx, mut rx) = TelemetryReceiver::new();
@@ -57,7 +57,7 @@ fn main() {
 
     let handle = thread::spawn(move || {
         for n in 0..1_000_000 {
-            telemetry_tx.observed_one_value_now(MetricsLabel::Request, n);
+            telemetry_tx.measure_time(MetricsLabel::Request, start);
         }
     });
 

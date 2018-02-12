@@ -7,6 +7,12 @@ use metrics::metrics::{Meter as MMeter, StdMeter};
 use Observation;
 use snapshot::*;
 
+#[derive(Debug, Clone, Copy)]
+pub enum ValueScaling {
+    NanosToMillis,
+    NanosToMicros,
+}
+
 /// An update instruction for an instrument
 pub enum Update {
     /// Many observations ithout a value at a given time
@@ -15,6 +21,19 @@ pub enum Update {
     Observation(Instant),
     /// One observation with a value at a given time
     ObservationWithValue(u64, Instant),
+}
+
+impl Update {
+    pub fn scale(self, scaling: ValueScaling) -> Update {
+        if let Update::ObservationWithValue(v, t) = self {
+            match scaling {
+                ValueScaling::NanosToMillis => Update::ObservationWithValue(v / 1_000_000, t),
+                ValueScaling::NanosToMicros => Update::ObservationWithValue(v / 1_000, t),
+            }
+        } else {
+            self
+        }
+    }
 }
 
 impl<T> From<Observation<T>> for Update {
@@ -64,16 +83,18 @@ pub trait HandlesObservations: Send + 'static {
 pub struct Cockpit<L> {
     name: String,
     panels: Vec<(L, Panel)>,
+    value_scaling: Option<ValueScaling>,
 }
 
 impl<L> Cockpit<L>
 where
     L: Display + Clone + Eq + Send + 'static,
 {
-    pub fn new<N: Into<String>>(name: N) -> Cockpit<L> {
+    pub fn new<N: Into<String>>(name: N, value_scaling: Option<ValueScaling>) -> Cockpit<L> {
         Cockpit {
             name: name.into(),
             panels: Vec::new(),
+            value_scaling,
         }
     }
 
@@ -94,10 +115,18 @@ where
     type Label = L;
 
     fn handle_observation(&mut self, observation: &Observation<Self::Label>) {
+        let update: Update = observation.into();
+
+        let update = if let Some(scaling) = self.value_scaling {
+            update.scale(scaling)
+        } else {
+            update
+        };
+
         if let Some(&mut (_, ref mut panel)) =
             self.panels.iter_mut().find(|p| &p.0 == observation.label())
         {
-            panel.update(&observation.into())
+            panel.update(&update)
         }
     }
 

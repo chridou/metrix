@@ -5,7 +5,7 @@ extern crate serde;
 
 use std::sync::{Arc, Mutex};
 use std::sync::mpsc;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use telemetry_receiver::TelemetryMessage;
 use instruments::{Cockpit, HandlesObservations};
@@ -77,6 +77,18 @@ pub trait TransmitsTelemetryData<L> {
         })
     }
 
+    fn observed_duration(&self, label: L, duration: Duration, timestamp: Instant) {
+        let nanos = (duration.as_secs() * 1_000_000_000) + (duration.subsec_nanos() as u64);
+        self.observed_one_value(label, nanos, timestamp)
+    }
+
+    fn measure_time(&self, label: L, from: Instant) {
+        let now = Instant::now();
+        if from <= now {
+            self.observed_duration(label, now - from, now)
+        }
+    }
+
     /// Observed `count` occurences at now.
     ///
     /// Convinience method. Simply calls `transmit`
@@ -96,6 +108,10 @@ pub trait TransmitsTelemetryData<L> {
     /// Convinience method. Simply calls `transmit`
     fn observed_one_value_now(&self, label: L, value: u64) {
         self.observed_one_value(label, value, Instant::now())
+    }
+
+    fn observed_one_duration_now(&self, label: L, duration: Duration) {
+        self.observed_duration(label, duration, Instant::now());
     }
 
     fn add_handler(&mut self, handler: Box<HandlesObservations<Label = L>>);
