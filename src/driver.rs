@@ -7,17 +7,9 @@ use telemetry_receiver::{AcceptsSendableReceiver, ReceivesTelemetryData,
                          SendableReceivesTelemetryData};
 use snapshot::TelemetrySnapshot;
 
-
 pub struct TelemetryDriver {
-    receivers: Arc<Mutex<Vec<(Option<String>, SendableReceivesTelemetryData)>>>,
+    receivers: Arc<Mutex<Vec<(String, SendableReceivesTelemetryData)>>>,
     is_running: Arc<AtomicBool>,
-}
-
-
-impl TelemetryDriver {
-    fn add_receiver_internal(&self, name: Option<String>, receiver: SendableReceivesTelemetryData) {
-        self.receivers.lock().unwrap().push((name, receiver));
-    }
 }
 
 impl ReceivesTelemetryData for TelemetryDriver {
@@ -53,16 +45,8 @@ impl Default for TelemetryDriver {
 }
 
 impl AcceptsSendableReceiver for TelemetryDriver {
-    fn register_receiver(&self, receiver: SendableReceivesTelemetryData) {
-        self.add_receiver_internal(None, receiver);
-    }
-
-    fn register_receiver_with_name<T: Into<String>>(
-        &self,
-        name: T,
-        receiver: SendableReceivesTelemetryData,
-    ) {
-        self.add_receiver_internal(Some(name.into()), receiver);
+    fn register_receiver<T: Into<String>>(&self, name: T, receiver: SendableReceivesTelemetryData) {
+        self.receivers.lock().unwrap().push((name.into(), receiver));
     }
 }
 
@@ -73,14 +57,14 @@ impl Drop for TelemetryDriver {
 }
 
 fn start_telemetry_loop(
-    receivers: Arc<Mutex<Vec<(Option<String>, SendableReceivesTelemetryData)>>>,
+    receivers: Arc<Mutex<Vec<(String, SendableReceivesTelemetryData)>>>,
     is_running: Arc<AtomicBool>,
 ) {
     thread::spawn(move || telemetry_loop(&receivers, &is_running));
 }
 
 fn telemetry_loop(
-    receivers: &Mutex<Vec<(Option<String>, SendableReceivesTelemetryData)>>,
+    receivers: &Mutex<Vec<(String, SendableReceivesTelemetryData)>>,
     is_running: &AtomicBool,
 ) {
     loop {
@@ -98,7 +82,7 @@ fn telemetry_loop(
     }
 }
 
-fn do_a_run(receivers: &Mutex<Vec<(Option<String>, SendableReceivesTelemetryData)>>) {
+fn do_a_run(receivers: &Mutex<Vec<(String, SendableReceivesTelemetryData)>>) {
     let mut receivers = receivers.lock().unwrap();
 
     for &mut (_, ref mut receiver) in receivers.iter_mut() {

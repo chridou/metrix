@@ -9,13 +9,7 @@ use snapshot::TelemetrySnapshot;
 pub type SendableReceivesTelemetryData = Box<ReceivesTelemetryData + Send + 'static>;
 
 pub trait AcceptsSendableReceiver {
-    fn register_receiver(&self, receiver: SendableReceivesTelemetryData);
-
-    fn register_receiver_with_name<T: Into<String>>(
-        &self,
-        name: T,
-        receiver: SendableReceivesTelemetryData,
-    );
+    fn register_receiver<T: Into<String>>(&self, name: T, receiver: SendableReceivesTelemetryData);
 }
 
 /// A message that can be handled by a `ReceivesTelemetryData`
@@ -27,7 +21,6 @@ pub enum TelemetryMessage<L> {
     /// An arbritrary `HandlesObservations` should be added
     AddHandler(Box<HandlesObservations<Label = L>>),
 }
-
 
 /// Can receive telemtry data also give snapshots
 pub trait ReceivesTelemetryData {
@@ -45,7 +38,7 @@ pub struct TelemetryReceiver<L> {
 }
 
 impl<L> TelemetryReceiver<L> {
-    pub fn new<N: Into<String>>() -> (TelemetryTransmitter<L>, TelemetryReceiver<L>) {
+    pub fn new() -> (TelemetryTransmitter<L>, TelemetryReceiver<L>) {
         let (tx, rx) = mpsc::channel();
 
         let transmitter = TelemetryTransmitter { sender: tx };
@@ -109,28 +102,13 @@ where
     }
 }
 
-
 pub struct GroupedReceivers {
-    receivers: Arc<Mutex<Vec<(Option<String>, SendableReceivesTelemetryData)>>>,
-}
-
-impl GroupedReceivers {
-    fn add_receiver_internal(&self, name: Option<String>, receiver: SendableReceivesTelemetryData) {
-        self.receivers.lock().unwrap().push((name, receiver));
-    }
+    receivers: Arc<Mutex<Vec<(String, SendableReceivesTelemetryData)>>>,
 }
 
 impl AcceptsSendableReceiver for GroupedReceivers {
-    fn register_receiver(&self, receiver: SendableReceivesTelemetryData) {
-        self.add_receiver_internal(None, receiver);
-    }
-
-    fn register_receiver_with_name<T: Into<String>>(
-        &self,
-        name: T,
-        receiver: SendableReceivesTelemetryData,
-    ) {
-        self.add_receiver_internal(Some(name.into()), receiver);
+    fn register_receiver<T: Into<String>>(&self, name: T, receiver: SendableReceivesTelemetryData) {
+        self.receivers.lock().unwrap().push((name.into(), receiver));
     }
 }
 
@@ -158,7 +136,6 @@ impl ReceivesTelemetryData for GroupedReceivers {
         TelemetrySnapshot::Group(collected)
     }
 }
-
 
 impl Default for GroupedReceivers {
     fn default() -> GroupedReceivers {

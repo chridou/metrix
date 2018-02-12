@@ -1,9 +1,8 @@
 #[derive(Debug, Clone, Serialize)]
 pub enum TelemetrySnapshot {
     Cockpits(Vec<CockpitSnapshot>),
-    Group(Vec<(Option<String>, TelemetrySnapshot)>),
+    Group(Vec<(String, TelemetrySnapshot)>),
 }
-
 
 #[derive(Debug, Clone, Serialize)]
 pub struct CockpitSnapshot {
