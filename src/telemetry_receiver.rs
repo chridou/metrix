@@ -63,7 +63,7 @@ impl<L> TelemetryReceiver<L> {
 
 impl<L> ReceivesTelemetryData for TelemetryReceiver<L>
 where
-    L: Clone + Display + Eq,
+    L: Clone + Display + Eq + Send + 'static,
 {
     fn receive(&mut self, max: u64) -> u64 {
         let mut n = 0;
