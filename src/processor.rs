@@ -27,10 +27,31 @@ pub(crate) enum TelemetryMessage<L> {
     },
 }
 
+pub struct ProcessingOutcome {
+    pub processed: usize,
+    pub dropped: usize,
+}
+
+impl ProcessingOutcome {
+    pub fn combine_with(&mut self, other: &ProcessingOutcome) {
+        self.processed += other.processed;
+        self.dropped += other.dropped;
+    }
+}
+
+impl Default for ProcessingOutcome {
+    fn default() -> ProcessingOutcome {
+        ProcessingOutcome {
+            processed: 0,
+            dropped: 0,
+        }
+    }
+}
+
 /// Can receive telemtry data also give snapshots
 pub trait ProcessesTelemetryMessages: Send + 'static {
     /// Receive and handle pending operations
-    fn process(&mut self, max: u64) -> u64;
+    fn process(&mut self, max: usize) -> ProcessingOutcome;
 
     /// Get the snapshot.
     fn snapshot(&self) -> MetricsSnapshot;
@@ -96,7 +117,7 @@ impl<L> ProcessesTelemetryMessages for TelemetryProcessor<L>
 where
     L: Clone + Display + Eq + Send + 'static,
 {
-    fn process(&mut self, max: u64) -> u64 {
+    fn process(&mut self, max: usize) -> ProcessingOutcome {
         let mut n = 0;
         while n < max {
             match self.receiver.try_recv() {
@@ -125,7 +146,11 @@ where
             };
             n += 1;
         }
-        n
+
+        ProcessingOutcome {
+            processed: n,
+            dropped: 0,
+        }
     }
 
     fn snapshot(&self) -> MetricsSnapshot {
@@ -186,14 +211,14 @@ impl AggregatesProcessors for ProcessorMount {
 }
 
 impl ProcessesTelemetryMessages for ProcessorMount {
-    fn process(&mut self, max: u64) -> u64 {
-        let mut sum = 0;
+    fn process(&mut self, max: usize) -> ProcessingOutcome {
+        let mut aggregated = ProcessingOutcome::default();
 
         for processor in self.processors.iter_mut() {
-            let n = processor.process(max);
-            sum += n;
+            aggregated.combine_with(&processor.process(max));
         }
-        sum
+
+        aggregated
     }
 
     fn snapshot(&self) -> MetricsSnapshot {

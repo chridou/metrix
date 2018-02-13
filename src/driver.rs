@@ -3,7 +3,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread;
 use std::time::{Duration, Instant};
 
-use processor::{AggregatesProcessors, ProcessesTelemetryMessages};
+use processor::{AggregatesProcessors, ProcessesTelemetryMessages, ProcessingOutcome};
 use snapshot::MetricsSnapshot;
 
 /// Triggers registered `ProcessesTelemetryMessages` to
@@ -35,8 +35,8 @@ impl TelemetryDriver {
 
 impl ProcessesTelemetryMessages for TelemetryDriver {
     /// Receive and handle pending operations
-    fn process(&mut self, _max: u64) -> u64 {
-        0
+    fn process(&mut self, _max: usize) -> ProcessingOutcome {
+        ProcessingOutcome::default()
     }
 
     fn snapshot(&self) -> MetricsSnapshot {
@@ -103,7 +103,7 @@ fn telemetry_loop(
         }
 
         let started = Instant::now();
-        do_a_run(processors);
+        let _outcome = do_a_run(processors);
         let finished = Instant::now();
         let elapsed = finished - started;
         if elapsed < Duration::from_millis(5) {
@@ -112,10 +112,14 @@ fn telemetry_loop(
     }
 }
 
-fn do_a_run(processors: &Mutex<Vec<Box<ProcessesTelemetryMessages>>>) {
+fn do_a_run(processors: &Mutex<Vec<Box<ProcessesTelemetryMessages>>>) -> ProcessingOutcome {
     let mut processors = processors.lock().unwrap();
 
+    let mut outcome = ProcessingOutcome::default();
+
     for processor in processors.iter_mut() {
-        let _ = processor.process(1000);
+        outcome.combine_with(&processor.process(1000));
     }
+
+    outcome
 }
