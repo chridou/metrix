@@ -7,12 +7,19 @@ use metrics::metrics::{Meter as MMeter, StdMeter};
 use Observation;
 use snapshot::*;
 
+/// Scales incoming values.
+///
+/// This can be used either on a `Cockpit`
+/// or on a `Panel`. Be carefule when using on both
+/// since both components do not care whether the
+/// other already scaled a value.
 #[derive(Debug, Clone, Copy)]
 pub enum ValueScaling {
     NanosToMillis,
     NanosToMicros,
 }
 
+#[derive(Debug, Clone)]
 /// An update instruction for an instrument
 pub enum Update {
     /// Many observations ithout a value at a given time
@@ -206,6 +213,7 @@ pub struct Panel {
     pub gauge: Option<Gauge>,
     pub meter: Option<Meter>,
     pub histogram: Option<Histogram>,
+    pub value_scaling: Option<ValueScaling>,
 }
 
 impl Panel {
@@ -225,6 +233,10 @@ impl Panel {
         self.histogram = Some(histogram);
     }
 
+    pub fn set_value_scaling(&mut self, value_scaling: ValueScaling) {
+        self.value_scaling = Some(value_scaling)
+    }
+
     pub fn snapshot(&self) -> PanelSnapshot {
         PanelSnapshot {
             counter: self.counter.as_ref().map(|x| x.snapshot()),
@@ -242,16 +254,22 @@ impl Default for Panel {
             gauge: None,
             meter: None,
             histogram: None,
+            value_scaling: None,
         }
     }
 }
 
 impl Updates for Panel {
     fn update(&mut self, with: &Update) {
-        self.counter.iter_mut().for_each(|x| x.update(with));
-        self.gauge.iter_mut().for_each(|x| x.update(with));
-        self.meter.iter_mut().for_each(|x| x.update(with));
-        self.histogram.iter_mut().for_each(|x| x.update(with));
+        let with = if let Some(scaling) = self.value_scaling {
+            with.clone().scale(scaling)
+        } else {
+            with.clone()
+        };
+        self.counter.iter_mut().for_each(|x| x.update(&with));
+        self.gauge.iter_mut().for_each(|x| x.update(&with));
+        self.meter.iter_mut().for_each(|x| x.update(&with));
+        self.histogram.iter_mut().for_each(|x| x.update(&with));
     }
 }
 

@@ -15,7 +15,13 @@ pub mod snapshot;
 pub mod processor;
 pub mod driver;
 
-/// An observation that has been made
+/// An observation that has been made.
+///
+/// Be aware that not all instruments handle all
+/// observations or values.
+/// E.g. a `Meter` does not take the `value` of
+/// an `Observation::ObservedOneValue` into account but
+/// simply counts the obsercation as one occurence.
 #[derive(Clone)]
 pub enum Observation<L> {
     /// Observed many occurances at th given timestamp
@@ -35,6 +41,7 @@ pub enum Observation<L> {
 }
 
 impl<L> Observation<L> where {
+    /// Extracts the label `L` from an observation.
     pub fn label(&self) -> &L {
         match *self {
             Observation::Observed { ref label, .. } => label,
@@ -77,11 +84,49 @@ pub trait TransmitsTelemetryData<L> {
         })
     }
 
+    /// Sends a `Duration` as an observed value observed at `timestamp`.
+    /// The `Duration` is converted to nanoseconds.
     fn observed_duration(&self, label: L, duration: Duration, timestamp: Instant) {
         let nanos = (duration.as_secs() * 1_000_000_000) + (duration.subsec_nanos() as u64);
         self.observed_one_value(label, nanos, timestamp)
     }
 
+    /// Observed `count` occurences at now.
+    ///
+    /// Convinience method. Simply calls `observed` with
+    /// the current timestamp.
+    fn observed_now(&self, label: L, count: u64) {
+        self.observed(label, count, Instant::now())
+    }
+
+    /// Observed one occurence now
+    ///
+    /// Convinience method. Simply calls `observed_one` with
+    /// the current timestamp.
+    fn observed_one_now(&self, label: L) {
+        self.observed_one(label, Instant::now())
+    }
+
+    /// Observed one occurence with value `value` now
+    ///
+    /// Convinience method. Simply calls `observed_one_value` with
+    /// the current timestamp.
+    fn observed_one_value_now(&self, label: L, value: u64) {
+        self.observed_one_value(label, value, Instant::now())
+    }
+
+    /// Sends a `Duration` as an observed value observed with the current
+    /// timestamp.
+    ///
+    /// The `Duration` is converted to nanoseconds.
+    fn observed_one_duration_now(&self, label: L, duration: Duration) {
+        self.observed_duration(label, duration, Instant::now());
+    }
+
+    /// Measures the time from `from` until now.
+    ///
+    /// The resultiong duration is an observed value
+    /// with the measured duration in nanoseconds.
     fn measure_time(&self, label: L, from: Instant) {
         let now = Instant::now();
         if from <= now {
@@ -89,33 +134,14 @@ pub trait TransmitsTelemetryData<L> {
         }
     }
 
-    /// Observed `count` occurences at now.
-    ///
-    /// Convinience method. Simply calls `transmit`
-    fn observed_now(&self, label: L, count: u64) {
-        self.observed(label, count, Instant::now())
-    }
-
-    /// Observed one occurence now
-    ///
-    /// Convinience method. Simply calls `transmit`
-    fn observed_one_now(&self, label: L) {
-        self.observed_one(label, Instant::now())
-    }
-
-    /// Observed one occurence with value `value` now
-    ///
-    /// Convinience method. Simply calls `transmit`
-    fn observed_one_value_now(&self, label: L, value: u64) {
-        self.observed_one_value(label, value, Instant::now())
-    }
-
-    fn observed_one_duration_now(&self, label: L, duration: Duration) {
-        self.observed_duration(label, duration, Instant::now());
-    }
-
+    /// Add a handler
     fn add_handler(&self, handler: Box<HandlesObservations<Label = L>>);
+
+    /// Add a `Copckpit`
     fn add_cockpit(&self, cockpit: Cockpit<L>);
+
+    /// Add a `Panel` to a `Cockpit` if that `Cockpit` has the
+    /// given name.
     fn add_panel_to_cockpit(&self, cockpit_name: String, label: L, panel: Panel);
 }
 
@@ -129,6 +155,7 @@ impl<L> TelemetryTransmitter<L>
 where
     L: Send + 'static,
 {
+    /// Get a `TelemetryTransmitterSync`.
     pub fn synced(&self) -> TelemetryTransmitterSync<L> {
         TelemetryTransmitterSync {
             sender: Arc::new(Mutex::new(self.sender.clone())),

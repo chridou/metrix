@@ -6,6 +6,15 @@ use std::time::{Duration, Instant};
 use processor::{AggregatesProcessors, ProcessesTelemetryMessages};
 use snapshot::MetricsSnapshot;
 
+/// Triggers registered `ProcessesTelemetryMessages` to
+/// poll for messages.
+///
+/// Runs its own background thread. The thread stops once
+/// this struct is dropped.
+///
+/// A `TelemetryDriver` can be 'mounted' into the hierarchy.
+/// If done so, it will still poll its children on its own thread
+/// independently.
 pub struct TelemetryDriver {
     processors: Arc<Mutex<Vec<Box<ProcessesTelemetryMessages>>>>,
     is_running: Arc<AtomicBool>,
