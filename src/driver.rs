@@ -13,6 +13,12 @@ pub struct TelemetryDriver {
 }
 
 impl TelemetryDriver {
+    pub fn new<T: Into<String>>(name: T) -> TelemetryDriver {
+        let mut driver = TelemetryDriver::default();
+        driver.set_name(name);
+        driver
+    }
+
     pub fn set_name<T: Into<String>>(&mut self, name: T) {
         self.name = Some(name.into())
     }
@@ -34,9 +40,9 @@ impl ProcessesTelemetryMessages for TelemetryDriver {
         }
 
         if let Some(ref name) = self.name {
-            MetricsSnapshot::NamedGroup(name.clone(), collected)
+            MetricsSnapshot::Group(name.clone(), collected)
         } else {
-            MetricsSnapshot::UnnamedGroup(collected)
+            MetricsSnapshot::GroupWithoutName(collected)
         }
     }
 

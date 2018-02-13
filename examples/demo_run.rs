@@ -8,6 +8,7 @@ use metrix::*;
 use metrix::instruments::*;
 use metrix::processor::*;
 use metrix::driver::*;
+use metrix::snapshot::*;
 
 #[derive(Clone, PartialEq, Eq)]
 enum FooLabel {
@@ -41,7 +42,7 @@ impl fmt::Display for BarLabel {
     }
 }
 
-fn create_foo_metrics() -> (TelemetryTransmitterSync<FooLabel>, GroupProcessor) {
+fn create_foo_metrics() -> (TelemetryTransmitterSync<FooLabel>, ProcessorMount) {
     let mut foo_a_panel = Panel::default();
     foo_a_panel.add_counter(Counter::new_with_defaults("foo_a_counter"));
     foo_a_panel.add_gauge(Gauge::new_with_defaults("foo_a_gauge"));
@@ -54,28 +55,28 @@ fn create_foo_metrics() -> (TelemetryTransmitterSync<FooLabel>, GroupProcessor) 
     foo_b_panel.add_meter(Meter::new_with_defaults("foo_b_meter"));
     foo_b_panel.add_histogram(Histogram::new_with_defaults("foo_b_histogram"));
 
-    let mut cockpit = Cockpit::new_with_name("foo_cockpit", None);
+    let mut cockpit = Cockpit::new("foo_cockpit", None);
     cockpit.add_panel(FooLabel::A, foo_a_panel);
     cockpit.add_panel(FooLabel::B, foo_b_panel);
 
-    let (tx, mut processor) = TelemetryProcessor::new_pair_with_name("processor_foo");
+    let (tx, mut processor) = TelemetryProcessor::new_pair("processor_foo");
 
     processor.add_cockpit(cockpit);
 
-    let mut group_processor = GroupProcessor::default();
+    let mut group_processor = ProcessorMount::default();
     group_processor.add_processor(Box::new(processor));
 
     (tx.synced(), group_processor)
 }
 
-fn create_bar_metrics() -> (TelemetryTransmitterSync<BarLabel>, GroupProcessor) {
+fn create_bar_metrics() -> (TelemetryTransmitterSync<BarLabel>, ProcessorMount) {
     let mut bar_a_panel = Panel::default();
     bar_a_panel.add_counter(Counter::new_with_defaults("bar_a_counter"));
     bar_a_panel.add_gauge(Gauge::new_with_defaults("bar_a_gauge"));
     bar_a_panel.add_meter(Meter::new_with_defaults("bar_a_meter"));
     bar_a_panel.add_histogram(Histogram::new_with_defaults("bar_a_histogram"));
 
-    let mut bar_a_cockpit = Cockpit::new_without_name(Some(ValueScaling::NanosToMicros));
+    let mut bar_a_cockpit = Cockpit::without_name(Some(ValueScaling::NanosToMicros));
     bar_a_cockpit.add_panel(BarLabel::A, bar_a_panel);
 
     let mut bar_b_panel = Panel::default();
@@ -84,7 +85,7 @@ fn create_bar_metrics() -> (TelemetryTransmitterSync<BarLabel>, GroupProcessor) 
     bar_b_panel.add_meter(Meter::new_with_defaults("bar_b_meter"));
     bar_b_panel.add_histogram(Histogram::new_with_defaults("bar_b_histogram"));
 
-    let mut bar_b_cockpit = Cockpit::new_with_name("bar_b_cockpit", None);
+    let mut bar_b_cockpit = Cockpit::new("bar_b_cockpit", None);
     bar_b_cockpit.add_panel(BarLabel::B, bar_b_panel);
 
     let mut bar_c_panel = Panel::default();
@@ -93,7 +94,7 @@ fn create_bar_metrics() -> (TelemetryTransmitterSync<BarLabel>, GroupProcessor) 
     bar_c_panel.add_meter(Meter::new_with_defaults("bar_c_meter"));
     bar_c_panel.add_histogram(Histogram::new_with_defaults("bar_c_histogram"));
 
-    let mut bar_c_cockpit = Cockpit::new_with_name("bar_c_cockpit", None);
+    let mut bar_c_cockpit = Cockpit::new("bar_c_cockpit", None);
     bar_c_cockpit.add_panel(BarLabel::C, bar_c_panel);
 
     let (tx, mut processor) = TelemetryProcessor::new_pair_without_name();
@@ -102,10 +103,10 @@ fn create_bar_metrics() -> (TelemetryTransmitterSync<BarLabel>, GroupProcessor) 
     processor.add_cockpit(bar_b_cockpit);
     processor.add_cockpit(bar_c_cockpit);
 
-    let mut group_processor1 = GroupProcessor::default();
+    let mut group_processor1 = ProcessorMount::default();
     group_processor1.add_processor(Box::new(processor));
 
-    let mut group_processor2 = GroupProcessor::default();
+    let mut group_processor2 = ProcessorMount::default();
     group_processor2.add_processor(Box::new(group_processor1));
     group_processor2.set_name("group_processor_2");
 
@@ -151,8 +152,8 @@ fn main() {
         let bar_transmitter = bar_transmitter.clone();
 
         thread::spawn(move || {
-            for _ in 0..5_000_000 {
-                bar_transmitter.observed(BarLabel::A, 1000, Instant::now());
+            for i in 0..5_000_000 {
+                bar_transmitter.observed_one_value(BarLabel::A, i, Instant::now());
             }
         })
     };
@@ -161,11 +162,16 @@ fn main() {
     handle2.join().unwrap();
     handle3.join().unwrap();
 
-    println!("{:?}", start.elapsed());
+    println!("{:?}. Sleeping 10 secs.", start.elapsed());
 
-    thread::sleep(Duration::from_secs(5));
+    thread::sleep(Duration::from_secs(10));
 
     let snapshot = driver.snapshot();
 
-    println!("{}", snapshot.to_json_pretty(4));
+    let mut config = JsonConfig::default();
+    config.pretty = Some(2);
+
+    println!("{:?}", snapshot);
+    println!("\n\n\n=======================\n\n");
+    println!("{}", snapshot.to_json(&config));
 }

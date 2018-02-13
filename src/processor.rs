@@ -49,9 +49,7 @@ impl<L> TelemetryProcessor<L>
 where
     L: Clone + Display + Eq + Send + 'static,
 {
-    pub fn new_pair<T: Into<String>>(
-        name: Option<T>,
-    ) -> (TelemetryTransmitter<L>, TelemetryProcessor<L>) {
+    pub fn new_pair<T: Into<String>>(name: T) -> (TelemetryTransmitter<L>, TelemetryProcessor<L>) {
         let (tx, rx) = mpsc::channel();
 
         let transmitter = TelemetryTransmitter { sender: tx };
@@ -60,20 +58,25 @@ where
             cockpits: Vec::new(),
             handlers: Vec::new(),
             receiver: rx,
-            name: name.map(Into::into),
+            name: Some(name.into()),
         };
 
         (transmitter, receiver)
     }
 
-    pub fn new_pair_with_name<T: Into<String>>(
-        name: T,
-    ) -> (TelemetryTransmitter<L>, TelemetryProcessor<L>) {
-        TelemetryProcessor::new_pair(Some(name))
-    }
-
     pub fn new_pair_without_name() -> (TelemetryTransmitter<L>, TelemetryProcessor<L>) {
-        TelemetryProcessor::new_pair::<String>(None)
+        let (tx, rx) = mpsc::channel();
+
+        let transmitter = TelemetryTransmitter { sender: tx };
+
+        let receiver = TelemetryProcessor {
+            cockpits: Vec::new(),
+            handlers: Vec::new(),
+            receiver: rx,
+            name: None,
+        };
+
+        (transmitter, receiver)
     }
 
     pub fn add_handler(&mut self, handler: Box<HandlesObservations<Label = L>>) {
@@ -111,14 +114,12 @@ where
                     cockpit_name,
                     label,
                     panel,
-                }) => {
-                    if let Some(ref mut cockpit) = self.cockpits
-                        .iter_mut()
-                        .find(|c| c.name() == Some(&cockpit_name))
-                    {
-                        let _ = cockpit.add_panel(label, panel);
-                    }
-                }
+                }) => if let Some(ref mut cockpit) = self.cockpits
+                    .iter_mut()
+                    .find(|c| c.name() == Some(&cockpit_name))
+                {
+                    let _ = cockpit.add_panel(label, panel);
+                },
                 Err(mpsc::TryRecvError::Empty) => break,
                 Err(mpsc::TryRecvError::Disconnected) => break,
             };
@@ -139,9 +140,9 @@ where
         }
 
         if let Some(ref name) = self.name {
-            MetricsSnapshot::NamedGroup(name.clone(), collected)
+            MetricsSnapshot::Group(name.clone(), collected)
         } else {
-            MetricsSnapshot::UnnamedGroup(collected)
+            MetricsSnapshot::GroupWithoutName(collected)
         }
     }
 
@@ -150,24 +151,41 @@ where
     }
 }
 
-pub struct GroupProcessor {
+/// Use to build your hierarchy
+pub struct ProcessorMount {
     name: Option<String>,
     processors: Vec<Box<ProcessesTelemetryMessages>>,
 }
 
-impl GroupProcessor {
+impl ProcessorMount {
+    pub fn new<T: Into<String>>(name: T) -> ProcessorMount {
+        ProcessorMount {
+            name: Some(name.into()),
+            processors: Vec::new(),
+        }
+    }
+
     pub fn set_name<T: Into<String>>(&mut self, name: T) {
         self.name = Some(name.into())
     }
 }
 
-impl AggregatesProcessors for GroupProcessor {
+impl Default for ProcessorMount {
+    fn default() -> ProcessorMount {
+        ProcessorMount {
+            name: None,
+            processors: Vec::new(),
+        }
+    }
+}
+
+impl AggregatesProcessors for ProcessorMount {
     fn add_processor(&mut self, processor: Box<ProcessesTelemetryMessages>) {
         self.processors.push(processor);
     }
 }
 
-impl ProcessesTelemetryMessages for GroupProcessor {
+impl ProcessesTelemetryMessages for ProcessorMount {
     fn process(&mut self, max: u64) -> u64 {
         let mut sum = 0;
 
@@ -187,22 +205,13 @@ impl ProcessesTelemetryMessages for GroupProcessor {
         }
 
         if let Some(ref name) = self.name {
-            MetricsSnapshot::NamedGroup(name.clone(), collected)
+            MetricsSnapshot::Group(name.clone(), collected)
         } else {
-            MetricsSnapshot::UnnamedGroup(collected)
+            MetricsSnapshot::GroupWithoutName(collected)
         }
     }
 
     fn name(&self) -> Option<&str> {
         self.name.as_ref().map(|n| &**n)
-    }
-}
-
-impl Default for GroupProcessor {
-    fn default() -> GroupProcessor {
-        GroupProcessor {
-            name: None,
-            processors: Vec::new(),
-        }
     }
 }

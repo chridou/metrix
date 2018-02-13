@@ -90,34 +90,39 @@ impl<L> Cockpit<L>
 where
     L: Display + Clone + Eq + Send + 'static,
 {
-    pub fn new<T: Into<String>>(
-        name: Option<T>,
-        value_scaling: Option<ValueScaling>,
-    ) -> Cockpit<L> {
+    pub fn new<T: Into<String>>(name: T, value_scaling: Option<ValueScaling>) -> Cockpit<L> {
         Cockpit {
-            name: name.map(Into::into),
+            name: Some(name.into()),
             panels: Vec::new(),
             value_scaling,
         }
     }
 
-    pub fn new_with_name<T: Into<String>>(
-        name: T,
-        value_scaling: Option<ValueScaling>,
-    ) -> Cockpit<L> {
-        Cockpit::new(Some(name.into()), value_scaling)
+    pub fn without_name(value_scaling: Option<ValueScaling>) -> Cockpit<L> {
+        Cockpit {
+            name: None,
+            panels: Vec::new(),
+            value_scaling,
+        }
     }
 
-    pub fn with_name<T: Into<String>>(&mut self, name: T) {
+    pub fn with_value_scaling<T: Into<String>>(
+        &mut self,
+        name: T,
+        value_scaling: ValueScaling,
+    ) -> Cockpit<L> {
+        Cockpit::new(name, Some(value_scaling))
+    }
+    pub fn without_value_scaling<T: Into<String>>(&mut self, name: T) -> Cockpit<L> {
+        Cockpit::new(name, None)
+    }
+
+    pub fn set_name<T: Into<String>>(&mut self, name: T) {
         self.name = Some(name.into())
     }
 
-    pub fn with_value_scaling(&mut self, value_scaling: ValueScaling) {
+    pub fn set_value_scaling(&mut self, value_scaling: ValueScaling) {
         self.value_scaling = Some(value_scaling)
-    }
-
-    pub fn new_without_name(value_scaling: Option<ValueScaling>) -> Cockpit<L> {
-        Cockpit::new::<String>(None, value_scaling)
     }
 
     pub fn add_panel(&mut self, label: L, panel: Panel) -> bool {
@@ -135,7 +140,11 @@ where
     L: Display + Clone + Eq + Send + 'static,
 {
     fn default() -> Cockpit<L> {
-        Cockpit::new::<String>(None, None)
+        Cockpit {
+            name: None,
+            panels: Vec::new(),
+            value_scaling: None,
+        }
     }
 }
 
@@ -166,10 +175,11 @@ where
             .iter()
             .map(|&(ref l, ref p)| (l.to_string(), p.snapshot()))
             .collect();
+
         if let Some(ref name) = self.name {
-            MetricsSnapshot::NamedGroup(name.clone(), vec![MetricsSnapshot::Panels(panels)])
+            MetricsSnapshot::Group(name.clone(), vec![MetricsSnapshot::Panels(panels)])
         } else {
-            MetricsSnapshot::Panels(panels)
+            MetricsSnapshot::GroupWithoutName(vec![MetricsSnapshot::Panels(panels)])
         }
     }
 
@@ -275,8 +285,8 @@ impl Counter {
         self.name = name.into();
     }
 
-    pub fn snapshot(&self) -> (String, CounterSnapshot) {
-        (self.name.clone(), CounterSnapshot { count: self.count })
+    pub fn snapshot(&self) -> (String, u64) {
+        (self.name.clone(), self.count)
     }
 }
 
@@ -293,27 +303,27 @@ impl Updates for Counter {
 /// Simply returns the value that has been observed last.
 pub struct Gauge {
     name: String,
-    value: u64,
+    value: Option<u64>,
 }
 
 impl Gauge {
     pub fn new_with_defaults<T: Into<String>>(name: T) -> Gauge {
         Gauge {
             name: name.into(),
-            value: 0,
+            value: None,
         }
     }
 
     pub fn set(&mut self, v: u64) {
-        self.value = v;
+        self.value = Some(v);
     }
 
     pub fn name(&self) -> &str {
         &self.name
     }
 
-    pub fn snapshot(&self) -> (String, GaugeSnapshot) {
-        (self.name.clone(), GaugeSnapshot { value: self.value })
+    pub fn snapshot(&self) -> (String, Option<u64>) {
+        (self.name.clone(), self.value)
     }
 }
 

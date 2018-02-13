@@ -1,104 +1,104 @@
 use json::{stringify, stringify_pretty, JsonValue};
 
+pub struct JsonConfig {
+    /// Serialize `true` as `1` and `false` as `0`
+    pub make_booleans_ints: bool,
+
+    /// Configure pretty JSON output.
+    ///
+    /// Produce pretty JSON with the given indentation if `Some(indentation)`.
+    /// If `None` compact JSON is generated.
+    pub pretty: Option<u16>,
+}
+
+impl Default for JsonConfig {
+    fn default() -> JsonConfig {
+        JsonConfig {
+            make_booleans_ints: false,
+            pretty: None,
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub enum MetricsSnapshot {
-    NamedGroup(String, Vec<MetricsSnapshot>),
-    UnnamedGroup(Vec<MetricsSnapshot>),
+    Group(String, Vec<MetricsSnapshot>),
+    GroupWithoutName(Vec<MetricsSnapshot>),
     Panels(Vec<(String, PanelSnapshot)>),
 }
 
 impl MetricsSnapshot {
-    pub fn condensed(self) -> CondensedMetrics {
-        unimplemented!()
-    }
-}
-
-#[derive(Debug, Clone)]
-pub enum CondensedMetrics {
-    Panels(Vec<(String, PanelSnapshot)>),
-    Group(Vec<(String, CondensedMetrics)>),
-}
-
-impl CondensedMetrics {
-    pub fn to_json(&self) -> String {
-        stringify(self.to_json_value())
+    /// Output JSON with default settings.
+    pub fn to_default_json(&self) -> String {
+        self.to_json_internal(&JsonConfig::default())
     }
 
-    pub fn to_json_pretty(&self, indent: u16) -> String {
-        stringify_pretty(self.to_json_value(), indent)
+    /// Output JSON with the given settings.
+    pub fn to_json(&self, config: &JsonConfig) -> String {
+        self.to_json_internal(config)
     }
 
-    fn to_json_value(&self) -> JsonValue {
+    fn to_json_internal(&self, config: &JsonConfig) -> String {
         let mut data = JsonValue::new_object();
 
+        self.into_json_value(config, &mut data);
+
+        if let Some(indent) = config.pretty {
+            stringify_pretty(data, indent)
+        } else {
+            stringify(data)
+        }
+    }
+
+    fn into_json_value(&self, config: &JsonConfig, into: &mut JsonValue) {
         match *self {
-            CondensedMetrics::Panels(ref items) => for &(ref n, ref p) in items {
-                data[n] = p.to_json_value();
+            MetricsSnapshot::Panels(ref items) => for &(ref name, ref item) in items {
+                into[name] = item.to_json_value(config)
             },
-            CondensedMetrics::Group(ref items) => for &(ref n, ref p) in items {
-                data[n] = p.to_json_value();
+            MetricsSnapshot::Group(ref name, ref items) => {
+                let mut grouping = JsonValue::new_object();
+                for item in items {
+                    item.into_json_value(config, &mut grouping);
+                }
+
+                into[name] = grouping
+            }
+            MetricsSnapshot::GroupWithoutName(ref items) => for item in items {
+                item.into_json_value(config, into);
             },
         }
-
-        data
     }
 }
 
 #[derive(Debug, Clone)]
 pub struct PanelSnapshot {
-    pub counter: Option<(String, CounterSnapshot)>,
-    pub gauge: Option<(String, GaugeSnapshot)>,
+    pub counter: Option<(String, u64)>,
+    pub gauge: Option<(String, Option<u64>)>,
     pub meter: Option<(String, MeterSnapshot)>,
     pub histogram: Option<(String, HistogramSnapshot)>,
 }
 
 impl PanelSnapshot {
-    fn to_json_value(&self) -> JsonValue {
+    fn to_json_value(&self, config: &JsonConfig) -> JsonValue {
         let mut data = JsonValue::new_object();
 
-        if let Some((ref name, ref counter)) = self.counter {
-            data[name] = counter.to_json_value();
+        if let Some((ref name, counter)) = self.counter {
+            data[name] = counter.into();
         }
 
-        if let Some((ref name, ref gauge)) = self.gauge {
-            data[name] = gauge.to_json_value();
+        if let Some((ref name, Some(ref gauge))) = self.gauge {
+            data[name] = (*gauge).into();
         }
 
         if let Some((ref name, ref meter)) = self.meter {
-            data[name] = meter.to_json_value();
+            data[name] = meter.to_json_value(config);
         }
 
         if let Some((ref name, ref histogram)) = self.histogram {
-            data[name] = histogram.to_json_value();
+            data[name] = histogram.to_json_value(config);
         }
 
         data
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct CounterSnapshot {
-    pub count: u64,
-}
-
-impl CounterSnapshot {
-    fn to_json_value(&self) -> JsonValue {
-        object! {
-            "count" => self.count,
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct GaugeSnapshot {
-    pub value: u64,
-}
-
-impl GaugeSnapshot {
-    fn to_json_value(&self) -> JsonValue {
-        object! {
-            "value" => self.value,
-        }
     }
 }
 
@@ -110,11 +110,11 @@ pub struct MeterSnapshot {
 }
 
 impl MeterSnapshot {
-    fn to_json_value(&self) -> JsonValue {
+    fn to_json_value(&self, config: &JsonConfig) -> JsonValue {
         object! {
-            "one_minute"     => self.one_minute.to_json_value(),
-            "five_minutes"   => self.five_minutes.to_json_value(),
-            "fifteen_minutes"=> self.fifteen_minutes.to_json_value(),
+            "one_minute"     => self.one_minute.to_json_value(config),
+            "five_minutes"   => self.five_minutes.to_json_value(config),
+            "fifteen_minutes"=> self.fifteen_minutes.to_json_value(config),
         }
     }
 }
@@ -126,7 +126,7 @@ pub struct MeterRate {
 }
 
 impl MeterRate {
-    fn to_json_value(&self) -> JsonValue {
+    fn to_json_value(&self, _config: &JsonConfig) -> JsonValue {
         object! {
             "rate"       => self.rate,
             "count"       => self.count,
@@ -145,7 +145,7 @@ pub struct HistogramSnapshot {
 }
 
 impl HistogramSnapshot {
-    fn to_json_value(&self) -> JsonValue {
+    fn to_json_value(&self, _config: &JsonConfig) -> JsonValue {
         let mut quantiles = JsonValue::new_object();
 
         for &(ref q, ref v) in &self.quantiles {
