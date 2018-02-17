@@ -13,10 +13,18 @@ where
     }
 }
 
-pub fn put_prefixed_descriptives<T>(what: &T, field_label_prefix: &str, into: &mut Snapshot)
-where
+pub fn put_prefixed_descriptives<T>(
+    what: &T,
+    field_label_prefix: &str,
+    into: &mut Snapshot,
+    add_descriptive_parts: bool,
+) where
     T: Descriptive,
 {
+    if !add_descriptive_parts {
+        return;
+    }
+
     if let Some(title) = what.title() {
         let label = format!("{}_{}", field_label_prefix, TITLE_FIELD_LABEL);
         let title_not_already_there = into.items.iter().find(|&&(ref n, _)| n == &label).is_none();

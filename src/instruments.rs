@@ -278,8 +278,10 @@ pub struct Panel<L> {
     pub description: Option<String>,
     pub counter: Option<Counter>,
     pub gauge: Option<Gauge>,
+    pub max_tracker: Option<MaxTracker>,
     pub meter: Option<Meter>,
     pub histogram: Option<Histogram>,
+
     pub value_scaling: Option<ValueScaling>,
 }
 
@@ -292,6 +294,7 @@ impl<L> Panel<L> {
             description: None,
             counter: None,
             gauge: None,
+            max_tracker: None,
             meter: None,
             histogram: None,
             value_scaling: None,
@@ -310,6 +313,10 @@ impl<L> Panel<L> {
 
     pub fn add_gauge(&mut self, gauge: Gauge) {
         self.gauge = Some(gauge);
+    }
+
+    pub fn add_max_tracker(&mut self, tracker: MaxTracker) {
+        self.max_tracker = Some(tracker);
     }
 
     pub fn add_meter(&mut self, meter: Meter) {
@@ -346,6 +353,10 @@ impl<L> Panel<L> {
             .as_ref()
             .iter()
             .for_each(|x| x.put_snapshot(into, descriptive));
+        self.max_tracker
+            .as_ref()
+            .iter()
+            .for_each(|x| x.put_snapshot(into, descriptive));
         self.meter
             .as_ref()
             .iter()
@@ -377,6 +388,7 @@ impl<L> Updates for Panel<L> {
         };
         self.counter.iter_mut().for_each(|x| x.update(&with));
         self.gauge.iter_mut().for_each(|x| x.update(&with));
+        self.max_tracker.iter_mut().for_each(|x| x.update(&with));
         self.meter.iter_mut().for_each(|x| x.update(&with));
         self.histogram.iter_mut().for_each(|x| x.update(&with));
     }
@@ -422,6 +434,10 @@ impl Counter {
         &self.name
     }
 
+    pub fn set_name<T: Into<String>>(&mut self, name: T) {
+        self.name = name.into();
+    }
+
     pub fn set_title<T: Into<String>>(&mut self, title: T) {
         self.title = Some(title.into())
     }
@@ -430,8 +446,8 @@ impl Counter {
         self.description = Some(description.into())
     }
 
-    fn put_snapshot(&self, into: &mut Snapshot, _descriptive: bool) {
-        util::put_prefixed_descriptives(self, &self.name, into);
+    fn put_snapshot(&self, into: &mut Snapshot, descriptive: bool) {
+        util::put_prefixed_descriptives(self, &self.name, into, descriptive);
         into.items
             .push((self.name.clone(), ItemKind::UInt(self.count)));
     }
@@ -475,6 +491,14 @@ impl Gauge {
         }
     }
 
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    pub fn set_name<T: Into<String>>(&mut self, name: T) {
+        self.name = name.into();
+    }
+
     pub fn set(&mut self, v: u64) {
         self.value = Some(v);
     }
@@ -487,9 +511,9 @@ impl Gauge {
         self.description = Some(description.into())
     }
 
-    fn put_snapshot(&self, into: &mut Snapshot, _descriptive: bool) {
+    fn put_snapshot(&self, into: &mut Snapshot, descriptive: bool) {
+        util::put_prefixed_descriptives(self, &self.name, into, descriptive);
         if let Some(v) = self.value {
-            util::put_prefixed_descriptives(self, &self.name, into);
             into.items.push((self.name.clone(), ItemKind::UInt(v)));
         }
     }
@@ -505,6 +529,98 @@ impl Updates for Gauge {
 }
 
 impl Descriptive for Gauge {
+    fn title(&self) -> Option<&str> {
+        self.title.as_ref().map(|n| &**n)
+    }
+
+    fn description(&self) -> Option<&str> {
+        self.description.as_ref().map(|n| &**n)
+    }
+}
+
+pub struct MaxTracker {
+    name: String,
+    title: Option<String>,
+    description: Option<String>,
+    current_max: Option<u64>,
+    display_max: Option<u64>,
+    display_until: Instant,
+    display_duration: Duration,
+}
+
+impl MaxTracker {
+    pub fn new_with_defaults<T: Into<String>>(name: T) -> MaxTracker {
+        let display_duration = Duration::from_secs(60);
+        MaxTracker {
+            name: name.into(),
+            title: None,
+            description: None,
+            current_max: None,
+            display_max: None,
+            display_until: Instant::now() + display_duration,
+            display_duration,
+        }
+    }
+
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    pub fn set_name<T: Into<String>>(&mut self, name: T) {
+        self.name = name.into();
+    }
+
+    pub fn set(&mut self, v: u64) {
+        let now = Instant::now();
+        if now > self.display_until {
+            self.display_max = None;
+        }
+
+        /* match (self.current_max, self.display_max) {
+            (Some(cur), Some(dis)) => {
+                if v >= dis {
+                    self.display_max = Some(v);
+                    self.current_max = None;
+                    self.display_until = now + self.display_duration;
+                } else {
+
+                }
+            }
+            (None, None) => {
+                self.display_max = Some(v);
+                self.current_max = None;
+                self.display_until = now + self.display_duration;
+            }
+        }*/
+    }
+
+    pub fn set_title<T: Into<String>>(&mut self, title: T) {
+        self.title = Some(title.into())
+    }
+
+    pub fn set_description<T: Into<String>>(&mut self, description: T) {
+        self.description = Some(description.into())
+    }
+
+    fn put_snapshot(&self, into: &mut Snapshot, descriptive: bool) {
+        util::put_prefixed_descriptives(self, &self.name, into, descriptive);
+
+        if let Some(v) = self.display_max {
+            into.items.push((self.name.clone(), ItemKind::UInt(v)));
+        }
+    }
+}
+
+impl Updates for MaxTracker {
+    fn update(&mut self, with: &Update) {
+        match *with {
+            Update::ObservationWithValue(v, _) => self.set(v),
+            _ => (),
+        }
+    }
+}
+
+impl Descriptive for MaxTracker {
     fn title(&self) -> Option<&str> {
         self.title.as_ref().map(|n| &**n)
     }
@@ -538,6 +654,10 @@ impl Meter {
         &self.name
     }
 
+    pub fn set_name<T: Into<String>>(&mut self, name: T) {
+        self.name = name.into();
+    }
+
     pub fn set_title<T: Into<String>>(&mut self, title: T) {
         self.title = Some(title.into())
     }
@@ -547,7 +667,7 @@ impl Meter {
     }
 
     fn put_snapshot(&self, into: &mut Snapshot, descriptive: bool) {
-        util::put_prefixed_descriptives(self, &self.name, into);
+        util::put_prefixed_descriptives(self, &self.name, into, descriptive);
         let mut new_level = Snapshot::default();
         self.put_values_into_snapshot(&mut new_level, descriptive);
         into.push(self.name.clone(), ItemKind::Snapshot(new_level));
@@ -574,7 +694,7 @@ impl Meter {
                 rate: snapshot.rates[2],
             },
         };
-        meter_snapshot.put_snapshot(into, descriptive);
+        meter_snapshot.put_snapshot(into);
     }
 }
 
@@ -627,6 +747,10 @@ impl Histogram {
         &self.name
     }
 
+    pub fn set_name<T: Into<String>>(&mut self, name: T) {
+        self.name = name.into();
+    }
+
     pub fn set_title<T: Into<String>>(&mut self, title: T) {
         self.title = Some(title.into())
     }
@@ -636,7 +760,7 @@ impl Histogram {
     }
 
     fn put_snapshot(&self, into: &mut Snapshot, descriptive: bool) {
-        util::put_prefixed_descriptives(self, &self.name, into);
+        util::put_prefixed_descriptives(self, &self.name, into, descriptive);
         let mut new_level = Snapshot::default();
         self.put_values_into_snapshot(&mut new_level, descriptive);
         into.push(self.name.clone(), ItemKind::Snapshot(new_level));
@@ -661,7 +785,7 @@ impl Histogram {
             quantiles: quantiles,
         };
 
-        histo_snapshot.put_snapshot(into, descriptive);
+        histo_snapshot.put_snapshot(into);
     }
 }
 

@@ -106,19 +106,17 @@ pub struct MeterSnapshot {
 }
 
 impl MeterSnapshot {
-    pub fn put_snapshot(&self, into: &mut Snapshot, descriptive: bool) {
+    pub fn put_snapshot(&self, into: &mut Snapshot) {
         let mut one_minute = Snapshot::default();
-        self.one_minute.put_snapshot(&mut one_minute, descriptive);
+        self.one_minute.put_snapshot(&mut one_minute);
         into.items
             .push(("one_minute".to_string(), ItemKind::Snapshot(one_minute)));
         let mut five_minutes = Snapshot::default();
-        self.five_minutes
-            .put_snapshot(&mut five_minutes, descriptive);
+        self.five_minutes.put_snapshot(&mut five_minutes);
         into.items
             .push(("five_minutes".to_string(), ItemKind::Snapshot(five_minutes)));
         let mut fifteen_minutes = Snapshot::default();
-        self.fifteen_minutes
-            .put_snapshot(&mut fifteen_minutes, descriptive);
+        self.fifteen_minutes.put_snapshot(&mut fifteen_minutes);
         into.items.push((
             "fifteen_minutes".to_string(),
             ItemKind::Snapshot(fifteen_minutes),
@@ -133,7 +131,7 @@ pub struct MeterRate {
 }
 
 impl MeterRate {
-    fn put_snapshot(&self, into: &mut Snapshot, _descriptive: bool) {
+    fn put_snapshot(&self, into: &mut Snapshot) {
         into.items
             .push(("rate".to_string(), ItemKind::Float(self.rate)));
         into.items
@@ -152,7 +150,7 @@ pub struct HistogramSnapshot {
 }
 
 impl HistogramSnapshot {
-    pub fn put_snapshot(&self, into: &mut Snapshot, _descriptive: bool) {
+    pub fn put_snapshot(&self, into: &mut Snapshot) {
         into.items
             .push(("max".to_string(), ItemKind::Int(self.max)));
         into.items
