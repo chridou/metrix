@@ -1,9 +1,9 @@
 use std::sync::mpsc;
-use std::fmt::Display;
 
 use {Observation, TelemetryTransmitter};
-use instruments::{Cockpit, HandlesObservations, Panel};
-use snapshot::MetricsSnapshot;
+use instruments::{Cockpit, Descriptive, HandlesObservations, Panel};
+use snapshot::{ItemKind, Snapshot};
+use util;
 
 pub trait AggregatesProcessors {
     fn add_processor(&mut self, processor: Box<ProcessesTelemetryMessages>);
@@ -22,8 +22,7 @@ pub(crate) enum TelemetryMessage<L> {
     /// This means the cockpit must have a name set.
     AddPanel {
         cockpit_name: String,
-        label: L,
-        panel: Panel,
+        panel: Panel<L>,
     },
 }
 
@@ -53,22 +52,22 @@ pub trait ProcessesTelemetryMessages: Send + 'static {
     /// Receive and handle pending operations
     fn process(&mut self, max: usize) -> ProcessingOutcome;
 
-    /// Get the snapshot.
-    fn snapshot(&self) -> MetricsSnapshot;
-
-    fn name(&self) -> Option<&str>;
+    /// Put the snapshot.
+    fn put_snapshot(&self, into: &mut Snapshot, descriptive: bool);
 }
 
 pub struct TelemetryProcessor<L> {
+    name: Option<String>,
+    title: Option<String>,
+    description: Option<String>,
     cockpits: Vec<Cockpit<L>>,
     handlers: Vec<Box<HandlesObservations<Label = L>>>,
     receiver: mpsc::Receiver<TelemetryMessage<L>>,
-    name: Option<String>,
 }
 
 impl<L> TelemetryProcessor<L>
 where
-    L: Clone + Display + Eq + Send + 'static,
+    L: Clone + Eq + Send + 'static,
 {
     pub fn new_pair<T: Into<String>>(name: T) -> (TelemetryTransmitter<L>, TelemetryProcessor<L>) {
         let (tx, rx) = mpsc::channel();
@@ -76,10 +75,12 @@ where
         let transmitter = TelemetryTransmitter { sender: tx };
 
         let receiver = TelemetryProcessor {
+            name: Some(name.into()),
+            title: None,
+            description: None,
             cockpits: Vec::new(),
             handlers: Vec::new(),
             receiver: rx,
-            name: Some(name.into()),
         };
 
         (transmitter, receiver)
@@ -91,10 +92,12 @@ where
         let transmitter = TelemetryTransmitter { sender: tx };
 
         let receiver = TelemetryProcessor {
+            name: None,
+            title: None,
+            description: None,
             cockpits: Vec::new(),
             handlers: Vec::new(),
             receiver: rx,
-            name: None,
         };
 
         (transmitter, receiver)
@@ -108,14 +111,29 @@ where
         self.cockpits.push(cockpit)
     }
 
+    pub fn name(&self) -> Option<&str> {
+        self.name.as_ref().map(|n| &**n)
+    }
+
     pub fn set_name<T: Into<String>>(&mut self, name: T) {
         self.name = Some(name.into())
+    }
+
+    fn put_values_into_snapshot(&self, into: &mut Snapshot, descriptive: bool) {
+        util::put_default_descriptives(self, into, descriptive);
+        for c in &self.cockpits {
+            c.put_snapshot(into, descriptive);
+        }
+
+        for h in &self.handlers {
+            h.put_snapshot(into, descriptive);
+        }
     }
 }
 
 impl<L> ProcessesTelemetryMessages for TelemetryProcessor<L>
 where
-    L: Clone + Display + Eq + Send + 'static,
+    L: Clone + Eq + Send + 'static,
 {
     fn process(&mut self, max: usize) -> ProcessingOutcome {
         let mut n = 0;
@@ -133,13 +151,12 @@ where
                 Ok(TelemetryMessage::AddHandler(h)) => self.add_handler(h),
                 Ok(TelemetryMessage::AddPanel {
                     cockpit_name,
-                    label,
                     panel,
                 }) => if let Some(ref mut cockpit) = self.cockpits
                     .iter_mut()
                     .find(|c| c.name() == Some(&cockpit_name))
                 {
-                    let _ = cockpit.add_panel(label, panel);
+                    let _ = cockpit.add_panel(panel);
                 },
                 Err(mpsc::TryRecvError::Empty) => break,
                 Err(mpsc::TryRecvError::Disconnected) => break,
@@ -153,45 +170,56 @@ where
         }
     }
 
-    fn snapshot(&self) -> MetricsSnapshot {
-        let mut collected = Vec::with_capacity(self.cockpits.len() + self.handlers.len());
-
-        for c in &self.cockpits {
-            collected.push(c.snapshot());
-        }
-
-        for h in &self.handlers {
-            collected.push(h.snapshot());
-        }
-
+    fn put_snapshot(&self, into: &mut Snapshot, descriptive: bool) {
         if let Some(ref name) = self.name {
-            MetricsSnapshot::Group(name.clone(), collected)
+            let mut new_level = Snapshot::default();
+            self.put_values_into_snapshot(&mut new_level, descriptive);
+            into.items
+                .push((name.clone(), ItemKind::Snapshot(new_level)));
         } else {
-            MetricsSnapshot::GroupWithoutName(collected)
+            self.put_values_into_snapshot(into, descriptive);
         }
     }
+}
 
-    fn name(&self) -> Option<&str> {
-        self.name.as_ref().map(|n| &**n)
+impl<L> Descriptive for TelemetryProcessor<L> {
+    fn title(&self) -> Option<&str> {
+        self.title.as_ref().map(|n| &**n)
+    }
+
+    fn description(&self) -> Option<&str> {
+        self.description.as_ref().map(|n| &**n)
     }
 }
 
 /// Use to build your hierarchy
 pub struct ProcessorMount {
     name: Option<String>,
+    title: Option<String>,
+    description: Option<String>,
     processors: Vec<Box<ProcessesTelemetryMessages>>,
 }
 
 impl ProcessorMount {
     pub fn new<T: Into<String>>(name: T) -> ProcessorMount {
-        ProcessorMount {
-            name: Some(name.into()),
-            processors: Vec::new(),
-        }
+        let mut mount = ProcessorMount::default();
+        mount.set_name(name);
+        mount
+    }
+
+    pub fn name(&self) -> Option<&str> {
+        self.name.as_ref().map(|n| &**n)
     }
 
     pub fn set_name<T: Into<String>>(&mut self, name: T) {
         self.name = Some(name.into())
+    }
+
+    fn put_values_into_snapshot(&self, into: &mut Snapshot, descriptive: bool) {
+        util::put_default_descriptives(self, into, descriptive);
+        for p in &self.processors {
+            p.put_snapshot(into, descriptive);
+        }
     }
 }
 
@@ -199,6 +227,8 @@ impl Default for ProcessorMount {
     fn default() -> ProcessorMount {
         ProcessorMount {
             name: None,
+            title: None,
+            description: None,
             processors: Vec::new(),
         }
     }
@@ -221,22 +251,24 @@ impl ProcessesTelemetryMessages for ProcessorMount {
         aggregated
     }
 
-    fn snapshot(&self) -> MetricsSnapshot {
-        let mut collected = Vec::with_capacity(self.processors.len());
-
-        for processor in &self.processors {
-            let snapshot = processor.snapshot();
-            collected.push(snapshot);
-        }
-
+    fn put_snapshot(&self, into: &mut Snapshot, descriptive: bool) {
         if let Some(ref name) = self.name {
-            MetricsSnapshot::Group(name.clone(), collected)
+            let mut new_level = Snapshot::default();
+            self.put_values_into_snapshot(&mut new_level, descriptive);
+            into.items
+                .push((name.clone(), ItemKind::Snapshot(new_level)));
         } else {
-            MetricsSnapshot::GroupWithoutName(collected)
+            self.put_values_into_snapshot(into, descriptive);
         }
     }
+}
 
-    fn name(&self) -> Option<&str> {
-        self.name.as_ref().map(|n| &**n)
+impl Descriptive for ProcessorMount {
+    fn title(&self) -> Option<&str> {
+        self.title.as_ref().map(|n| &**n)
+    }
+
+    fn description(&self) -> Option<&str> {
+        self.description.as_ref().map(|n| &**n)
     }
 }

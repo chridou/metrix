@@ -2,7 +2,6 @@ extern crate metrix;
 
 use std::thread;
 use std::time::{Duration, Instant};
-use std::fmt;
 
 use metrix::*;
 use metrix::instruments::*;
@@ -16,15 +15,6 @@ enum FooLabel {
     B,
 }
 
-impl fmt::Display for FooLabel {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match *self {
-            FooLabel::A => write!(f, "foo_a"),
-            FooLabel::B => write!(f, "foo_b"),
-        }
-    }
-}
-
 #[derive(Clone, PartialEq, Eq)]
 enum BarLabel {
     A,
@@ -32,32 +22,34 @@ enum BarLabel {
     C,
 }
 
-impl fmt::Display for BarLabel {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match *self {
-            BarLabel::A => write!(f, "bar_a"),
-            BarLabel::B => write!(f, "bar_b"),
-            BarLabel::C => write!(f, "bar_c"),
-        }
-    }
-}
-
 fn create_foo_metrics() -> (TelemetryTransmitterSync<FooLabel>, ProcessorMount) {
-    let mut foo_a_panel = Panel::default();
+    let mut foo_a_panel = Panel::with_name(FooLabel::A, "foo_a_panel");
     foo_a_panel.add_counter(Counter::new_with_defaults("foo_a_counter"));
-    foo_a_panel.add_gauge(Gauge::new_with_defaults("foo_a_gauge"));
+    let mut gauge = Gauge::new_with_defaults("foo_a_gauge");
+    gauge.set_title("title");
+    gauge.set_description("description");
+    foo_a_panel.add_gauge(gauge);
     foo_a_panel.add_meter(Meter::new_with_defaults("foo_a_meter"));
     foo_a_panel.add_histogram(Histogram::new_with_defaults("foo_a_histogram"));
+    foo_a_panel.set_title("foo_1_panel_title");
+    foo_a_panel.set_description("foo_a_panel_description");
 
-    let mut foo_b_panel = Panel::default();
+    let mut foo_b_panel = Panel::new(FooLabel::B);
     foo_b_panel.add_counter(Counter::new_with_defaults("foo_b_counter"));
-    foo_b_panel.add_gauge(Gauge::new_with_defaults("foo_b_gauge"));
+    let mut gauge = Gauge::new_with_defaults("foo_b_gauge");
+    gauge.set_title("title");
+    gauge.set_description("description");
+    foo_b_panel.add_gauge(gauge);
     foo_b_panel.add_meter(Meter::new_with_defaults("foo_b_meter"));
     foo_b_panel.add_histogram(Histogram::new_with_defaults("foo_b_histogram"));
+    foo_b_panel.set_title("foo_b_panel_title");
+    foo_b_panel.set_description("foo_b_panel_description");
 
     let mut cockpit = Cockpit::new("foo_cockpit", None);
-    cockpit.add_panel(FooLabel::A, foo_a_panel);
-    cockpit.add_panel(FooLabel::B, foo_b_panel);
+    cockpit.add_panel(foo_a_panel);
+    cockpit.add_panel(foo_b_panel);
+    cockpit.set_title("foo_cockpit_title");
+    cockpit.set_description("foo_cockpit_description");
 
     let (tx, mut processor) = TelemetryProcessor::new_pair("processor_foo");
 
@@ -70,32 +62,32 @@ fn create_foo_metrics() -> (TelemetryTransmitterSync<FooLabel>, ProcessorMount) 
 }
 
 fn create_bar_metrics() -> (TelemetryTransmitterSync<BarLabel>, ProcessorMount) {
-    let mut bar_a_panel = Panel::default();
+    let mut bar_a_panel = Panel::with_name(BarLabel::A, "bar_a_panel");
     bar_a_panel.add_counter(Counter::new_with_defaults("bar_a_counter"));
     bar_a_panel.add_gauge(Gauge::new_with_defaults("bar_a_gauge"));
     bar_a_panel.add_meter(Meter::new_with_defaults("bar_a_meter"));
     bar_a_panel.add_histogram(Histogram::new_with_defaults("bar_a_histogram"));
 
     let mut bar_a_cockpit = Cockpit::without_name(Some(ValueScaling::NanosToMicros));
-    bar_a_cockpit.add_panel(BarLabel::A, bar_a_panel);
+    bar_a_cockpit.add_panel(bar_a_panel);
 
-    let mut bar_b_panel = Panel::default();
+    let mut bar_b_panel = Panel::new(BarLabel::B);
     bar_b_panel.add_counter(Counter::new_with_defaults("bar_b_counter"));
     bar_b_panel.add_gauge(Gauge::new_with_defaults("bar_b_gauge"));
     bar_b_panel.add_meter(Meter::new_with_defaults("bar_b_meter"));
     bar_b_panel.add_histogram(Histogram::new_with_defaults("bar_b_histogram"));
 
     let mut bar_b_cockpit = Cockpit::new("bar_b_cockpit", None);
-    bar_b_cockpit.add_panel(BarLabel::B, bar_b_panel);
+    bar_b_cockpit.add_panel(bar_b_panel);
 
-    let mut bar_c_panel = Panel::default();
+    let mut bar_c_panel = Panel::with_name(BarLabel::C, "bar_c_panel");
     bar_c_panel.add_counter(Counter::new_with_defaults("bar_c_counter"));
     bar_c_panel.add_gauge(Gauge::new_with_defaults("bar_c_gauge"));
     bar_c_panel.add_meter(Meter::new_with_defaults("bar_c_meter"));
     bar_c_panel.add_histogram(Histogram::new_with_defaults("bar_c_histogram"));
 
     let mut bar_c_cockpit = Cockpit::new("bar_c_cockpit", None);
-    bar_c_cockpit.add_panel(BarLabel::C, bar_c_panel);
+    bar_c_cockpit.add_panel(bar_c_panel);
 
     let (tx, mut processor) = TelemetryProcessor::new_pair_without_name();
 
@@ -129,7 +121,7 @@ fn main() {
         let bar_transmitter = bar_transmitter.clone();
 
         thread::spawn(move || {
-            for n in 0..1_000_000 {
+            for n in 0..5_000_000 {
                 foo_transmitter.observed_one_value(FooLabel::A, n, Instant::now());
                 bar_transmitter.measure_time(BarLabel::C, start);
             }
@@ -141,7 +133,7 @@ fn main() {
         let bar_transmitter = bar_transmitter.clone();
 
         thread::spawn(move || {
-            for n in 0..1_000_000 {
+            for n in 0..5_000_000 {
                 foo_transmitter.observed_one_value(FooLabel::B, n, Instant::now());
                 bar_transmitter.observed_one_value(BarLabel::B, n * n, Instant::now());
             }
@@ -162,14 +154,14 @@ fn main() {
     handle2.join().unwrap();
     handle3.join().unwrap();
 
-    println!("{:?}. Sleeping 10 secs.", start.elapsed());
+    println!("{:?}. Sleeping 1 secs.", start.elapsed());
 
-    thread::sleep(Duration::from_secs(10));
+    thread::sleep(Duration::from_secs(1));
 
-    let snapshot = driver.snapshot();
+    let snapshot = driver.snapshot(true);
 
     let mut config = JsonConfig::default();
-    config.pretty = Some(2);
+    config.pretty = Some(4);
 
     println!("{:?}", snapshot);
     println!("\n\n\n=======================\n\n");

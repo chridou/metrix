@@ -1,5 +1,4 @@
 extern crate exponential_decay_histogram;
-#[macro_use]
 extern crate json;
 extern crate metrics;
 
@@ -14,6 +13,7 @@ pub mod instruments;
 pub mod snapshot;
 pub mod processor;
 pub mod driver;
+pub(crate) mod util;
 
 /// An observation that has been made.
 ///
@@ -142,7 +142,7 @@ pub trait TransmitsTelemetryData<L> {
 
     /// Add a `Panel` to a `Cockpit` if that `Cockpit` has the
     /// given name.
-    fn add_panel_to_cockpit(&self, cockpit_name: String, label: L, panel: Panel);
+    fn add_panel_to_cockpit(&self, cockpit_name: String, panel: Panel<L>);
 }
 
 /// Transmits `Observation`s to the backend
@@ -182,10 +182,9 @@ impl<L> TransmitsTelemetryData<L> for TelemetryTransmitter<L> {
         }
     }
 
-    fn add_panel_to_cockpit(&self, cockpit_name: String, label: L, panel: Panel) {
+    fn add_panel_to_cockpit(&self, cockpit_name: String, panel: Panel<L>) {
         if let Err(_err) = self.sender.send(TelemetryMessage::AddPanel {
             cockpit_name,
-            label,
             panel,
         }) {
             // maybe log...
@@ -242,13 +241,12 @@ impl<L> TransmitsTelemetryData<L> for TelemetryTransmitterSync<L> {
         }
     }
 
-    fn add_panel_to_cockpit(&self, cockpit_name: String, label: L, panel: Panel) {
+    fn add_panel_to_cockpit(&self, cockpit_name: String, panel: Panel<L>) {
         if let Err(_err) = self.sender
             .lock()
             .unwrap()
             .send(TelemetryMessage::AddPanel {
                 cockpit_name,
-                label,
                 panel,
             }) {
             // maybe log...

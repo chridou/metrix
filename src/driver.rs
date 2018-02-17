@@ -4,7 +4,9 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 use processor::{AggregatesProcessors, ProcessesTelemetryMessages, ProcessingOutcome};
-use snapshot::MetricsSnapshot;
+use snapshot::{ItemKind, Snapshot};
+use instruments::Descriptive;
+use util;
 
 /// Triggers registered `ProcessesTelemetryMessages` to
 /// poll for messages.
@@ -16,9 +18,11 @@ use snapshot::MetricsSnapshot;
 /// If done so, it will still poll its children on its own thread
 /// independently.
 pub struct TelemetryDriver {
+    name: Option<String>,
+    title: Option<String>,
+    description: Option<String>,
     processors: Arc<Mutex<Vec<Box<ProcessesTelemetryMessages>>>>,
     is_running: Arc<AtomicBool>,
-    name: Option<String>,
 }
 
 impl TelemetryDriver {
@@ -28,8 +32,35 @@ impl TelemetryDriver {
         driver
     }
 
+    pub fn name(&self) -> Option<&str> {
+        self.name.as_ref().map(|n| &**n)
+    }
+
     pub fn set_name<T: Into<String>>(&mut self, name: T) {
         self.name = Some(name.into())
+    }
+
+    pub fn set_title<T: Into<String>>(&mut self, title: T) {
+        self.title = Some(title.into())
+    }
+
+    pub fn set_description<T: Into<String>>(&mut self, description: T) {
+        self.description = Some(description.into())
+    }
+
+    fn put_values_into_snapshot(&self, into: &mut Snapshot, descriptive: bool) {
+        util::put_default_descriptives(self, into, descriptive);
+        self.processors
+            .lock()
+            .unwrap()
+            .iter()
+            .for_each(|p| p.put_snapshot(into, descriptive))
+    }
+
+    pub fn snapshot(&self, descriptive: bool) -> Snapshot {
+        let mut outer = Snapshot::default();
+        self.put_snapshot(&mut outer, descriptive);
+        outer
     }
 }
 
@@ -39,24 +70,15 @@ impl ProcessesTelemetryMessages for TelemetryDriver {
         ProcessingOutcome::default()
     }
 
-    fn snapshot(&self) -> MetricsSnapshot {
-        let processors = self.processors.lock().unwrap();
-        let mut collected = Vec::with_capacity(processors.len());
-
-        for processor in processors.iter() {
-            let snapshot = processor.snapshot();
-            collected.push(snapshot);
-        }
-
+    fn put_snapshot(&self, into: &mut Snapshot, descriptive: bool) {
         if let Some(ref name) = self.name {
-            MetricsSnapshot::Group(name.clone(), collected)
+            let mut new_level = Snapshot::default();
+            self.put_values_into_snapshot(&mut new_level, descriptive);
+            into.items
+                .push((name.clone(), ItemKind::Snapshot(new_level)));
         } else {
-            MetricsSnapshot::GroupWithoutName(collected)
+            self.put_values_into_snapshot(into, descriptive);
         }
-    }
-
-    fn name(&self) -> Option<&str> {
-        self.name.as_ref().map(|n| &**n)
     }
 }
 
@@ -64,6 +86,8 @@ impl Default for TelemetryDriver {
     fn default() -> TelemetryDriver {
         let driver = TelemetryDriver {
             name: None,
+            title: None,
+            description: None,
             is_running: Arc::new(AtomicBool::new(true)),
             processors: Arc::new(Mutex::new(Vec::new())),
         };
@@ -86,6 +110,16 @@ impl Drop for TelemetryDriver {
     }
 }
 
+impl Descriptive for TelemetryDriver {
+    fn title(&self) -> Option<&str> {
+        self.title.as_ref().map(|n| &**n)
+    }
+
+    fn description(&self) -> Option<&str> {
+        self.description.as_ref().map(|n| &**n)
+    }
+}
+
 fn start_telemetry_loop(
     processors: Arc<Mutex<Vec<Box<ProcessesTelemetryMessages>>>>,
     is_running: Arc<AtomicBool>,
@@ -103,7 +137,10 @@ fn telemetry_loop(
         }
 
         let started = Instant::now();
-        let _outcome = do_a_run(processors);
+        let outcome = do_a_run(processors, 1_000);
+        if outcome.dropped > 0 || outcome.processed > 0 {
+            continue;
+        }
         let finished = Instant::now();
         let elapsed = finished - started;
         if elapsed < Duration::from_millis(5) {
@@ -112,13 +149,16 @@ fn telemetry_loop(
     }
 }
 
-fn do_a_run(processors: &Mutex<Vec<Box<ProcessesTelemetryMessages>>>) -> ProcessingOutcome {
+fn do_a_run(
+    processors: &Mutex<Vec<Box<ProcessesTelemetryMessages>>>,
+    max: usize,
+) -> ProcessingOutcome {
     let mut processors = processors.lock().unwrap();
 
     let mut outcome = ProcessingOutcome::default();
 
     for processor in processors.iter_mut() {
-        outcome.combine_with(&processor.process(1000));
+        outcome.combine_with(&processor.process(max));
     }
 
     outcome
