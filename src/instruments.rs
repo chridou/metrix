@@ -572,8 +572,11 @@ impl MaxTracker {
 
     pub fn set(&mut self, v: u64) {
         let now = Instant::now();
+
+        // Create the state that should be there now
         if now > self.display_until {
-            self.display_max = None;
+            self.display_max = self.current_max;
+            self.current_max = None;
         }
 
         /* match (self.current_max, self.display_max) {
@@ -604,6 +607,8 @@ impl MaxTracker {
 
     fn put_snapshot(&self, into: &mut Snapshot, descriptive: bool) {
         util::put_prefixed_descriptives(self, &self.name, into, descriptive);
+
+        let now = Instant::now();
 
         if let Some(v) = self.display_max {
             into.items.push((self.name.clone(), ItemKind::UInt(v)));
