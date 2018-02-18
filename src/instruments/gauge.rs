@@ -1,7 +1,7 @@
 use instruments::{Update, Updates};
 
 use snapshot::{ItemKind, Snapshot};
-use Descriptive;
+use {Descriptive, PutsSnapshot};
 use util;
 
 /// Simply returns the value that has been observed last.
@@ -41,8 +41,10 @@ impl Gauge {
     pub fn set_description<T: Into<String>>(&mut self, description: T) {
         self.description = Some(description.into())
     }
+}
 
-    pub fn put_snapshot(&self, into: &mut Snapshot, descriptive: bool) {
+impl PutsSnapshot for Gauge {
+    fn put_snapshot(&self, into: &mut Snapshot, descriptive: bool) {
         util::put_prefixed_descriptives(self, &self.name, into, descriptive);
         if let Some(v) = self.value {
             into.items.push((self.name.clone(), ItemKind::UInt(v)));

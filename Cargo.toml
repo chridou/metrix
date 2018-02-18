@@ -8,7 +8,7 @@ description = "metrics for application monitoring"
 documentation = "https://docs.rs/metrix"
 homepage = "https://github.com/chridou/metrix"
 repository = "https://github.com/chridou/metrix"
-keywords = ["metrics", "monitoring"]
+keywords = ["metrics", "monitoring", "alerting"]
 
 [dependencies]
 exponential-decay-histogram = "0.1.0"

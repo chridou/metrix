@@ -4,7 +4,7 @@ use std::time::{Duration, Instant};
 
 use metrics::metrics::{Meter as MMeter, StdMeter};
 
-use Descriptive;
+use {Descriptive, PutsSnapshot};
 use snapshot::{ItemKind, MeterRate, MeterSnapshot, Snapshot};
 use util;
 
@@ -44,13 +44,6 @@ impl Meter {
         self.description = Some(description.into())
     }
 
-    pub fn put_snapshot(&self, into: &mut Snapshot, descriptive: bool) {
-        util::put_prefixed_descriptives(self, &self.name, into, descriptive);
-        let mut new_level = Snapshot::default();
-        self.put_values_into_snapshot(&mut new_level);
-        into.push(self.name.clone(), ItemKind::Snapshot(new_level));
-    }
-
     fn put_values_into_snapshot(&self, into: &mut Snapshot) {
         if self.last_tick.elapsed() >= Duration::from_secs(5) {
             self.inner_meter.tick()
@@ -73,6 +66,15 @@ impl Meter {
             },
         };
         meter_snapshot.put_snapshot(into);
+    }
+}
+
+impl PutsSnapshot for Meter {
+    fn put_snapshot(&self, into: &mut Snapshot, descriptive: bool) {
+        util::put_prefixed_descriptives(self, &self.name, into, descriptive);
+        let mut new_level = Snapshot::default();
+        self.put_values_into_snapshot(&mut new_level);
+        into.push(self.name.clone(), ItemKind::Snapshot(new_level));
     }
 }
 

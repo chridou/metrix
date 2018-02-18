@@ -1,9 +1,9 @@
 use std::sync::mpsc;
 
-use {Observation, TelemetryTransmitter};
+use {Observation, PutsSnapshot, TelemetryTransmitter};
 use Descriptive;
-use instruments::{HandlesObservations, Panel};
-use cockpit::Cockpit;
+use instruments::Panel;
+use cockpit::{Cockpit, HandlesObservations};
 use snapshot::{ItemKind, Snapshot};
 use util;
 
@@ -50,12 +50,9 @@ impl Default for ProcessingOutcome {
 }
 
 /// Can receive telemtry data also give snapshots
-pub trait ProcessesTelemetryMessages: Send + 'static {
+pub trait ProcessesTelemetryMessages: PutsSnapshot + Send + 'static {
     /// Receive and handle pending operations
     fn process(&mut self, max: usize) -> ProcessingOutcome;
-
-    /// Put the snapshot.
-    fn put_snapshot(&self, into: &mut Snapshot, descriptive: bool);
 }
 
 pub struct TelemetryProcessor<L> {
@@ -171,7 +168,12 @@ where
             dropped: 0,
         }
     }
+}
 
+impl<L> PutsSnapshot for TelemetryProcessor<L>
+where
+    L: Clone + Eq + Send + 'static,
+{
     fn put_snapshot(&self, into: &mut Snapshot, descriptive: bool) {
         if let Some(ref name) = self.name {
             let mut new_level = Snapshot::default();
@@ -252,7 +254,9 @@ impl ProcessesTelemetryMessages for ProcessorMount {
 
         aggregated
     }
+}
 
+impl PutsSnapshot for ProcessorMount {
     fn put_snapshot(&self, into: &mut Snapshot, descriptive: bool) {
         if let Some(ref name) = self.name {
             let mut new_level = Snapshot::default();

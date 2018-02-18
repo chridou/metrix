@@ -2,7 +2,7 @@ use std::time::Instant;
 
 use Observation;
 use snapshot::{ItemKind, Snapshot};
-use Descriptive;
+use {Descriptive, PutsSnapshot};
 use util;
 
 pub use self::counter::*;
@@ -23,7 +23,9 @@ mod histogram;
 /// other already scaled a value.
 #[derive(Debug, Clone, Copy)]
 pub enum ValueScaling {
+    /// Consider incoming values nanos and make them millis
     NanosToMillis,
+    /// Consider incoming values nanos and make them micros
     NanosToMicros,
 }
 
@@ -39,6 +41,7 @@ pub enum Update {
 }
 
 impl Update {
+    /// Scale by the given `ValueScaling`
     pub fn scale(self, scaling: ValueScaling) -> Update {
         if let Update::ObservationWithValue(v, t) = self {
             match scaling {
@@ -51,68 +54,61 @@ impl Update {
     }
 }
 
-pub struct LabelAndObservation<T>(pub T, pub Update);
+/// A label with the associated `Update`
+///
+/// This is basically an explodes `Observation`
+pub struct LabelAndUpdate<T>(pub T, pub Update);
 
-impl<T> From<Observation<T>> for LabelAndObservation<T> {
-    fn from(obs: Observation<T>) -> LabelAndObservation<T> {
+impl<T> From<Observation<T>> for LabelAndUpdate<T> {
+    fn from(obs: Observation<T>) -> LabelAndUpdate<T> {
         match obs {
             Observation::Observed {
                 label,
                 count,
                 timestamp,
                 ..
-            } => LabelAndObservation(label, Update::Observations(count, timestamp)),
+            } => LabelAndUpdate(label, Update::Observations(count, timestamp)),
             Observation::ObservedOne {
                 label, timestamp, ..
-            } => LabelAndObservation(label, Update::Observation(timestamp)),
+            } => LabelAndUpdate(label, Update::Observation(timestamp)),
             Observation::ObservedOneValue {
                 label,
                 value,
                 timestamp,
                 ..
-            } => LabelAndObservation(label, Update::ObservationWithValue(value, timestamp)),
+            } => LabelAndUpdate(label, Update::ObservationWithValue(value, timestamp)),
         }
     }
 }
 
-impl<'a, T> From<&'a Observation<T>> for LabelAndObservation<T>
+impl<'a, T> From<&'a Observation<T>> for LabelAndUpdate<T>
 where
     T: Clone,
 {
-    fn from(obs: &'a Observation<T>) -> LabelAndObservation<T> {
+    fn from(obs: &'a Observation<T>) -> LabelAndUpdate<T> {
         match *obs {
             Observation::Observed {
                 ref label,
                 count,
                 timestamp,
                 ..
-            } => LabelAndObservation(label.clone(), Update::Observations(count, timestamp)),
+            } => LabelAndUpdate(label.clone(), Update::Observations(count, timestamp)),
             Observation::ObservedOne {
                 ref label,
                 timestamp,
                 ..
-            } => LabelAndObservation(label.clone(), Update::Observation(timestamp)),
+            } => LabelAndUpdate(label.clone(), Update::Observation(timestamp)),
             Observation::ObservedOneValue {
                 ref label,
                 value,
                 timestamp,
                 ..
-            } => LabelAndObservation(
+            } => LabelAndUpdate(
                 label.clone(),
                 Update::ObservationWithValue(value, timestamp),
             ),
         }
     }
-}
-
-/// Something that can react on `Observation`s where
-/// the `Label` is the type of the label.
-///
-/// You can use this to implement your own Metrics.
-pub trait HandlesObservations: Send + 'static {
-    type Label: Send + 'static;
-    fn handle_observation(&mut self, observation: &Observation<Self::Label>);
-    fn put_snapshot(&self, into: &mut Snapshot, descriptive: bool);
 }
 
 pub trait Updates {
@@ -121,7 +117,7 @@ pub trait Updates {
 
 /// The panel shows recorded
 /// observations of the same label
-/// in different flavours.
+/// in different representations.
 ///
 /// Let's say you want to monitor the successful requests
 /// of a specific endpoint of your REST API.
@@ -142,6 +138,7 @@ pub struct Panel<L> {
 }
 
 impl<L> Panel<L> {
+    /// Create a new `Panel` without a name.
     pub fn new(label: L) -> Panel<L> {
         Panel {
             label: label,
@@ -156,25 +153,26 @@ impl<L> Panel<L> {
         }
     }
 
+    /// Create a new `Panel` with the given name
     pub fn with_name<T: Into<String>>(label: L, name: T) -> Panel<L> {
         let mut panel = Panel::new(label);
         panel.set_name(name);
         panel
     }
 
-    pub fn add_counter(&mut self, counter: Counter) {
+    pub fn set_counter(&mut self, counter: Counter) {
         self.counter = Some(counter);
     }
 
-    pub fn add_gauge(&mut self, gauge: Gauge) {
+    pub fn set_gauge(&mut self, gauge: Gauge) {
         self.gauge = Some(gauge);
     }
 
-    pub fn add_meter(&mut self, meter: Meter) {
+    pub fn set_meter(&mut self, meter: Meter) {
         self.meter = Some(meter);
     }
 
-    pub fn add_histogram(&mut self, histogram: Histogram) {
+    pub fn set_histogram(&mut self, histogram: Histogram) {
         self.histogram = Some(histogram);
     }
 
@@ -213,8 +211,10 @@ impl<L> Panel<L> {
             .iter()
             .for_each(|x| x.put_snapshot(into, descriptive));
     }
+}
 
-    pub fn put_snapshot(&self, into: &mut Snapshot, descriptive: bool) {
+impl<L> PutsSnapshot for Panel<L> {
+    fn put_snapshot(&self, into: &mut Snapshot, descriptive: bool) {
         if let Some(ref name) = self.name {
             let mut new_level = Snapshot::default();
             self.put_values_into_snapshot(&mut new_level, descriptive);

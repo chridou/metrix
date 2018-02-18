@@ -25,24 +25,24 @@ enum BarLabel {
 
 fn create_foo_metrics() -> (TelemetryTransmitterSync<FooLabel>, ProcessorMount) {
     let mut foo_a_panel = Panel::with_name(FooLabel::A, "foo_a_panel");
-    foo_a_panel.add_counter(Counter::new_with_defaults("foo_a_counter"));
+    foo_a_panel.set_counter(Counter::new_with_defaults("foo_a_counter"));
     let mut gauge = Gauge::new_with_defaults("foo_a_gauge");
     gauge.set_title("title");
     gauge.set_description("description");
-    foo_a_panel.add_gauge(gauge);
-    foo_a_panel.add_meter(Meter::new_with_defaults("foo_a_meter"));
-    foo_a_panel.add_histogram(Histogram::new_with_defaults("foo_a_histogram"));
+    foo_a_panel.set_gauge(gauge);
+    foo_a_panel.set_meter(Meter::new_with_defaults("foo_a_meter"));
+    foo_a_panel.set_histogram(Histogram::new_with_defaults("foo_a_histogram"));
     foo_a_panel.set_title("foo_1_panel_title");
     foo_a_panel.set_description("foo_a_panel_description");
 
     let mut foo_b_panel = Panel::new(FooLabel::B);
-    foo_b_panel.add_counter(Counter::new_with_defaults("foo_b_counter"));
+    foo_b_panel.set_counter(Counter::new_with_defaults("foo_b_counter"));
     let mut gauge = Gauge::new_with_defaults("foo_b_gauge");
     gauge.set_title("title");
     gauge.set_description("description");
-    foo_b_panel.add_gauge(gauge);
-    foo_b_panel.add_meter(Meter::new_with_defaults("foo_b_meter"));
-    foo_b_panel.add_histogram(Histogram::new_with_defaults("foo_b_histogram"));
+    foo_b_panel.set_gauge(gauge);
+    foo_b_panel.set_meter(Meter::new_with_defaults("foo_b_meter"));
+    foo_b_panel.set_histogram(Histogram::new_with_defaults("foo_b_histogram"));
     foo_b_panel.set_title("foo_b_panel_title");
     foo_b_panel.set_description("foo_b_panel_description");
 
@@ -64,28 +64,28 @@ fn create_foo_metrics() -> (TelemetryTransmitterSync<FooLabel>, ProcessorMount) 
 
 fn create_bar_metrics() -> (TelemetryTransmitterSync<BarLabel>, ProcessorMount) {
     let mut bar_a_panel = Panel::with_name(BarLabel::A, "bar_a_panel");
-    bar_a_panel.add_counter(Counter::new_with_defaults("bar_a_counter"));
-    bar_a_panel.add_gauge(Gauge::new_with_defaults("bar_a_gauge"));
-    bar_a_panel.add_meter(Meter::new_with_defaults("bar_a_meter"));
-    bar_a_panel.add_histogram(Histogram::new_with_defaults("bar_a_histogram"));
+    bar_a_panel.set_counter(Counter::new_with_defaults("bar_a_counter"));
+    bar_a_panel.set_gauge(Gauge::new_with_defaults("bar_a_gauge"));
+    bar_a_panel.set_meter(Meter::new_with_defaults("bar_a_meter"));
+    bar_a_panel.set_histogram(Histogram::new_with_defaults("bar_a_histogram"));
 
     let mut bar_a_cockpit = Cockpit::without_name(Some(ValueScaling::NanosToMicros));
     bar_a_cockpit.add_panel(bar_a_panel);
 
     let mut bar_b_panel = Panel::new(BarLabel::B);
-    bar_b_panel.add_counter(Counter::new_with_defaults("bar_b_counter"));
-    bar_b_panel.add_gauge(Gauge::new_with_defaults("bar_b_gauge"));
-    bar_b_panel.add_meter(Meter::new_with_defaults("bar_b_meter"));
-    bar_b_panel.add_histogram(Histogram::new_with_defaults("bar_b_histogram"));
+    bar_b_panel.set_counter(Counter::new_with_defaults("bar_b_counter"));
+    bar_b_panel.set_gauge(Gauge::new_with_defaults("bar_b_gauge"));
+    bar_b_panel.set_meter(Meter::new_with_defaults("bar_b_meter"));
+    bar_b_panel.set_histogram(Histogram::new_with_defaults("bar_b_histogram"));
 
     let mut bar_b_cockpit = Cockpit::new("bar_b_cockpit", None);
     bar_b_cockpit.add_panel(bar_b_panel);
 
     let mut bar_c_panel = Panel::with_name(BarLabel::C, "bar_c_panel");
-    bar_c_panel.add_counter(Counter::new_with_defaults("bar_c_counter"));
-    bar_c_panel.add_gauge(Gauge::new_with_defaults("bar_c_gauge"));
-    bar_c_panel.add_meter(Meter::new_with_defaults("bar_c_meter"));
-    bar_c_panel.add_histogram(Histogram::new_with_defaults("bar_c_histogram"));
+    bar_c_panel.set_counter(Counter::new_with_defaults("bar_c_counter"));
+    bar_c_panel.set_gauge(Gauge::new_with_defaults("bar_c_gauge"));
+    bar_c_panel.set_meter(Meter::new_with_defaults("bar_c_meter"));
+    bar_c_panel.set_histogram(Histogram::new_with_defaults("bar_c_histogram"));
 
     let mut bar_c_cockpit = Cockpit::new("bar_c_cockpit", None);
     bar_c_cockpit.add_panel(bar_c_panel);

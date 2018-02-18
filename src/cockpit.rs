@@ -1,7 +1,16 @@
-use Observation;
+use {Observation, PutsSnapshot};
 use instruments::*;
 use snapshot::{ItemKind, Snapshot};
 use util;
+
+/// Something that can react on `Observation`s where
+/// the `Label` is the type of the label.
+///
+/// You can use this to implement your own Metrics.
+pub trait HandlesObservations: PutsSnapshot + Send + 'static {
+    type Label: Send + 'static;
+    fn handle_observation(&mut self, observation: &Observation<Self::Label>);
+}
 
 /// A cockpit groups panels.
 ///
@@ -85,6 +94,22 @@ where
     }
 }
 
+impl<L> PutsSnapshot for Cockpit<L>
+where
+    L: Clone + Eq + Send + 'static,
+{
+    fn put_snapshot(&self, into: &mut Snapshot, descriptive: bool) {
+        if let Some(ref name) = self.name {
+            let mut new_level = Snapshot::default();
+            self.put_values_into_snapshot(&mut new_level, descriptive);
+            into.items
+                .push((name.clone(), ItemKind::Snapshot(new_level)));
+        } else {
+            self.put_values_into_snapshot(into, descriptive);
+        }
+    }
+}
+
 impl<L> Default for Cockpit<L>
 where
     L: Clone + Eq + Send + 'static,
@@ -107,7 +132,7 @@ where
     type Label = L;
 
     fn handle_observation(&mut self, observation: &Observation<Self::Label>) {
-        let LabelAndObservation(label, update) = observation.into();
+        let LabelAndUpdate(label, update) = observation.into();
 
         let update = if let Some(scaling) = self.value_scaling {
             update.scale(scaling)
@@ -119,17 +144,6 @@ where
             .iter_mut()
             .filter(|p| p.label == label)
             .for_each(|p| p.update(&update));
-    }
-
-    fn put_snapshot(&self, into: &mut Snapshot, descriptive: bool) {
-        if let Some(ref name) = self.name {
-            let mut new_level = Snapshot::default();
-            self.put_values_into_snapshot(&mut new_level, descriptive);
-            into.items
-                .push((name.clone(), ItemKind::Snapshot(new_level)));
-        } else {
-            self.put_values_into_snapshot(into, descriptive);
-        }
     }
 }
 

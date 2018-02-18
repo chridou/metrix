@@ -14,21 +14,97 @@
 //! (https://github.com/chridou/metrix/blob/master/LICENSE-APACHE)
 //!
 //!
-//! Metrics for monitoring applications
+//! Metrics for monitoring applications and alerting.
 //!
 //! ## Goal
 //!
 //! Applications/services can have a lot of metrics and one of the greatest challenges is
 //! organizing them. This is what `metrix` tries to help with.
 //!
-//! Metrix does not aim for providing exact numbers for scientific or financial analysis.
+//! **Metrix** does not aim for providing exact numbers for scientific or financial analysis.
 //!
 //! This crate is in a very **early** stage and the API might still change. There may be
-//! backends provided for monitoring solutions but currently only a snapshot that can be
+//! backends provided for monitoring solutions in the future
+//! but currently only a snapshot that can be
 //! serialized to JSON is provided.
 //!
 //! ## How does it work
 //!
+//! **Metrix** is based on observations collected while running your
+//! application. These observations will then be sent to a backend where
+//! the actual metrics(counters etc.) are updated. For the metrics configured
+//! a snapshot can be queried.
+//!
+//! The primary focus of **metrix** is to organize these metrics. There are several
+//! building blocks available. Most of them can have a name that will then be part
+//! of a path within a snapshot.
+//!
+//! ### Labels
+//!
+//! Labels link observations to panels. Labels can be of any type that implements
+//! `Clone + Eq + Send + 'static`. An `enum` is a good start for a lable.
+//!
+//! ### Observations
+//!
+//! An abservation is made somewhere within your application. When an observation
+//! is sent to the backend it must have a label attached. This label
+//! is then matched against the label of a panel to determine whether an observation is
+//! handled or not.
+//!
+//! ### Instruments
+//!
+//! Instruments are gauges, meters, etc. An instrument gets updated by an observation
+//! where an update is meaningful. Instruments are grouped by  `Panel`s.
+//!
+//! You can find instruments in the module `instruments`.
+//!
+//! ### Panels
+//!
+//! A `Panel` groups instruments under same same label. So each instrument within
+//! a panel will be updated by observations that have the same label as the panel.
+//!
+//! Lets say you defined a label `OutgoingRequests`. If you are interested
+//! in the request rate and the latencies. You would then create a panel with a
+//! label `OutgoingRequests` and add a histogram and a meter.
+//!
+//! ### Cockpit
+//!
+//! A cockpit aggregates multiple `Panel`s. A cockpit can be used to monitor
+//! different tasks/parts of a component or worklflow. A cockpit
+//! is bound to a label type.
+//!
+//! An example can be that you have service component that calls an external
+//! HTTP client. You could be interested in successful calls and failed calls
+//! individually. So for both cases you would create a value for your label
+//! and then add two panels to the cockpit.
+//!
+//! Cockpits are in the module `cockpit`.
+//!
+//! ### Processors
+//!
+//! The most important processor is the `TelemetryProcessor`. It has
+//! a label type as a type parameter and consist of a `TelemetryTransmitter`
+//! that sends observations to the backend and the actual `TelemetryProcessor`
+//! that forms the backend and processes observations. The `TelemetryProcessor`
+//! can own several cockpits for a label type.
+//!
+//! There is also a `ProcessorMount` that is label agnostic and can group
+//! several processors. It can also have a name that will be included in the
+//! snapshot.
+//!
+//! The processors can be found the module `processors`.
+//!
+//! ### Driver
+//!
+//! The driver contains priodically asks the registered processors
+//! to process their messages. You need add your processors to
+//! a driver to make anything happen. A driver is also a processor
+//! which means it can have a name and it can also be part of another
+//! hierarchy.
+//!
+//! Each driver has its own thread so even when attached to another
+//! hierarchy all processors registered with the driver will only
+//! be driven by that driver.
 //!
 //!
 //! ## Contributing
@@ -50,10 +126,11 @@ extern crate metrics;
 use std::sync::{Arc, Mutex};
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
+use snapshot::Snapshot;
 
 use processor::TelemetryMessage;
-use instruments::{HandlesObservations, Panel};
-use cockpit::Cockpit;
+use instruments::Panel;
+use cockpit::{Cockpit, HandlesObservations};
 
 pub mod instruments;
 pub mod snapshot;
@@ -68,7 +145,7 @@ pub(crate) mod util;
 /// observations or values.
 /// E.g. a `Meter` does not take the `value` of
 /// an `Observation::ObservedOneValue` into account but
-/// simply counts the obsercation as one occurence.
+/// simply counts the observation as one occurence.
 #[derive(Clone)]
 pub enum Observation<L> {
     /// Observed many occurances at th given timestamp
@@ -99,7 +176,7 @@ impl<L> Observation<L> where {
 }
 
 pub trait TransmitsTelemetryData<L> {
-    /// Collect an observation.
+    /// Transit an observation to the backend.
     fn transmit(&self, observation: Observation<L>);
 
     /// Observed `count` occurences at time `timestamp`
@@ -181,7 +258,7 @@ pub trait TransmitsTelemetryData<L> {
         }
     }
 
-    /// Add a handler
+    /// Add a handler.
     fn add_handler(&self, handler: Box<HandlesObservations<Label = L>>);
 
     /// Add a `Copckpit`
@@ -193,6 +270,10 @@ pub trait TransmitsTelemetryData<L> {
 }
 
 /// Transmits `Observation`s to the backend
+///
+/// This struct does **not** implement the `Sync` trait
+/// and can therefore not be shared between threads.
+/// See `synced()` method.
 #[derive(Clone)]
 pub struct TelemetryTransmitter<L> {
     sender: mpsc::Sender<TelemetryMessage<L>>,
@@ -239,7 +320,7 @@ impl<L> TransmitsTelemetryData<L> for TelemetryTransmitter<L> {
     }
 }
 
-/// Transmits `Observation`s to the backend and has the `Sync` marker
+/// Transmits `Observation`s to the backend and has the `Sync` marker.
 ///
 /// This is almost the same as the `TelemetryTransmitter`.
 ///
@@ -302,6 +383,8 @@ impl<L> TransmitsTelemetryData<L> for TelemetryTransmitterSync<L> {
 }
 
 /// Something that has a title and a description
+///
+/// This is mostly useful for snapshots.
 pub trait Descriptive {
     fn title(&self) -> Option<&str> {
         None
@@ -310,4 +393,28 @@ pub trait Descriptive {
     fn description(&self) -> Option<&str> {
         None
     }
+}
+
+/// Implementors are able to writ thier snapshot into the given snapshot.
+///
+/// Guidelines for writing snapshots:
+///
+/// * A `PutsSnapshot` that has a name should create a new sub snapshot
+/// and add its values there
+///
+/// * A `PutsSnapshot` that does not have a name should add its values
+/// directly to the given snapshot
+///
+/// * When `descriptive` is set to `true` `PutsSnapshot` should put
+/// its `title` and `description` into the same `Snapshot` it put
+/// its values(exception: instruments) thereby not overwriting already
+/// existing descriptions so that the more general top level ones survive.
+///
+/// * When `descriptive` is set to `true` on an instrument the instrument
+/// should put its description into the snapshot it got passed therby adding the
+/// suffixes "_title" and "_description" to its name.
+pub trait PutsSnapshot {
+    /// Puts the current snapshot values into the given `Snapshot` thereby
+    /// following the guidelines of `PutsSnapshot`.
+    fn put_snapshot(&self, into: &mut Snapshot, descriptive: bool);
 }

@@ -2,7 +2,7 @@ use instruments::Update;
 use instruments::Updates;
 
 use snapshot::{ItemKind, Snapshot};
-use Descriptive;
+use {Descriptive, PutsSnapshot};
 use util;
 
 /// A simple ever increasing counter
@@ -46,8 +46,10 @@ impl Counter {
     pub fn set_description<T: Into<String>>(&mut self, description: T) {
         self.description = Some(description.into())
     }
+}
 
-    pub fn put_snapshot(&self, into: &mut Snapshot, descriptive: bool) {
+impl PutsSnapshot for Counter {
+    fn put_snapshot(&self, into: &mut Snapshot, descriptive: bool) {
         util::put_prefixed_descriptives(self, &self.name, into, descriptive);
         into.items
             .push((self.name.clone(), ItemKind::UInt(self.count)));

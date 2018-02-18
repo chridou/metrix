@@ -5,7 +5,7 @@ use std::time::{Duration, Instant};
 
 use processor::{AggregatesProcessors, ProcessesTelemetryMessages, ProcessingOutcome};
 use snapshot::{ItemKind, Snapshot};
-use Descriptive;
+use {Descriptive, PutsSnapshot};
 use util;
 
 /// Triggers registered `ProcessesTelemetryMessages` to
@@ -48,6 +48,12 @@ impl TelemetryDriver {
         self.description = Some(description.into())
     }
 
+    pub fn snapshot(&self, descriptive: bool) -> Snapshot {
+        let mut outer = Snapshot::default();
+        self.put_snapshot(&mut outer, descriptive);
+        outer
+    }
+
     fn put_values_into_snapshot(&self, into: &mut Snapshot, descriptive: bool) {
         util::put_default_descriptives(self, into, descriptive);
         self.processors
@@ -56,12 +62,6 @@ impl TelemetryDriver {
             .iter()
             .for_each(|p| p.put_snapshot(into, descriptive))
     }
-
-    pub fn snapshot(&self, descriptive: bool) -> Snapshot {
-        let mut outer = Snapshot::default();
-        self.put_snapshot(&mut outer, descriptive);
-        outer
-    }
 }
 
 impl ProcessesTelemetryMessages for TelemetryDriver {
@@ -69,7 +69,9 @@ impl ProcessesTelemetryMessages for TelemetryDriver {
     fn process(&mut self, _max: usize) -> ProcessingOutcome {
         ProcessingOutcome::default()
     }
+}
 
+impl PutsSnapshot for TelemetryDriver {
     fn put_snapshot(&self, into: &mut Snapshot, descriptive: bool) {
         if let Some(ref name) = self.name {
             let mut new_level = Snapshot::default();

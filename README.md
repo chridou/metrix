@@ -8,7 +8,7 @@
 [![license-apache](http://img.shields.io/badge/license-APACHE-blue.svg)](https://github.com/chridou/metrix/blob/master/LICENSE-APACHE)
 
 
-Metrics for monitoring applications
+Metrics for monitoring applications and alerting.
 
 ## Goal
 
@@ -18,7 +18,8 @@ organizing them. This is what `metrix` tries to help with.
 Metrix does not aim for providing exact numbers for scientific or financial analysis.
 
 This crate is in a very **early** stage and the API might still change. There may be
-backends provided for monitoring solutions but currently only a snapshot that can be 
+backends provided for monitoring solutions in the future 
+but currently only a snapshot that can be 
 serialized to JSON is provided.
 
 ## Contributing

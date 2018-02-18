@@ -1,11 +1,11 @@
-use instruments::Updates;
-use instruments::Update;
 use std::time::Instant;
 
 use exponential_decay_histogram::ExponentialDecayHistogram;
 
 use snapshot::{HistogramSnapshot, ItemKind, Snapshot};
-use Descriptive;
+use {Descriptive, PutsSnapshot};
+use instruments::{Update, Updates};
+
 use util;
 
 /// For tracking values. E.g. request latencies
@@ -45,13 +45,6 @@ impl Histogram {
         self.description = Some(description.into())
     }
 
-    pub fn put_snapshot(&self, into: &mut Snapshot, descriptive: bool) {
-        util::put_prefixed_descriptives(self, &self.name, into, descriptive);
-        let mut new_level = Snapshot::default();
-        self.put_values_into_snapshot(&mut new_level);
-        into.push(self.name.clone(), ItemKind::Snapshot(new_level));
-    }
-
     fn put_values_into_snapshot(&self, into: &mut Snapshot) {
         let snapshot = self.inner_histogram.snapshot();
 
@@ -72,6 +65,15 @@ impl Histogram {
         };
 
         histo_snapshot.put_snapshot(into);
+    }
+}
+
+impl PutsSnapshot for Histogram {
+    fn put_snapshot(&self, into: &mut Snapshot, descriptive: bool) {
+        util::put_prefixed_descriptives(self, &self.name, into, descriptive);
+        let mut new_level = Snapshot::default();
+        self.put_values_into_snapshot(&mut new_level);
+        into.push(self.name.clone(), ItemKind::Snapshot(new_level));
     }
 }
 
