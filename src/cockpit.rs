@@ -1,3 +1,5 @@
+//! Cockpits are used to monitor different aspects of a component
+
 use {Observation, PutsSnapshot};
 use instruments::*;
 use snapshot::{ItemKind, Snapshot};
@@ -58,7 +60,7 @@ pub trait HandlesObservations: PutsSnapshot + Send + 'static {
 /// assert_eq!(0, counter.get());
 /// assert_eq!(None, gauge.get());
 ///
-/// let mut failed_panel = Panel::with_name(Request::Failed, "succesful_requests");
+/// let mut failed_panel = Panel::with_name(Request::Failed, "failed_requests");
 /// failed_panel.set_counter(counter);
 /// failed_panel.set_gauge(gauge);
 /// failed_panel.set_meter(meter);
