@@ -3,7 +3,7 @@
 [![crates.io](https://img.shields.io/crates/v/metrix.svg)](https://crates.io/crates/metrix) 
 [![docs.rs](https://docs.rs/metrix/badge.svg)](https://docs.rs/metrix) 
 [![downloads](https://img.shields.io/crates/d/metrix.svg)](https://crates.io/crates/metrix) 
-[![Build Status](https://travis-ci.org/chridou/metrix?branch=master)](https://travis-ci.org/chridou/metrix) 
+[![Build Status](https://travis-ci.org/chridou/metrix.svg?branch=master)](https://travis-ci.org/chridou/metrix) 
 [![license-mit](http://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/chridou/metrix/blob/master/LICENSE-MIT) 
 [![license-apache](http://img.shields.io/badge/license-APACHE-blue.svg)](https://github.com/chridou/metrix/blob/master/LICENSE-APACHE)
 
