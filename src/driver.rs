@@ -1,3 +1,4 @@
+//! The thing that makes it happen... You need it!
 use std::sync::{Arc, Mutex};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread;

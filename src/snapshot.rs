@@ -1,3 +1,4 @@
+//! Pulling data from the backend for monitoring
 use json::{stringify, stringify_pretty, JsonValue};
 
 pub struct JsonConfig {

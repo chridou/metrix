@@ -1,3 +1,4 @@
+//! Transmitting observations and grouping metrics.
 use std::sync::mpsc;
 
 use {Observation, PutsSnapshot, TelemetryTransmitter};

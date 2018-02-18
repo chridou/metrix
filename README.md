@@ -24,7 +24,7 @@ serialized to JSON is provided.
 
 ## Contributing
 
-Contributing is welcome. Even if done by constructive criticism.
+Contributing is welcome. Criticism is also welcome!
 
 ## License
 
