@@ -5,7 +5,7 @@ use std::time::{Duration, Instant};
 
 use processor::{AggregatesProcessors, ProcessesTelemetryMessages, ProcessingOutcome};
 use snapshot::{ItemKind, Snapshot};
-use instruments::Descriptive;
+use Descriptive;
 use util;
 
 /// Triggers registered `ProcessesTelemetryMessages` to

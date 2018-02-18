@@ -1,7 +1,9 @@
 use std::sync::mpsc;
 
 use {Observation, TelemetryTransmitter};
-use instruments::{Cockpit, Descriptive, HandlesObservations, Panel};
+use Descriptive;
+use instruments::{HandlesObservations, Panel};
+use cockpit::Cockpit;
 use snapshot::{ItemKind, Snapshot};
 use util;
 

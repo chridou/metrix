@@ -7,12 +7,14 @@ use std::sync::mpsc;
 use std::time::{Duration, Instant};
 
 use processor::TelemetryMessage;
-use instruments::{Cockpit, HandlesObservations, Panel};
+use instruments::{HandlesObservations, Panel};
+use cockpit::Cockpit;
 
 pub mod instruments;
 pub mod snapshot;
 pub mod processor;
 pub mod driver;
+pub mod cockpit;
 pub(crate) mod util;
 
 /// An observation that has been made.
@@ -251,5 +253,16 @@ impl<L> TransmitsTelemetryData<L> for TelemetryTransmitterSync<L> {
             }) {
             // maybe log...
         }
+    }
+}
+
+/// Something that has a title and a description
+pub trait Descriptive {
+    fn title(&self) -> Option<&str> {
+        None
+    }
+
+    fn description(&self) -> Option<&str> {
+        None
     }
 }

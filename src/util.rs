@@ -1,4 +1,4 @@
-use instruments::Descriptive;
+use Descriptive;
 use snapshot::{ItemKind, Snapshot};
 
 const TITLE_FIELD_LABEL: &'static str = "title";
