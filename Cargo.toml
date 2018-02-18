@@ -11,7 +11,7 @@ repository = "https://github.com/chridou/metrix"
 keywords = ["metrics", "monitoring", "alerting"]
 
 [badges]
-travis-ci = { repository = "https://github.com/chridou/metrix", branch = "master" }
+travis-ci = { repository = "https://travis-ci.org/chridou/metrix", branch = "master" }
 
 [dependencies]
 exponential-decay-histogram = "0.1.0"
