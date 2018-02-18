@@ -8,6 +8,7 @@ use metrix::instruments::*;
 use metrix::processor::*;
 use metrix::driver::*;
 use metrix::snapshot::*;
+use metrix::cockpit::*;
 
 #[derive(Clone, PartialEq, Eq)]
 enum FooLabel {
@@ -154,9 +155,16 @@ fn main() {
     handle2.join().unwrap();
     handle3.join().unwrap();
 
-    println!("{:?}. Sleeping 1 secs.", start.elapsed());
+    println!(
+        "Sending observations took {:?}. Sleeping 1 secs to collect remaining data. \
+         Depending on your machine you might see that not all metrics have a count \
+         of 5 million obseravtions.",
+        start.elapsed()
+    );
 
     thread::sleep(Duration::from_secs(1));
+
+    println!("\n\n\n=======================\n\n");
 
     let snapshot = driver.snapshot(true);
 

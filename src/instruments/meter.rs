@@ -47,11 +47,11 @@ impl Meter {
     pub fn put_snapshot(&self, into: &mut Snapshot, descriptive: bool) {
         util::put_prefixed_descriptives(self, &self.name, into, descriptive);
         let mut new_level = Snapshot::default();
-        self.put_values_into_snapshot(&mut new_level, descriptive);
+        self.put_values_into_snapshot(&mut new_level);
         into.push(self.name.clone(), ItemKind::Snapshot(new_level));
     }
 
-    fn put_values_into_snapshot(&self, into: &mut Snapshot, descriptive: bool) {
+    fn put_values_into_snapshot(&self, into: &mut Snapshot) {
         if self.last_tick.elapsed() >= Duration::from_secs(5) {
             self.inner_meter.tick()
         }
