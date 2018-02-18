@@ -384,7 +384,10 @@ impl<L> TransmitsTelemetryData<L> for TelemetryTransmitterSync<L> {
 
 /// Something that has a title and a description
 ///
-/// This is mostly useful for snapshots.
+/// This is mostly useful for snapshots. When a `Snapshot`
+/// is taken there is usually a parameter `descriptive`
+/// that determines whether title and description should
+/// be part of a `Snapshot`. See also `PutsSnapshot`.
 pub trait Descriptive {
     fn title(&self) -> Option<&str> {
         None

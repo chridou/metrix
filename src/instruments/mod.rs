@@ -1,3 +1,5 @@
+//! Instruments that track values and/or derive values
+//! from observations.
 use std::time::Instant;
 
 use Observation;
@@ -111,7 +113,16 @@ where
     }
 }
 
+/// Implementors of `Updates`
+/// can handle `Update`s.
+///
+/// `Update`s are basically observations without a label.
 pub trait Updates {
+    /// Update the internal state according to the given `Update`.
+    ///
+    /// Not all `Update`s might modify the internal state.
+    /// Only those that are appropriate and meaningful for
+    /// the implementor.
     fn update(&mut self, with: &Update);
 }
 
@@ -124,6 +135,32 @@ pub trait Updates {
 /// You would then create a panel for this and might
 /// want to add a counter and a meter and a histogram
 /// to track latencies.
+///
+/// # Example
+///
+/// ```
+/// use std::time::Instant;
+/// use metrix::instruments::*;
+///
+/// #[derive(Clone, PartialEq, Eq)]
+/// struct DemoLabel;
+///
+/// let counter = Counter::new_with_defaults("the_counter");
+/// let gauge = Gauge::new_with_defaults("the_gauge");
+///
+/// assert_eq!(0, counter.get());
+/// assert_eq!(None, gauge.get());
+///
+/// let mut panel = Panel::new(DemoLabel);
+/// panel.set_counter(counter);
+/// panel.set_gauge(gauge);
+///
+/// let update = Update::ObservationWithValue(12, Instant::now());
+/// panel.update(&update);
+///
+/// assert_eq!(Some(1), panel.counter().map(|c| c.get()));
+/// assert_eq!(Some(12), panel.gauge().and_then(|g| g.get()));
+/// ```
 pub struct Panel<L> {
     pub label: L,
     pub name: Option<String>,
@@ -176,18 +213,48 @@ impl<L> Panel<L> {
         self.histogram = Some(histogram);
     }
 
+    pub fn counter(&self) -> Option<&Counter> {
+        self.counter.as_ref()
+    }
+
+    pub fn gauge(&self) -> Option<&Gauge> {
+        self.gauge.as_ref()
+    }
+
+    pub fn meter(&self) -> Option<&Meter> {
+        self.meter.as_ref()
+    }
+
+    pub fn histogram(&self) -> Option<&Histogram> {
+        self.histogram.as_ref()
+    }
+
     pub fn set_value_scaling(&mut self, value_scaling: ValueScaling) {
         self.value_scaling = Some(value_scaling)
     }
 
-    pub fn set_name<T: Into<String>>(&mut self, name: T) {
-        self.name = Some(name.into())
+    /// Gets the name of this `Panel`
+    pub fn name(&self) -> Option<&str> {
+        self.name.as_ref().map(|n| &**n)
     }
 
+    /// Set the name if this `Panel`.
+    ///
+    /// The name is path segment within a `Snapshot`
+    pub fn set_name<T: Into<String>>(&mut self, name: T) {
+        self.name = Some(name.into());
+    }
+
+    /// Sets the `title` of this `Panel`.
+    ///
+    /// A title can be part of a descriptive `Snapshot`
     pub fn set_title<T: Into<String>>(&mut self, title: T) {
         self.title = Some(title.into())
     }
 
+    /// Sets the `description` of this `Panel`.
+    ///
+    /// A description can be part of a descriptive `Snapshot`
     pub fn set_description<T: Into<String>>(&mut self, description: T) {
         self.description = Some(description.into())
     }

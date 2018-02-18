@@ -5,6 +5,24 @@ use {Descriptive, PutsSnapshot};
 use util;
 
 /// Simply returns the value that has been observed last.
+///
+/// Reacts to the following `Observation`:
+///
+/// * `Obervation::ObservedOneValue`(Update::ObservationWithValue)
+///
+/// # Example
+///
+/// ```
+/// use std::time::Instant;
+/// use metrix::instruments::*;
+///
+/// let mut gauge = Gauge::new_with_defaults("example");
+/// assert_eq!(None, gauge.get());
+/// let update = Update::ObservationWithValue(12, Instant::now());
+/// gauge.update(&update);
+///
+/// assert_eq!(Some(12), gauge.get());
+/// ```
 pub struct Gauge {
     name: String,
     title: Option<String>,
@@ -22,22 +40,36 @@ impl Gauge {
         }
     }
 
-    pub fn name(&self) -> &str {
-        &self.name
-    }
-
-    pub fn set_name<T: Into<String>>(&mut self, name: T) {
-        self.name = name.into();
-    }
-
     pub fn set(&mut self, v: u64) {
         self.value = Some(v);
     }
 
+    pub fn get(&self) -> Option<u64> {
+        self.value
+    }
+
+    /// Gets the name of this `Gauge`
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    /// Set the name if this `Gauge`.
+    ///
+    /// The name is path segment within a `Snapshot`
+    pub fn set_name<T: Into<String>>(&mut self, name: T) {
+        self.name = name.into();
+    }
+
+    /// Sets the `title` of this `Gauge`.
+    ///
+    /// A title can be part of a descriptive `Snapshot`
     pub fn set_title<T: Into<String>>(&mut self, title: T) {
         self.title = Some(title.into())
     }
 
+    /// Sets the `description` of this `Gauge`.
+    ///
+    /// A description can be part of a descriptive `Snapshot`
     pub fn set_description<T: Into<String>>(&mut self, description: T) {
         self.description = Some(description.into())
     }
