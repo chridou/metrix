@@ -42,19 +42,19 @@
 //! ### Labels
 //!
 //! Labels link observations to panels. Labels can be of any type that implements
-//! `Clone + Eq + Send + 'static`. An `enum` is a good start for a lable.
+//! `Clone + Eq + Send + 'static`. An `enum` is a good choice for a label.
 //!
 //! ### Observations
 //!
 //! An abservation is made somewhere within your application. When an observation
 //! is sent to the backend it must have a label attached. This label
 //! is then matched against the label of a panel to determine whether an observation is
-//! handled or not.
+//! handled for updating or not.
 //!
 //! ### Instruments
 //!
 //! Instruments are gauges, meters, etc. An instrument gets updated by an observation
-//! where an update is meaningful. Instruments are grouped by  `Panel`s.
+//! where an update is meaningful. Instruments are grouped by `Panel`s.
 //!
 //! You can find instruments in the module `instruments`.
 //!
@@ -84,28 +84,29 @@
 //!
 //! The most important processor is the `TelemetryProcessor`. It has
 //! a label type as a type parameter and consist of a `TelemetryTransmitter`
-//! that sends observations to the backend and the actual `TelemetryProcessor`
-//! that forms the backend and processes observations. The `TelemetryProcessor`
-//! can own several cockpits for a label type.
+//! that sends observations to the backend(used within your app)
+//! and the actual `TelemetryProcessor` that forms the backend and
+//! processes observations. The `TelemetryProcessor`
+//! can **own** several cockpits for a label type.
 //!
 //! There is also a `ProcessorMount` that is label agnostic and can group
 //! several processors. It can also have a name that will be included in the
 //! snapshot.
 //!
-//! The processors can be found the module `processors`.
+//! The processors can be found the module `processor`.
 //!
 //! ### Driver
 //!
-//! The driver contains priodically asks the registered processors
-//! to process their messages. You need add your processors to
-//! a driver to make anything happen. A driver is also a processor
+//! The driver **owns** processors and asks the **owned** processors
+//! to process their messages. You need to add your processors to
+//! a driver to start the machinery. A driver is also a processor
 //! which means it can have a name and it can also be part of another
 //! hierarchy.
 //!
-//! Each driver has its own thread so even when attached to another
+//! Each driver has its own thread for polling its processors
+//! so even when attached to another
 //! hierarchy all processors registered with the driver will only
 //! be driven by that driver.
-//!
 //!
 //! ## Contributing
 //!

@@ -6,7 +6,7 @@ use util;
 /// Something that can react on `Observation`s where
 /// the `Label` is the type of the label.
 ///
-/// You can use this to implement your own Metrics.
+/// You can use this to implement your own metrics.
 pub trait HandlesObservations: PutsSnapshot + Send + 'static {
     type Label: Send + 'static;
     fn handle_observation(&mut self, observation: &Observation<Self::Label>);
@@ -17,6 +17,91 @@ pub trait HandlesObservations: PutsSnapshot + Send + 'static {
 /// Use a cockpit to group panels that are somehow related.
 /// Since the Cockpit is generic over its label you can
 /// use an enum as a label for grouping panels easily.
+///
+/// # Example
+///
+/// Imagine you have a HTTP component that makes requests to
+/// another service and you want to track successful and failed
+/// requests individually.
+///
+/// ```
+/// use std::time::Instant;
+/// use metrix::Observation;
+/// use metrix::instruments::*;
+/// use metrix::cockpit::*;
+///
+/// #[derive(Clone, PartialEq, Eq)]
+/// enum Request {
+///     Successful,
+///     Failed,
+/// }
+///
+/// let counter = Counter::new_with_defaults("count");
+/// let gauge = Gauge::new_with_defaults("last_latency");
+/// let meter = Meter::new_with_defaults("per_second");
+/// let histogram = Histogram::new_with_defaults("latencies");
+///
+/// assert_eq!(0, counter.get());
+/// assert_eq!(None, gauge.get());
+///
+/// let mut success_panel = Panel::with_name(Request::Successful, "succesful_requests");
+/// success_panel.set_counter(counter);
+/// success_panel.set_gauge(gauge);
+/// success_panel.set_meter(meter);
+/// success_panel.set_histogram(histogram);
+///
+/// let counter = Counter::new_with_defaults("count");
+/// let gauge = Gauge::new_with_defaults("last_latency");
+/// let meter = Meter::new_with_defaults("per_second");
+/// let histogram = Histogram::new_with_defaults("latencies");
+///
+/// assert_eq!(0, counter.get());
+/// assert_eq!(None, gauge.get());
+///
+/// let mut failed_panel = Panel::with_name(Request::Failed, "succesful_requests");
+/// failed_panel.set_counter(counter);
+/// failed_panel.set_gauge(gauge);
+/// failed_panel.set_meter(meter);
+/// failed_panel.set_histogram(histogram);
+///
+/// let mut cockpit = Cockpit::new("requests", None);
+/// cockpit.add_panel(success_panel);
+/// cockpit.add_panel(failed_panel);
+///
+/// let observation = Observation::ObservedOneValue {
+///     label: Request::Successful,
+///     value: 100,
+///     timestamp: Instant::now(),
+/// };
+///
+/// cockpit.handle_observation(&observation);
+///
+/// {
+///     let panels = cockpit.panels();
+///     let success_panel = panels
+///         .iter()
+///         .find(|p| p.label == Request::Successful)
+///         .unwrap();
+///
+///     assert_eq!(Some(1), success_panel.counter().map(|c| c.get()));
+///     assert_eq!(Some(100), success_panel.gauge().and_then(|g| g.get()));
+/// }
+///
+/// let observation = Observation::ObservedOneValue {
+///     label: Request::Failed,
+///     value: 667,
+///     timestamp: Instant::now(),
+/// };
+///
+/// cockpit.handle_observation(&observation);
+///
+/// let panels = cockpit.panels();
+/// let failed_panel = panels.iter().find(|p| p.label == Request::Failed).unwrap();
+///
+/// assert_eq!(Some(1), failed_panel.counter().map(|c| c.get()));
+/// assert_eq!(Some(667), failed_panel.gauge().and_then(|g| g.get()));
+/// ```
+
 pub struct Cockpit<L> {
     name: Option<String>,
     title: Option<String>,
@@ -84,6 +169,14 @@ where
             self.panels.push(panel);
             true
         }
+    }
+
+    pub fn panels(&self) -> Vec<&Panel<L>> {
+        self.panels.iter().collect()
+    }
+
+    pub fn panels_mut(&mut self) -> Vec<&mut Panel<L>> {
+        self.panels.iter_mut().collect()
     }
 
     fn put_values_into_snapshot(&self, into: &mut Snapshot, descriptive: bool) {

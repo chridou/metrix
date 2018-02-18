@@ -1,6 +1,6 @@
 [package]
 name = "metrix"
-version = "0.4.2"
+version = "0.4.3"
 authors = ["Christian Douven <chridou@users.noreply.github.com>"]
 readme = "README.md"
 license = "Apache-2.0/MIT"
@@ -9,6 +9,9 @@ documentation = "https://docs.rs/metrix"
 homepage = "https://github.com/chridou/metrix"
 repository = "https://github.com/chridou/metrix"
 keywords = ["metrics", "monitoring", "alerting"]
+
+[badges]
+travis-ci = { repository = "https://github.com/chridou/metrix", branch = "master" }
 
 [dependencies]
 exponential-decay-histogram = "0.1.0"

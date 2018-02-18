@@ -55,7 +55,7 @@ impl Gauge {
 
     /// Set the name if this `Gauge`.
     ///
-    /// The name is path segment within a `Snapshot`
+    /// The name is a path segment within a `Snapshot`
     pub fn set_name<T: Into<String>>(&mut self, name: T) {
         self.name = name.into();
     }

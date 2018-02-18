@@ -19,8 +19,8 @@ mod histogram;
 
 /// Scales incoming values.
 ///
-/// This can be used either on a `Cockpit`
-/// or on a `Panel`. Be carefule when using on both
+/// This can be used either with a `Cockpit`
+/// or with a `Panel`. Be careful when using on both
 /// since both components do not care whether the
 /// other already scaled a value.
 #[derive(Debug, Clone, Copy)]
@@ -34,11 +34,11 @@ pub enum ValueScaling {
 #[derive(Debug, Clone)]
 /// An update instruction for an instrument
 pub enum Update {
-    /// Many observations ithout a value at a given time
+    /// Many observations without a value observed at a given time
     Observations(u64, Instant),
-    /// One observation without a value at a given time
+    /// One observation without a value observed at a given time
     Observation(Instant),
-    /// One observation with a value at a given time
+    /// One observation with a value observed at a given time
     ObservationWithValue(u64, Instant),
 }
 
@@ -58,7 +58,7 @@ impl Update {
 
 /// A label with the associated `Update`
 ///
-/// This is basically an explodes `Observation`
+/// This is basically splits an `Observation`
 pub struct LabelAndUpdate<T>(pub T, pub Update);
 
 impl<T> From<Observation<T>> for LabelAndUpdate<T> {
@@ -143,17 +143,21 @@ pub trait Updates {
 /// use metrix::instruments::*;
 ///
 /// #[derive(Clone, PartialEq, Eq)]
-/// struct DemoLabel;
+/// struct SuccessfulRequests;
 ///
-/// let counter = Counter::new_with_defaults("the_counter");
-/// let gauge = Gauge::new_with_defaults("the_gauge");
+/// let counter = Counter::new_with_defaults("count");
+/// let gauge = Gauge::new_with_defaults("last_latency");
+/// let meter = Meter::new_with_defaults("per_second");
+/// let histogram = Histogram::new_with_defaults("latencies");
 ///
 /// assert_eq!(0, counter.get());
 /// assert_eq!(None, gauge.get());
 ///
-/// let mut panel = Panel::new(DemoLabel);
+/// let mut panel = Panel::with_name(SuccessfulRequests, "succesful_requests");
 /// panel.set_counter(counter);
 /// panel.set_gauge(gauge);
+/// panel.set_meter(meter);
+/// panel.set_histogram(histogram);
 ///
 /// let update = Update::ObservationWithValue(12, Instant::now());
 /// panel.update(&update);
@@ -240,7 +244,7 @@ impl<L> Panel<L> {
 
     /// Set the name if this `Panel`.
     ///
-    /// The name is path segment within a `Snapshot`
+    /// The name is a path segment within a `Snapshot`
     pub fn set_name<T: Into<String>>(&mut self, name: T) {
         self.name = Some(name.into());
     }
