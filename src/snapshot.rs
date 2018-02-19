@@ -170,6 +170,12 @@ impl From<String> for ItemKind {
     }
 }
 
+impl<'a> From<&'a str> for ItemKind {
+    fn from(what: &'a str) -> ItemKind {
+        ItemKind::Text(what.into())
+    }
+}
+
 impl From<f64> for ItemKind {
     fn from(what: f64) -> ItemKind {
         ItemKind::Float(what)
