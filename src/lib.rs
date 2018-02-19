@@ -424,7 +424,7 @@ pub trait Descriptive {
     }
 }
 
-/// Implementors are able to writ thier snapshot into the given snapshot.
+/// Implementors are able to write their current data into given `Snapshot`.
 ///
 /// Guidelines for writing snapshots:
 ///
