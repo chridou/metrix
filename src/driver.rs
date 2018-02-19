@@ -156,7 +156,7 @@ fn telemetry_loop(
 
         let started = Instant::now();
         let outcome = do_a_run(processors, 1_000);
-        if outcome.dropped > 0 || outcome.processed > 0 {
+        if outcome.dropped > 0 || outcome.processed > 100 {
             continue;
         }
         let finished = Instant::now();
