@@ -2,9 +2,11 @@ extern crate metrix;
 
 use std::thread;
 use std::time::{Duration, Instant};
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use metrix::*;
 use metrix::instruments::*;
+use metrix::instruments::polled::*;
 use metrix::processor::*;
 use metrix::driver::*;
 use metrix::snapshot::*;
@@ -21,6 +23,26 @@ enum BarLabel {
     A,
     B,
     C,
+}
+
+struct PolledCounter {
+    counter: AtomicUsize,
+}
+
+impl PolledCounter {
+    pub fn new() -> PolledCounter {
+        PolledCounter {
+            counter: AtomicUsize::new(0),
+        }
+    }
+}
+
+impl PutsSnapshot for PolledCounter {
+    fn put_snapshot(&self, into: &mut Snapshot, _descriptive: bool) {
+        let v = self.counter.fetch_add(1, Ordering::SeqCst);
+        into.items
+            .push(("polled_counter".into(), ItemKind::UInt(v as u64)));
+    }
 }
 
 fn create_foo_metrics() -> (TelemetryTransmitterSync<FooLabel>, ProcessorMount) {
@@ -45,6 +67,13 @@ fn create_foo_metrics() -> (TelemetryTransmitterSync<FooLabel>, ProcessorMount) 
     foo_b_panel.set_histogram(Histogram::new_with_defaults("foo_b_histogram"));
     foo_b_panel.set_title("foo_b_panel_title");
     foo_b_panel.set_description("foo_b_panel_description");
+
+    let polled_counter = PolledCounter::new();
+    let mut polled_instrument =
+        PollingInstrument::new_with_defaults("polled_instrument", polled_counter);
+    polled_instrument.set_title("The polled counter");
+    polled_instrument.set_description("A counter that is increased when a snapshot is polled");
+    foo_b_panel.add_polling_instrument(polled_instrument);
 
     let mut cockpit = Cockpit::new("foo_cockpit", None);
     cockpit.add_panel(foo_a_panel);
@@ -129,6 +158,9 @@ fn main() {
         })
     };
 
+    // Poll a snapshot for the counter
+    let _ = driver.snapshot(true);
+
     let handle2 = {
         let foo_transmitter = foo_transmitter.clone();
         let bar_transmitter = bar_transmitter.clone();
@@ -140,6 +172,9 @@ fn main() {
             }
         })
     };
+
+    // Poll a snapshot for the counter
+    let _ = driver.snapshot(true);
 
     let handle3 = {
         let bar_transmitter = bar_transmitter.clone();

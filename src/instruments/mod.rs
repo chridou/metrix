@@ -6,6 +6,7 @@ use Observation;
 use snapshot::{ItemKind, Snapshot};
 use {Descriptive, PutsSnapshot};
 use util;
+use self::polled::PollsOnSnapshot;
 
 pub use self::counter::*;
 pub use self::gauge::*;
@@ -16,6 +17,7 @@ mod counter;
 mod gauge;
 mod meter;
 mod histogram;
+pub mod polled;
 
 /// Scales incoming values.
 ///
@@ -174,6 +176,7 @@ pub struct Panel<L> {
     pub gauge: Option<Gauge>,
     pub meter: Option<Meter>,
     pub histogram: Option<Histogram>,
+    pub polling_instruments: Vec<Box<PollsOnSnapshot>>,
 
     pub value_scaling: Option<ValueScaling>,
 }
@@ -191,6 +194,7 @@ impl<L> Panel<L> {
             meter: None,
             histogram: None,
             value_scaling: None,
+            polling_instruments: Vec::new(),
         }
     }
 
@@ -217,6 +221,10 @@ impl<L> Panel<L> {
         self.histogram = Some(histogram);
     }
 
+    pub fn add_polling_instrument<T: PollsOnSnapshot>(&mut self, polls: T) {
+        self.polling_instruments.push(Box::new(polls));
+    }
+
     pub fn counter(&self) -> Option<&Counter> {
         self.counter.as_ref()
     }
@@ -231,6 +239,10 @@ impl<L> Panel<L> {
 
     pub fn histogram(&self) -> Option<&Histogram> {
         self.histogram.as_ref()
+    }
+
+    pub fn polling_instruments(&self) -> Vec<&PollsOnSnapshot> {
+        self.polling_instruments.iter().map(|p| &**p).collect()
     }
 
     pub fn set_value_scaling(&mut self, value_scaling: ValueScaling) {
@@ -281,6 +293,9 @@ impl<L> Panel<L> {
             .as_ref()
             .iter()
             .for_each(|x| x.put_snapshot(into, descriptive));
+        self.polling_instruments
+            .iter()
+            .for_each(|p| p.put_snapshot(into, descriptive));
     }
 }
 

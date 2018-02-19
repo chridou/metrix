@@ -69,14 +69,14 @@ impl Counter {
         self.name = name.into();
     }
 
-    /// Sets the `title` of this `Counter.
+    /// Sets the `title` of this `Counter`.
     ///
     /// A title can be part of a descriptive `Snapshot`
     pub fn set_title<T: Into<String>>(&mut self, title: T) {
         self.title = Some(title.into())
     }
 
-    /// Sets the `description` of this `Counter.
+    /// Sets the `description` of this `Counter`.
     ///
     /// A description can be part of a descriptive `Snapshot`
     pub fn set_description<T: Into<String>>(&mut self, description: T) {
