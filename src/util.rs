@@ -1,8 +1,8 @@
 use Descriptive;
 use snapshot::{ItemKind, Snapshot};
 
-const TITLE_FIELD_LABEL: &'static str = "title";
-const DESCRIPTION_FIELD_LABEL: &'static str = "description";
+const TITLE_FIELD_LABEL: &'static str = "_title";
+const DESCRIPTION_FIELD_LABEL: &'static str = "_description";
 
 pub fn put_default_descriptives<T>(what: &T, into: &mut Snapshot, add_descriptive_parts: bool)
 where
@@ -13,9 +13,9 @@ where
     }
 }
 
-pub fn put_prefixed_descriptives<T>(
+pub fn put_postfixed_descriptives<T>(
     what: &T,
-    field_label_prefix: &str,
+    field_label_postfix: &str,
     into: &mut Snapshot,
     add_descriptive_parts: bool,
 ) where
@@ -26,7 +26,7 @@ pub fn put_prefixed_descriptives<T>(
     }
 
     if let Some(title) = what.title() {
-        let label = format!("{}_{}", field_label_prefix, TITLE_FIELD_LABEL);
+        let label = format!("{}_{}", TITLE_FIELD_LABEL, field_label_postfix);
         let title_not_already_there = into.items.iter().find(|&&(ref n, _)| n == &label).is_none();
         if title_not_already_there {
             into.items.push((label, ItemKind::Text(title.to_string())));
@@ -34,7 +34,7 @@ pub fn put_prefixed_descriptives<T>(
     }
 
     if let Some(description) = what.description() {
-        let label = format!("{}_{}", field_label_prefix, DESCRIPTION_FIELD_LABEL);
+        let label = format!("{}_{}", DESCRIPTION_FIELD_LABEL, field_label_postfix);
         let description_not_already_there =
             into.items.iter().find(|&&(ref n, _)| n == &label).is_none();
         if description_not_already_there {

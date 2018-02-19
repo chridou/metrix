@@ -130,7 +130,7 @@ use std::time::{Duration, Instant};
 use snapshot::Snapshot;
 
 use processor::TelemetryMessage;
-use instruments::Panel;
+use instruments::{Panel, ValueScaling};
 use cockpit::{Cockpit, HandlesObservations};
 
 pub mod instruments;
@@ -165,7 +165,10 @@ pub enum Observation<L> {
     },
 }
 
-impl<L> Observation<L> where {
+impl<L> Observation<L>
+where
+    L: Clone,
+{
     /// Extracts the label `L` from an observation.
     pub fn label(&self) -> &L {
         match *self {
@@ -174,8 +177,30 @@ impl<L> Observation<L> where {
             Observation::ObservedOneValue { ref label, .. } => label,
         }
     }
+
+    /// Scale by the given `ValueScaling`
+    ///
+    /// This will clone the `Observation`
+    pub fn scaled(&self, scaling: ValueScaling) -> Observation<L> {
+        let mut cloned = (*self).clone();
+
+        match cloned {
+            Observation::ObservedOneValue { ref mut value, .. } => match scaling {
+                ValueScaling::NanosToMillis => *value = *value / 1_000_000,
+                ValueScaling::NanosToMicros => *value = *value / 1_000,
+            },
+            _ => (),
+        }
+
+        cloned
+    }
 }
 
+/// Transmits telemetry data to the backend.
+///
+/// Implementors should tranfer `Observations` to
+/// a backend and manipulate the instruments there to not
+/// to interfere to much with the actual task being measured/observed
 pub trait TransmitsTelemetryData<L> {
     /// Transit an observation to the backend.
     fn transmit(&self, observation: Observation<L>);
@@ -417,7 +442,10 @@ pub trait Descriptive {
 /// * When `descriptive` is set to `true` on an instrument the instrument
 /// should put its description into the snapshot it got passed therby adding the
 /// suffixes "_title" and "_description" to its name.
-pub trait PutsSnapshot {
+///
+/// Implementors of this trait can be added to almost all components via
+/// the `add_snapshooter` method which is also defined on trait `AggregatesProcessors`.
+pub trait PutsSnapshot: Send + 'static {
     /// Puts the current snapshot values into the given `Snapshot` thereby
     /// following the guidelines of `PutsSnapshot`.
     fn put_snapshot(&self, into: &mut Snapshot, descriptive: bool);

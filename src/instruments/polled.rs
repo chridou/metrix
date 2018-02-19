@@ -6,16 +6,11 @@ use {Descriptive, PutsSnapshot};
 use snapshot::*;
 use util;
 
-/// Implementors return values when a `Snapshot` is requested.
-///
-/// This can be added to a `Panel`.
-pub trait PollsOnSnapshot: Descriptive + PutsSnapshot + Send + 'static {}
-
 /// Create an instrument that delivers metrics based on querying values
 /// when a `Snapshot` is requested.
 ///
 /// The `Snapshot` can be generated from anything that
-/// implements `PutsSnapshot + Send + 'static`.
+/// implements `PutsSnapshot`.
 pub struct PollingInstrument<P> {
     /// If `create_group_with_name` is true, this name will create a new named
     /// group.
@@ -100,7 +95,7 @@ where
     P: PutsSnapshot,
 {
     fn put_snapshot(&self, into: &mut Snapshot, descriptive: bool) {
-        util::put_prefixed_descriptives(self, &self.name, into, descriptive);
+        util::put_postfixed_descriptives(self, &self.name, into, descriptive);
         if self.create_group_with_name {
             let mut new_level = Snapshot::default();
             self.put_values_into_snapshot(&mut new_level, descriptive);
@@ -110,10 +105,4 @@ where
             self.put_values_into_snapshot(into, descriptive);
         }
     }
-}
-
-impl<P> PollsOnSnapshot for PollingInstrument<P>
-where
-    P: PutsSnapshot + Send + 'static,
-{
 }

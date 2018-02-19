@@ -1,6 +1,6 @@
 use instruments::{Update, Updates};
 
-use snapshot::{ItemKind, Snapshot};
+use snapshot::Snapshot;
 use {Descriptive, PutsSnapshot};
 use util;
 
@@ -77,9 +77,9 @@ impl Gauge {
 
 impl PutsSnapshot for Gauge {
     fn put_snapshot(&self, into: &mut Snapshot, descriptive: bool) {
-        util::put_prefixed_descriptives(self, &self.name, into, descriptive);
+        util::put_postfixed_descriptives(self, &self.name, into, descriptive);
         if let Some(v) = self.value {
-            into.items.push((self.name.clone(), ItemKind::UInt(v)));
+            into.items.push((self.name.clone(), v.into()));
         }
     }
 }

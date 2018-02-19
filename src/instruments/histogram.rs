@@ -70,7 +70,7 @@ impl Histogram {
 
 impl PutsSnapshot for Histogram {
     fn put_snapshot(&self, into: &mut Snapshot, descriptive: bool) {
-        util::put_prefixed_descriptives(self, &self.name, into, descriptive);
+        util::put_postfixed_descriptives(self, &self.name, into, descriptive);
         let mut new_level = Snapshot::default();
         self.put_values_into_snapshot(&mut new_level);
         into.push(self.name.clone(), ItemKind::Snapshot(new_level));

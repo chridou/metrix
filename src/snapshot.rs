@@ -21,6 +21,8 @@ impl Default for JsonConfig {
     }
 }
 
+/// A `Snapshot` which contains measured values
+/// at a point in time.
 #[derive(Debug, Clone)]
 pub struct Snapshot {
     pub items: Vec<(String, ItemKind)>,
@@ -70,6 +72,9 @@ impl Snapshot {
 
 #[derive(Debug, Clone)]
 pub enum ItemKind {
+    /// Simply a `String` in the `Snapshot.
+    ///
+    /// Unfortunately the name `String` was already taken...
     Text(String),
     Boolean(bool),
     Float(f64),
@@ -96,6 +101,84 @@ impl ItemKind {
             ItemKind::Int(v) => v.into(),
             ItemKind::Snapshot(ref snapshot) => snapshot.to_json_value(config),
         }
+    }
+}
+
+impl From<u64> for ItemKind {
+    fn from(what: u64) -> ItemKind {
+        ItemKind::UInt(what)
+    }
+}
+
+impl From<u32> for ItemKind {
+    fn from(what: u32) -> ItemKind {
+        ItemKind::UInt(what as u64)
+    }
+}
+
+impl From<u16> for ItemKind {
+    fn from(what: u16) -> ItemKind {
+        ItemKind::UInt(what as u64)
+    }
+}
+
+impl From<u8> for ItemKind {
+    fn from(what: u8) -> ItemKind {
+        ItemKind::UInt(what as u64)
+    }
+}
+
+impl From<usize> for ItemKind {
+    fn from(what: usize) -> ItemKind {
+        ItemKind::UInt(what as u64)
+    }
+}
+
+impl From<i64> for ItemKind {
+    fn from(what: i64) -> ItemKind {
+        ItemKind::Int(what)
+    }
+}
+
+impl From<i32> for ItemKind {
+    fn from(what: i32) -> ItemKind {
+        ItemKind::Int(what as i64)
+    }
+}
+
+impl From<i16> for ItemKind {
+    fn from(what: i16) -> ItemKind {
+        ItemKind::Int(what as i64)
+    }
+}
+
+impl From<i8> for ItemKind {
+    fn from(what: i8) -> ItemKind {
+        ItemKind::Int(what as i64)
+    }
+}
+
+impl From<isize> for ItemKind {
+    fn from(what: isize) -> ItemKind {
+        ItemKind::Int(what as i64)
+    }
+}
+
+impl From<String> for ItemKind {
+    fn from(what: String) -> ItemKind {
+        ItemKind::Text(what)
+    }
+}
+
+impl From<f64> for ItemKind {
+    fn from(what: f64) -> ItemKind {
+        ItemKind::Float(what)
+    }
+}
+
+impl From<f32> for ItemKind {
+    fn from(what: f32) -> ItemKind {
+        ItemKind::Float(what as f64)
     }
 }
 
@@ -133,10 +216,8 @@ pub struct MeterRate {
 
 impl MeterRate {
     fn put_snapshot(&self, into: &mut Snapshot) {
-        into.items
-            .push(("rate".to_string(), ItemKind::Float(self.rate)));
-        into.items
-            .push(("count".to_string(), ItemKind::UInt(self.count)));
+        into.items.push(("rate".to_string(), self.rate.into()));
+        into.items.push(("count".to_string(), self.count.into()));
     }
 }
 
@@ -152,16 +233,11 @@ pub struct HistogramSnapshot {
 
 impl HistogramSnapshot {
     pub fn put_snapshot(&self, into: &mut Snapshot) {
-        into.items
-            .push(("max".to_string(), ItemKind::Int(self.max)));
-        into.items
-            .push(("min".to_string(), ItemKind::Int(self.min)));
-        into.items
-            .push(("mean".to_string(), ItemKind::Float(self.mean)));
-        into.items
-            .push(("stddev".to_string(), ItemKind::Float(self.stddev)));
-        into.items
-            .push(("count".to_string(), ItemKind::UInt(self.count)));
+        into.items.push(("max".to_string(), self.max.into()));
+        into.items.push(("min".to_string(), self.min.into()));
+        into.items.push(("mean".to_string(), self.mean.into()));
+        into.items.push(("stddev".to_string(), self.stddev.into()));
+        into.items.push(("count".to_string(), self.count.into()));
 
         let mut quantiles = Snapshot::default();
 

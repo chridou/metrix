@@ -70,10 +70,10 @@ fn create_foo_metrics() -> (TelemetryTransmitterSync<FooLabel>, ProcessorMount) 
 
     let polled_counter = PolledCounter::new();
     let mut polled_instrument =
-        PollingInstrument::new_with_defaults("polled_instrument", polled_counter);
-    polled_instrument.set_title("The polled counter");
+        PollingInstrument::new_with_defaults("polled_instrument_1", polled_counter);
+    polled_instrument.set_title("The polled counter 1");
     polled_instrument.set_description("A counter that is increased when a snapshot is polled");
-    foo_b_panel.add_polling_instrument(polled_instrument);
+    foo_b_panel.add_snapshooter(polled_instrument);
 
     let mut cockpit = Cockpit::new("foo_cockpit", None);
     cockpit.add_panel(foo_a_panel);
@@ -86,7 +86,7 @@ fn create_foo_metrics() -> (TelemetryTransmitterSync<FooLabel>, ProcessorMount) 
     processor.add_cockpit(cockpit);
 
     let mut group_processor = ProcessorMount::default();
-    group_processor.add_processor(Box::new(processor));
+    group_processor.add_processor(processor);
 
     (tx.synced(), group_processor)
 }
@@ -126,11 +126,19 @@ fn create_bar_metrics() -> (TelemetryTransmitterSync<BarLabel>, ProcessorMount) 
     processor.add_cockpit(bar_c_cockpit);
 
     let mut group_processor1 = ProcessorMount::default();
-    group_processor1.add_processor(Box::new(processor));
+    group_processor1.add_processor(processor);
 
     let mut group_processor2 = ProcessorMount::default();
-    group_processor2.add_processor(Box::new(group_processor1));
+    group_processor2.add_processor(group_processor1);
     group_processor2.set_name("group_processor_2");
+
+    let polled_counter = PolledCounter::new();
+    let mut polled_instrument =
+        PollingInstrument::new_with_defaults("polled_instrument_2", polled_counter);
+    polled_instrument.set_title("The polled counter 2");
+    polled_instrument.set_description("A counter that is increased when a snapshot is polled");
+
+    group_processor2.add_snapshooter(polled_instrument);
 
     (tx.synced(), group_processor2)
 }
@@ -141,8 +149,16 @@ fn main() {
     let (foo_transmitter, foo_processor) = create_foo_metrics();
     let (bar_transmitter, bar_processor) = create_bar_metrics();
 
-    driver.add_processor(Box::new(foo_processor));
-    driver.add_processor(Box::new(bar_processor));
+    driver.add_processor(foo_processor);
+    driver.add_processor(bar_processor);
+
+    let polled_counter = PolledCounter::new();
+    let mut polled_instrument =
+        PollingInstrument::new_with_defaults("polled_instrument_3", polled_counter);
+    polled_instrument.set_title("The polled counter 3");
+    polled_instrument.set_description("A counter that is increased when a snapshot is polled");
+
+    driver.add_snapshooter(polled_instrument);
 
     let start = Instant::now();
 
@@ -191,13 +207,19 @@ fn main() {
     handle3.join().unwrap();
 
     println!(
-        "Sending observations took {:?}. Sleeping 1 secs to collect remaining data. \
+        "Sending observations took {:?}. Sleeping 3 secs to collect remaining data. \
          Depending on your machine you might see that not all metrics have a count \
          of 5 million obseravtions.",
         start.elapsed()
     );
 
-    thread::sleep(Duration::from_secs(1));
+    thread::sleep(Duration::from_secs(3));
+
+    println!("\n\n\n=======================\n\n");
+
+    println!(
+        "Get snapshot. If it still blocks here there are still many messges to be processed..."
+    );
 
     println!("\n\n\n=======================\n\n");
 

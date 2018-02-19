@@ -23,6 +23,7 @@ pub struct TelemetryDriver {
     title: Option<String>,
     description: Option<String>,
     processors: Arc<Mutex<Vec<Box<ProcessesTelemetryMessages>>>>,
+    snapshooters: Arc<Mutex<Vec<Box<PutsSnapshot>>>>,
     is_running: Arc<AtomicBool>,
 }
 
@@ -61,7 +62,13 @@ impl TelemetryDriver {
             .lock()
             .unwrap()
             .iter()
-            .for_each(|p| p.put_snapshot(into, descriptive))
+            .for_each(|p| p.put_snapshot(into, descriptive));
+
+        self.snapshooters
+            .lock()
+            .unwrap()
+            .iter()
+            .for_each(|s| s.put_snapshot(into, descriptive));
     }
 }
 
@@ -93,6 +100,7 @@ impl Default for TelemetryDriver {
             description: None,
             is_running: Arc::new(AtomicBool::new(true)),
             processors: Arc::new(Mutex::new(Vec::new())),
+            snapshooters: Arc::new(Mutex::new(Vec::new())),
         };
 
         start_telemetry_loop(driver.processors.clone(), driver.is_running.clone());
@@ -102,8 +110,15 @@ impl Default for TelemetryDriver {
 }
 
 impl AggregatesProcessors for TelemetryDriver {
-    fn add_processor(&mut self, processor: Box<ProcessesTelemetryMessages>) {
-        self.processors.lock().unwrap().push(processor);
+    fn add_processor<P: ProcessesTelemetryMessages>(&mut self, processor: P) {
+        self.processors.lock().unwrap().push(Box::new(processor));
+    }
+
+    fn add_snapshooter<S: PutsSnapshot>(&mut self, snapshooter: S) {
+        self.snapshooters
+            .lock()
+            .unwrap()
+            .push(Box::new(snapshooter));
     }
 }
 

@@ -6,7 +6,6 @@ use Observation;
 use snapshot::{ItemKind, Snapshot};
 use {Descriptive, PutsSnapshot};
 use util;
-use self::polled::PollsOnSnapshot;
 
 pub use self::counter::*;
 pub use self::gauge::*;
@@ -60,7 +59,7 @@ impl Update {
 
 /// A label with the associated `Update`
 ///
-/// This is basically splits an `Observation`
+/// This is basically a split `Observation`
 pub struct LabelAndUpdate<T>(pub T, pub Update);
 
 impl<T> From<Observation<T>> for LabelAndUpdate<T> {
@@ -85,36 +84,6 @@ impl<T> From<Observation<T>> for LabelAndUpdate<T> {
     }
 }
 
-impl<'a, T> From<&'a Observation<T>> for LabelAndUpdate<T>
-where
-    T: Clone,
-{
-    fn from(obs: &'a Observation<T>) -> LabelAndUpdate<T> {
-        match *obs {
-            Observation::Observed {
-                ref label,
-                count,
-                timestamp,
-                ..
-            } => LabelAndUpdate(label.clone(), Update::Observations(count, timestamp)),
-            Observation::ObservedOne {
-                ref label,
-                timestamp,
-                ..
-            } => LabelAndUpdate(label.clone(), Update::Observation(timestamp)),
-            Observation::ObservedOneValue {
-                ref label,
-                value,
-                timestamp,
-                ..
-            } => LabelAndUpdate(
-                label.clone(),
-                Update::ObservationWithValue(value, timestamp),
-            ),
-        }
-    }
-}
-
 /// Implementors of `Updates`
 /// can handle `Update`s.
 ///
@@ -129,7 +98,7 @@ pub trait Updates {
 }
 
 /// The panel shows recorded
-/// observations of the same label
+/// observations with the same label
 /// in different representations.
 ///
 /// Let's say you want to monitor the successful requests
@@ -168,17 +137,16 @@ pub trait Updates {
 /// assert_eq!(Some(12), panel.gauge().and_then(|g| g.get()));
 /// ```
 pub struct Panel<L> {
-    pub label: L,
-    pub name: Option<String>,
-    pub title: Option<String>,
-    pub description: Option<String>,
-    pub counter: Option<Counter>,
-    pub gauge: Option<Gauge>,
-    pub meter: Option<Meter>,
-    pub histogram: Option<Histogram>,
-    pub polling_instruments: Vec<Box<PollsOnSnapshot>>,
-
-    pub value_scaling: Option<ValueScaling>,
+    label: L,
+    name: Option<String>,
+    title: Option<String>,
+    description: Option<String>,
+    counter: Option<Counter>,
+    gauge: Option<Gauge>,
+    meter: Option<Meter>,
+    histogram: Option<Histogram>,
+    snapshooters: Vec<Box<PutsSnapshot>>,
+    value_scaling: Option<ValueScaling>,
 }
 
 impl<L> Panel<L> {
@@ -194,7 +162,7 @@ impl<L> Panel<L> {
             meter: None,
             histogram: None,
             value_scaling: None,
-            polling_instruments: Vec::new(),
+            snapshooters: Vec::new(),
         }
     }
 
@@ -209,40 +177,40 @@ impl<L> Panel<L> {
         self.counter = Some(counter);
     }
 
-    pub fn set_gauge(&mut self, gauge: Gauge) {
-        self.gauge = Some(gauge);
-    }
-
-    pub fn set_meter(&mut self, meter: Meter) {
-        self.meter = Some(meter);
-    }
-
-    pub fn set_histogram(&mut self, histogram: Histogram) {
-        self.histogram = Some(histogram);
-    }
-
-    pub fn add_polling_instrument<T: PollsOnSnapshot>(&mut self, polls: T) {
-        self.polling_instruments.push(Box::new(polls));
-    }
-
     pub fn counter(&self) -> Option<&Counter> {
         self.counter.as_ref()
+    }
+
+    pub fn set_gauge(&mut self, gauge: Gauge) {
+        self.gauge = Some(gauge);
     }
 
     pub fn gauge(&self) -> Option<&Gauge> {
         self.gauge.as_ref()
     }
 
+    pub fn set_meter(&mut self, meter: Meter) {
+        self.meter = Some(meter);
+    }
+
     pub fn meter(&self) -> Option<&Meter> {
         self.meter.as_ref()
+    }
+
+    pub fn set_histogram(&mut self, histogram: Histogram) {
+        self.histogram = Some(histogram);
     }
 
     pub fn histogram(&self) -> Option<&Histogram> {
         self.histogram.as_ref()
     }
 
-    pub fn polling_instruments(&self) -> Vec<&PollsOnSnapshot> {
-        self.polling_instruments.iter().map(|p| &**p).collect()
+    pub fn add_snapshooter<T: PutsSnapshot>(&mut self, snapshooter: T) {
+        self.snapshooters.push(Box::new(snapshooter));
+    }
+
+    pub fn snapshooters(&self) -> Vec<&PutsSnapshot> {
+        self.snapshooters.iter().map(|p| &**p).collect()
     }
 
     pub fn set_value_scaling(&mut self, value_scaling: ValueScaling) {
@@ -275,6 +243,10 @@ impl<L> Panel<L> {
         self.description = Some(description.into())
     }
 
+    pub fn label(&self) -> &L {
+        &self.label
+    }
+
     fn put_values_into_snapshot(&self, into: &mut Snapshot, descriptive: bool) {
         util::put_default_descriptives(self, into, descriptive);
         self.counter
@@ -293,13 +265,16 @@ impl<L> Panel<L> {
             .as_ref()
             .iter()
             .for_each(|x| x.put_snapshot(into, descriptive));
-        self.polling_instruments
+        self.snapshooters
             .iter()
             .for_each(|p| p.put_snapshot(into, descriptive));
     }
 }
 
-impl<L> PutsSnapshot for Panel<L> {
+impl<L> PutsSnapshot for Panel<L>
+where
+    L: Send + 'static,
+{
     fn put_snapshot(&self, into: &mut Snapshot, descriptive: bool) {
         if let Some(ref name) = self.name {
             let mut new_level = Snapshot::default();

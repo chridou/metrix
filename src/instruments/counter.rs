@@ -1,7 +1,7 @@
 use instruments::Update;
 use instruments::Updates;
 
-use snapshot::{ItemKind, Snapshot};
+use snapshot::Snapshot;
 use {Descriptive, PutsSnapshot};
 use util;
 
@@ -86,9 +86,8 @@ impl Counter {
 
 impl PutsSnapshot for Counter {
     fn put_snapshot(&self, into: &mut Snapshot, descriptive: bool) {
-        util::put_prefixed_descriptives(self, &self.name, into, descriptive);
-        into.items
-            .push((self.name.clone(), ItemKind::UInt(self.count)));
+        util::put_postfixed_descriptives(self, &self.name, into, descriptive);
+        into.items.push((self.name.clone(), self.count.into()));
     }
 }
 
