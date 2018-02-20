@@ -196,6 +196,16 @@ where
     }
 }
 
+impl<L> Observation<L> {
+    pub fn timestamp(&self) -> Instant {
+        match *self {
+            Observation::Observed { timestamp, .. } => timestamp,
+            Observation::ObservedOne { timestamp, .. } => timestamp,
+            Observation::ObservedOneValue { timestamp, .. } => timestamp,
+        }
+    }
+}
+
 /// Transmits telemetry data to the backend.
 ///
 /// Implementors should tranfer `Observations` to

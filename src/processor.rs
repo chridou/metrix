@@ -1,5 +1,6 @@
 //! Transmitting observations and grouping metrics.
 use std::sync::mpsc;
+use std::time::Instant;
 
 use {Observation, PutsSnapshot, TelemetryTransmitter};
 use Descriptive;
@@ -72,7 +73,7 @@ impl Default for ProcessingOutcome {
 /// trait also requires the capability to write `Snapshot`s.
 pub trait ProcessesTelemetryMessages: PutsSnapshot + Send + 'static {
     /// Receive and handle pending operations
-    fn process(&mut self, max: usize) -> ProcessingOutcome;
+    fn process(&mut self, max: usize, drop_deadline: Instant) -> ProcessingOutcome;
 }
 
 /// The counterpart of the `TelemetryTransmitter`. It receives the
@@ -200,39 +201,52 @@ impl<L> ProcessesTelemetryMessages for TelemetryProcessor<L>
 where
     L: Clone + Eq + Send + 'static,
 {
-    fn process(&mut self, max: usize) -> ProcessingOutcome {
-        let mut n = 0;
-        while n < max {
+    fn process(&mut self, max: usize, drop_deadline: Instant) -> ProcessingOutcome {
+        let mut num_received = 0;
+        let mut processed = 0;
+        let mut dropped = 0;
+        while num_received < max {
             match self.receiver.try_recv() {
                 Ok(TelemetryMessage::Observation(obs)) => {
-                    self.cockpits
-                        .iter_mut()
-                        .for_each(|c| c.handle_observation(&obs));
-                    self.handlers
-                        .iter_mut()
-                        .for_each(|h| h.handle_observation(&obs));
+                    if obs.timestamp() <= drop_deadline {
+                        dropped += 1;
+                    } else {
+                        self.cockpits
+                            .iter_mut()
+                            .for_each(|c| c.handle_observation(&obs));
+                        self.handlers
+                            .iter_mut()
+                            .for_each(|h| h.handle_observation(&obs));
+                        processed += 1;
+                    }
                 }
-                Ok(TelemetryMessage::AddCockpit(c)) => self.add_cockpit(c),
-                Ok(TelemetryMessage::AddHandler(h)) => self.add_handler(h),
+                Ok(TelemetryMessage::AddCockpit(c)) => {
+                    self.add_cockpit(c);
+                    processed += 1;
+                }
+                Ok(TelemetryMessage::AddHandler(h)) => {
+                    self.add_handler(h);
+                    processed += 1;
+                }
                 Ok(TelemetryMessage::AddPanel {
                     cockpit_name,
                     panel,
-                }) => if let Some(ref mut cockpit) = self.cockpits
-                    .iter_mut()
-                    .find(|c| c.name() == Some(&cockpit_name))
-                {
-                    let _ = cockpit.add_panel(panel);
-                },
+                }) => {
+                    if let Some(ref mut cockpit) = self.cockpits
+                        .iter_mut()
+                        .find(|c| c.name() == Some(&cockpit_name))
+                    {
+                        let _ = cockpit.add_panel(panel);
+                    }
+                    processed += 1;
+                }
                 Err(mpsc::TryRecvError::Empty) => break,
                 Err(mpsc::TryRecvError::Disconnected) => break,
             };
-            n += 1;
+            num_received += 1;
         }
 
-        ProcessingOutcome {
-            processed: n,
-            dropped: 0,
-        }
+        ProcessingOutcome { processed, dropped }
     }
 }
 
@@ -338,11 +352,11 @@ impl AggregatesProcessors for ProcessorMount {
 }
 
 impl ProcessesTelemetryMessages for ProcessorMount {
-    fn process(&mut self, max: usize) -> ProcessingOutcome {
+    fn process(&mut self, max: usize, drop_deadline: Instant) -> ProcessingOutcome {
         let mut aggregated = ProcessingOutcome::default();
 
         for processor in self.processors.iter_mut() {
-            aggregated.combine_with(&processor.process(max));
+            aggregated.combine_with(&processor.process(max, drop_deadline));
         }
 
         aggregated

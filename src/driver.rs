@@ -28,9 +28,31 @@ pub struct TelemetryDriver {
 }
 
 impl TelemetryDriver {
-    pub fn new<T: Into<String>>(name: T) -> TelemetryDriver {
-        let mut driver = TelemetryDriver::default();
-        driver.set_name(name);
+    /// Creates a new `TelemetryDriver`.
+    ///
+    /// `max_observation_age` is the maximum age of an `Observation`
+    /// to be taken into account. This is determined by the `timestamp`
+    /// field of an `Observation`. `Observations` that are too old are simply dropped.
+    /// The default is **60 seconds**.
+    pub fn new<T: Into<String>>(
+        name: Option<T>,
+        max_observation_age: Option<Duration>,
+    ) -> TelemetryDriver {
+        let driver = TelemetryDriver {
+            name: name.map(Into::into),
+            title: None,
+            description: None,
+            is_running: Arc::new(AtomicBool::new(true)),
+            processors: Arc::new(Mutex::new(Vec::new())),
+            snapshooters: Arc::new(Mutex::new(Vec::new())),
+        };
+
+        start_telemetry_loop(
+            driver.processors.clone(),
+            driver.is_running.clone(),
+            max_observation_age.unwrap_or(Duration::from_secs(60)),
+        );
+
         driver
     }
 
@@ -74,7 +96,7 @@ impl TelemetryDriver {
 
 impl ProcessesTelemetryMessages for TelemetryDriver {
     /// Receive and handle pending operations
-    fn process(&mut self, _max: usize) -> ProcessingOutcome {
+    fn process(&mut self, _max: usize, _drop_deadline: Instant) -> ProcessingOutcome {
         ProcessingOutcome::default()
     }
 }
@@ -94,18 +116,7 @@ impl PutsSnapshot for TelemetryDriver {
 
 impl Default for TelemetryDriver {
     fn default() -> TelemetryDriver {
-        let driver = TelemetryDriver {
-            name: None,
-            title: None,
-            description: None,
-            is_running: Arc::new(AtomicBool::new(true)),
-            processors: Arc::new(Mutex::new(Vec::new())),
-            snapshooters: Arc::new(Mutex::new(Vec::new())),
-        };
-
-        start_telemetry_loop(driver.processors.clone(), driver.is_running.clone());
-
-        driver
+        TelemetryDriver::new::<String>(None, Some(Duration::from_secs(60)))
     }
 }
 
@@ -141,13 +152,15 @@ impl Descriptive for TelemetryDriver {
 fn start_telemetry_loop(
     processors: Arc<Mutex<Vec<Box<ProcessesTelemetryMessages>>>>,
     is_running: Arc<AtomicBool>,
+    max_observation_age: Duration,
 ) {
-    thread::spawn(move || telemetry_loop(&processors, &is_running));
+    thread::spawn(move || telemetry_loop(&processors, &is_running, max_observation_age));
 }
 
 fn telemetry_loop(
     processors: &Mutex<Vec<Box<ProcessesTelemetryMessages>>>,
     is_running: &AtomicBool,
+    max_observation_age: Duration,
 ) {
     loop {
         if !is_running.load(Ordering::Relaxed) {
@@ -155,10 +168,11 @@ fn telemetry_loop(
         }
 
         let started = Instant::now();
-        let outcome = do_a_run(processors, 1_000);
+        let outcome = do_a_run(processors, 1_000, max_observation_age);
         if outcome.dropped > 0 || outcome.processed > 100 {
             continue;
         }
+
         let finished = Instant::now();
         let elapsed = finished - started;
         if elapsed < Duration::from_millis(5) {
@@ -170,13 +184,15 @@ fn telemetry_loop(
 fn do_a_run(
     processors: &Mutex<Vec<Box<ProcessesTelemetryMessages>>>,
     max: usize,
+    max_observation_age: Duration,
 ) -> ProcessingOutcome {
     let mut processors = processors.lock().unwrap();
 
     let mut outcome = ProcessingOutcome::default();
 
     for processor in processors.iter_mut() {
-        outcome.combine_with(&processor.process(max));
+        let drop_deadline = Instant::now() - max_observation_age;
+        outcome.combine_with(&processor.process(max, drop_deadline));
     }
 
     outcome

@@ -82,16 +82,31 @@ impl Snapshot {
 /// let snapshot = Snapshot {
 ///     items: vec![
 ///         ("a".to_string(), ItemKind::UInt(23)),
-///         ("b".to_string(), ItemKind::Snapshot(Snapshot {
-///             items: vec![
-///          ("c".to_string(), ItemKind::UInt(42)),
-///            ]})),
-///     ]};
+///         (
+///             "b".to_string(),
+///             ItemKind::Snapshot(Snapshot {
+///                 items: vec![("c".to_string(), ItemKind::UInt(42))],
+///             }),
+///         ),
+///     ],
+/// };
 ///
-/// assert_eq!(find_item_in_snapshot(&snapshot, &["a"]), Some(&ItemKind::UInt(23)));
-/// assert_eq!(find_item_in_snapshot(&snapshot, &["a", "x"]), Some(&ItemKind::UInt(23)));
-/// assert_eq!(find_item_in_snapshot(&snapshot, &["b", "c"]), Some(&ItemKind::UInt(42)));
-/// assert_eq!(find_item_in_snapshot(&snapshot, &["b", "c", "x"]), Some(&ItemKind::UInt(42)));
+/// assert_eq!(
+///     find_item_in_snapshot(&snapshot, &["a"]),
+///     Some(&ItemKind::UInt(23))
+/// );
+/// assert_eq!(
+///     find_item_in_snapshot(&snapshot, &["a", "x"]),
+///     Some(&ItemKind::UInt(23))
+/// );
+/// assert_eq!(
+///     find_item_in_snapshot(&snapshot, &["b", "c"]),
+///     Some(&ItemKind::UInt(42))
+/// );
+/// assert_eq!(
+///     find_item_in_snapshot(&snapshot, &["b", "c", "x"]),
+///     Some(&ItemKind::UInt(42))
+/// );
 /// assert_eq!(find_item_in_snapshot(&snapshot, &["b", "", "c"]), None);
 /// assert_eq!(find_item_in_snapshot(&snapshot, &["x"]), None);
 /// assert_eq!(find_item_in_snapshot(&snapshot, &[""]), None);
