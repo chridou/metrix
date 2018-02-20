@@ -2,7 +2,7 @@ use std::time::Instant;
 
 use exponential_decay_histogram::ExponentialDecayHistogram;
 
-use snapshot::{HistogramSnapshot, ItemKind, Snapshot};
+use snapshot::{ItemKind, Snapshot};
 use {Descriptive, PutsSnapshot};
 use instruments::{Update, Updates};
 
@@ -99,5 +99,33 @@ impl Descriptive for Histogram {
 
     fn description(&self) -> Option<&str> {
         self.description.as_ref().map(|n| &**n)
+    }
+}
+
+struct HistogramSnapshot {
+    pub max: i64,
+    pub min: i64,
+    pub mean: f64,
+    pub stddev: f64,
+    pub count: u64,
+    pub quantiles: Vec<(u16, i64)>,
+}
+
+impl HistogramSnapshot {
+    pub fn put_snapshot(&self, into: &mut Snapshot) {
+        into.items.push(("max".to_string(), self.max.into()));
+        into.items.push(("min".to_string(), self.min.into()));
+        into.items.push(("mean".to_string(), self.mean.into()));
+        into.items.push(("stddev".to_string(), self.stddev.into()));
+        into.items.push(("count".to_string(), self.count.into()));
+
+        let mut quantiles = Snapshot::default();
+
+        for &(ref q, ref v) in &self.quantiles {
+            quantiles.items.push((format!("p{}", q), ItemKind::Int(*v)));
+        }
+
+        into.items
+            .push(("quantiles".to_string(), ItemKind::Snapshot(quantiles)));
     }
 }

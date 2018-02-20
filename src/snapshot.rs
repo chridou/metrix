@@ -20,14 +20,74 @@ impl Snapshot {
     }
 
     /// Find an item on a path with a given a separator.
-    pub fn find_with(&self, path: &str, separator: char) -> Option<&ItemKind> {
-        let path: Vec<&str> = path.split(separator).collect();
-        find_item_in_snapshot(self, &path[..])
+    ///
+    /// Same as `find` but with a configurable seperator.
+    pub fn find_with_separator(&self, path: &str, separator: char) -> Option<&ItemKind> {
+        let path: Vec<&str> = path.split(separator).filter(|x| !x.is_empty()).collect();
+
+        if path.is_empty() {
+            return None;
+        }
+
+        if let Some(item) = self.items
+            .iter()
+            .find(|&&(ref name, _)| name == path[0])
+            .map(|x| &x.1)
+        {
+            find_item(item, &path[1..])
+        } else {
+            None
+        }
     }
 
     /// Find an item on a path with a `/` as a separator.
+    ///
+    /// If the path is empty `None` is returned.
+    ///
+    /// Since a `Snapshot` may contain multiple items with the same name
+    /// only the first found will be returned.
+    ///
+    /// If a prefix of a path leads to a value that value is returned
+    /// and the rest of the path is discarded.
+    ///
+    /// Empty segments of a path are ignored.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use metrix::snapshot::*;
+    ///
+    /// // a -> 23
+    /// // b -> c -> 42
+    ///
+    /// let inner = ItemKind::Snapshot(Snapshot {
+    ///     items: vec![("c".to_string(), ItemKind::UInt(42))],
+    /// });
+    ///
+    /// let snapshot = Snapshot {
+    ///     items: vec![
+    ///         ("a".to_string(), ItemKind::UInt(23)),
+    ///         ("b".to_string(), inner.clone()),
+    ///     ],
+    /// };
+    ///
+    /// assert_eq!(snapshot.find("a"), Some(&ItemKind::UInt(23)));
+    /// assert_eq!(snapshot.find("a/x"), Some(&ItemKind::UInt(23)));
+    /// assert_eq!(snapshot.find("/a/x"), Some(&ItemKind::UInt(23)));
+    ///
+    /// assert_eq!(snapshot.find("b"), Some(&inner));
+    ///
+    /// assert_eq!(snapshot.find("b/c"), Some(&ItemKind::UInt(42)));
+    /// assert_eq!(snapshot.find("/b//c"), Some(&ItemKind::UInt(42)));
+    ///
+    /// assert_eq!(snapshot.find("b/c/x"), Some(&ItemKind::UInt(42)));
+    ///
+    /// assert_eq!(snapshot.find(""), None);
+    ///
+    /// assert_eq!(snapshot.find("/"), None);
+    /// ```
     pub fn find(&self, path: &str) -> Option<&ItemKind> {
-        self.find_with(path, '/')
+        self.find_with_separator(path, '/')
     }
 
     /// Output JSON with default settings.
@@ -71,67 +131,77 @@ impl Snapshot {
 /// If a prefix of a path leads to a value that value is returned
 /// and the rest of the path is discarded.
 ///
+/// Empty segments of a path are ignored.
+///
 /// # Example
 ///
 /// ```
 /// use metrix::snapshot::*;
 ///
 /// // a -> 23
-/// // b -> c-> 42
+/// // b -> c -> 42
 ///
-/// let snapshot = Snapshot {
+/// let inner = ItemKind::Snapshot(Snapshot {
+///     items: vec![("c".to_string(), ItemKind::UInt(42))],
+/// });
+///
+/// let snapshot = ItemKind::Snapshot(Snapshot {
 ///     items: vec![
 ///         ("a".to_string(), ItemKind::UInt(23)),
-///         (
-///             "b".to_string(),
-///             ItemKind::Snapshot(Snapshot {
-///                 items: vec![("c".to_string(), ItemKind::UInt(42))],
-///             }),
-///         ),
+///         ("b".to_string(), inner.clone()),
 ///     ],
-/// };
+/// });
+///
+/// assert_eq!(find_item(&snapshot, &["a"]), Some(&ItemKind::UInt(23)));
+/// assert_eq!(find_item(&snapshot, &["a", "x"]), Some(&ItemKind::UInt(23)));
+/// assert_eq!(
+///     find_item(&snapshot, &["", "a", "x"]),
+///     Some(&ItemKind::UInt(23))
+/// );
+///
+/// assert_eq!(find_item(&snapshot, &["b"]), Some(&inner));
+///
+/// assert_eq!(find_item(&snapshot, &["b", "c"]), Some(&ItemKind::UInt(42)));
+/// assert_eq!(
+///     find_item(&snapshot, &["", "b", "", "c"]),
+///     Some(&ItemKind::UInt(42))
+/// );
 ///
 /// assert_eq!(
-///     find_item_in_snapshot(&snapshot, &["a"]),
-///     Some(&ItemKind::UInt(23))
-/// );
-/// assert_eq!(
-///     find_item_in_snapshot(&snapshot, &["a", "x"]),
-///     Some(&ItemKind::UInt(23))
-/// );
-/// assert_eq!(
-///     find_item_in_snapshot(&snapshot, &["b", "c"]),
+///     find_item(&snapshot, &["b", "c", "x"]),
 ///     Some(&ItemKind::UInt(42))
 /// );
-/// assert_eq!(
-///     find_item_in_snapshot(&snapshot, &["b", "c", "x"]),
-///     Some(&ItemKind::UInt(42))
-/// );
-/// assert_eq!(find_item_in_snapshot(&snapshot, &["b", "", "c"]), None);
-/// assert_eq!(find_item_in_snapshot(&snapshot, &["x"]), None);
-/// assert_eq!(find_item_in_snapshot(&snapshot, &[""]), None);
-/// assert_eq!(find_item_in_snapshot::<&str>(&snapshot, &[]), None);
+///
+/// assert_eq!(find_item::<String>(&snapshot, &[]), Some(&snapshot));
+///
+/// assert_eq!(find_item(&snapshot, &[""]), Some(&snapshot));
 /// ```
-pub fn find_item_in_snapshot<'a, T>(snapshot: &'a Snapshot, path: &[T]) -> Option<&'a ItemKind>
+pub fn find_item<'a, T>(item: &'a ItemKind, path: &[T]) -> Option<&'a ItemKind>
 where
     T: AsRef<str>,
 {
     if path.is_empty() {
-        return None;
+        return Some(item);
     };
 
-    if let Some(item) = snapshot
-        .items
-        .iter()
-        .find(|&&(ref name, _)| name == path[0].as_ref())
-        .map(|x| &x.1)
-    {
-        match *item {
-            ItemKind::Snapshot(ref snapshot) => find_item_in_snapshot(snapshot, &path[1..]),
-            ref other => Some(other),
+    if path[0].as_ref().is_empty() {
+        return find_item(item, &path[1..]);
+    }
+
+    match *item {
+        ItemKind::Snapshot(ref snapshot) => {
+            if let Some(item) = snapshot
+                .items
+                .iter()
+                .find(|&&(ref name, _)| name == path[0].as_ref())
+                .map(|x| &x.1)
+            {
+                find_item(item, &path[1..])
+            } else {
+                None
+            }
         }
-    } else {
-        None
+        ref other => Some(other),
     }
 }
 
@@ -270,73 +340,5 @@ impl From<f64> for ItemKind {
 impl From<f32> for ItemKind {
     fn from(what: f32) -> ItemKind {
         ItemKind::Float(what as f64)
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct MeterSnapshot {
-    pub one_minute: MeterRate,
-    pub five_minutes: MeterRate,
-    pub fifteen_minutes: MeterRate,
-}
-
-impl MeterSnapshot {
-    pub fn put_snapshot(&self, into: &mut Snapshot) {
-        let mut one_minute = Snapshot::default();
-        self.one_minute.put_snapshot(&mut one_minute);
-        into.items
-            .push(("one_minute".to_string(), ItemKind::Snapshot(one_minute)));
-        let mut five_minutes = Snapshot::default();
-        self.five_minutes.put_snapshot(&mut five_minutes);
-        into.items
-            .push(("five_minutes".to_string(), ItemKind::Snapshot(five_minutes)));
-        let mut fifteen_minutes = Snapshot::default();
-        self.fifteen_minutes.put_snapshot(&mut fifteen_minutes);
-        into.items.push((
-            "fifteen_minutes".to_string(),
-            ItemKind::Snapshot(fifteen_minutes),
-        ));
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct MeterRate {
-    pub rate: f64,
-    pub count: u64,
-}
-
-impl MeterRate {
-    fn put_snapshot(&self, into: &mut Snapshot) {
-        into.items.push(("rate".to_string(), self.rate.into()));
-        into.items.push(("count".to_string(), self.count.into()));
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct HistogramSnapshot {
-    pub max: i64,
-    pub min: i64,
-    pub mean: f64,
-    pub stddev: f64,
-    pub count: u64,
-    pub quantiles: Vec<(u16, i64)>,
-}
-
-impl HistogramSnapshot {
-    pub fn put_snapshot(&self, into: &mut Snapshot) {
-        into.items.push(("max".to_string(), self.max.into()));
-        into.items.push(("min".to_string(), self.min.into()));
-        into.items.push(("mean".to_string(), self.mean.into()));
-        into.items.push(("stddev".to_string(), self.stddev.into()));
-        into.items.push(("count".to_string(), self.count.into()));
-
-        let mut quantiles = Snapshot::default();
-
-        for &(ref q, ref v) in &self.quantiles {
-            quantiles.items.push((format!("p{}", q), ItemKind::Int(*v)));
-        }
-
-        into.items
-            .push(("quantiles".to_string(), ItemKind::Snapshot(quantiles)));
     }
 }

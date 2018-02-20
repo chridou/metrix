@@ -5,7 +5,7 @@ use std::time::{Duration, Instant};
 use metrics::metrics::{Meter as MMeter, StdMeter};
 
 use {Descriptive, PutsSnapshot};
-use snapshot::{ItemKind, MeterRate, MeterSnapshot, Snapshot};
+use snapshot::{ItemKind, Snapshot};
 use util;
 
 /// For measuring rates, e.g. request/s
@@ -99,5 +99,42 @@ impl Descriptive for Meter {
 
     fn description(&self) -> Option<&str> {
         self.description.as_ref().map(|n| &**n)
+    }
+}
+
+struct MeterSnapshot {
+    pub one_minute: MeterRate,
+    pub five_minutes: MeterRate,
+    pub fifteen_minutes: MeterRate,
+}
+
+impl MeterSnapshot {
+    pub fn put_snapshot(&self, into: &mut Snapshot) {
+        let mut one_minute = Snapshot::default();
+        self.one_minute.put_snapshot(&mut one_minute);
+        into.items
+            .push(("one_minute".to_string(), ItemKind::Snapshot(one_minute)));
+        let mut five_minutes = Snapshot::default();
+        self.five_minutes.put_snapshot(&mut five_minutes);
+        into.items
+            .push(("five_minutes".to_string(), ItemKind::Snapshot(five_minutes)));
+        let mut fifteen_minutes = Snapshot::default();
+        self.fifteen_minutes.put_snapshot(&mut fifteen_minutes);
+        into.items.push((
+            "fifteen_minutes".to_string(),
+            ItemKind::Snapshot(fifteen_minutes),
+        ));
+    }
+}
+
+struct MeterRate {
+    pub rate: f64,
+    pub count: u64,
+}
+
+impl MeterRate {
+    fn put_snapshot(&self, into: &mut Snapshot) {
+        into.items.push(("rate".to_string(), self.rate.into()));
+        into.items.push(("count".to_string(), self.count.into()));
     }
 }
