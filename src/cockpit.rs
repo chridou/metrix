@@ -174,12 +174,14 @@ where
         self.name = Some(name.into())
     }
 
-    /// Sets the title which will be displayed if a descriptive snaphot is requested.
+    /// Sets the title which will be displayed if a descriptive snaphot is
+    /// requested.
     pub fn set_title<T: Into<String>>(&mut self, title: T) {
         self.title = Some(title.into())
     }
 
-    /// Sets the description which will be displayed if a descriptive snaphot is requested.
+    /// Sets the description which will be displayed if a descriptive snaphot
+    /// is requested.
     pub fn set_description<T: Into<String>>(&mut self, description: T) {
         self.description = Some(description.into())
     }

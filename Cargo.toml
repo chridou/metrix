@@ -1,19 +1,22 @@
 [package]
-name = "metrix"
-version = "0.5.2"
 authors = ["Christian Douven <chridou@users.noreply.github.com>"]
-readme = "README.md"
-license = "Apache-2.0/MIT"
 description = "metrics for application monitoring"
 documentation = "https://docs.rs/metrix"
 homepage = "https://github.com/chridou/metrix"
-repository = "https://github.com/chridou/metrix"
 keywords = ["metrics", "monitoring", "alerting"]
-
+license = "Apache-2.0/MIT"
+name = "metrix"
+readme = "README.md"
+repository = "https://github.com/chridou/metrix"
+version = "0.5.2"
 [badges]
-travis-ci = { repository = "chridou/metrix", branch = "master" }
+[badges.travis-ci]
+branch = "master"
+repository = "chridou/metrix"
 
 [dependencies]
+component = "*"
 exponential-decay-histogram = "0.1.0"
-metrics = "0.2.0"
 json = "0.11.0"
+metrics = "0.2.0"
+rustfmt-preview = "*"

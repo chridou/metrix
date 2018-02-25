@@ -5,6 +5,7 @@ use std::time::Instant;
 use Observation;
 use snapshot::{ItemKind, Snapshot};
 use {Descriptive, PutsSnapshot};
+use self::switches::*;
 use util;
 
 pub use self::counter::*;
@@ -16,6 +17,7 @@ mod counter;
 mod gauge;
 mod meter;
 mod histogram;
+pub mod switches;
 pub mod polled;
 
 /// Scales incoming values.
@@ -145,6 +147,7 @@ pub struct Panel<L> {
     gauge: Option<Gauge>,
     meter: Option<Meter>,
     histogram: Option<Histogram>,
+    staircase_timer: Option<StaircaseTimer>,
     snapshooters: Vec<Box<PutsSnapshot>>,
     value_scaling: Option<ValueScaling>,
 }
@@ -161,6 +164,7 @@ impl<L> Panel<L> {
             gauge: None,
             meter: None,
             histogram: None,
+            staircase_timer: None,
             value_scaling: None,
             snapshooters: Vec::new(),
         }
@@ -203,6 +207,14 @@ impl<L> Panel<L> {
 
     pub fn histogram(&self) -> Option<&Histogram> {
         self.histogram.as_ref()
+    }
+
+    pub fn set_staircase_timer(&mut self, timer: StaircaseTimer) {
+        self.staircase_timer = Some(timer);
+    }
+
+    pub fn staircase_timer(&self) -> Option<&StaircaseTimer> {
+        self.staircase_timer.as_ref()
     }
 
     pub fn add_snapshooter<T: PutsSnapshot>(&mut self, snapshooter: T) {
@@ -265,6 +277,10 @@ impl<L> Panel<L> {
             .as_ref()
             .iter()
             .for_each(|x| x.put_snapshot(into, descriptive));
+        self.staircase_timer
+            .as_ref()
+            .iter()
+            .for_each(|x| x.put_snapshot(into, descriptive));
         self.snapshooters
             .iter()
             .for_each(|p| p.put_snapshot(into, descriptive));
@@ -298,6 +314,9 @@ impl<L> Updates for Panel<L> {
         self.gauge.iter_mut().for_each(|x| x.update(&with));
         self.meter.iter_mut().for_each(|x| x.update(&with));
         self.histogram.iter_mut().for_each(|x| x.update(&with));
+        self.staircase_timer
+            .iter_mut()
+            .for_each(|x| x.update(&with));
     }
 }
 

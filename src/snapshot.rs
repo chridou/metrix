@@ -273,6 +273,12 @@ impl From<f32> for ItemKind {
     }
 }
 
+impl From<bool> for ItemKind {
+    fn from(what: bool) -> ItemKind {
+        ItemKind::Boolean(what)
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct MeterSnapshot {
     pub one_minute: MeterRate,

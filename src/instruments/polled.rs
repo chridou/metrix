@@ -1,6 +1,7 @@
 //! Instruments that poll their values when a snapshot is requested.
 //!
-//! This is useful when you need to query values like currently opened DB connections etc.
+//! This is useful when you need to query values like currently opened DB
+//! connections etc.
 
 use {Descriptive, PutsSnapshot};
 use snapshot::*;
