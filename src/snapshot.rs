@@ -342,7 +342,6 @@ impl From<f32> for ItemKind {
         ItemKind::Float(what as f64)
     }
 }
-<<<<<<< HEAD
 
 impl From<bool> for ItemKind {
     fn from(what: bool) -> ItemKind {
@@ -417,5 +416,3 @@ impl HistogramSnapshot {
             .push(("quantiles".to_string(), ItemKind::Snapshot(quantiles)));
     }
 }
-=======
->>>>>>> 2550223aea6835af37ba955d240dbff13f551b7b
