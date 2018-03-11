@@ -9,6 +9,11 @@ use snapshot::{ItemKind, Snapshot};
 use util;
 
 /// For measuring rates, e.g. request/s
+///
+/// This meter count occurences. An occurrence with values is
+/// counted as 1 occurence.
+///
+/// To get rates on values use `instruments::other_instruments::ValeMeter`
 pub struct Meter {
     name: String,
     title: Option<String>,
@@ -89,6 +94,7 @@ impl Updates for Meter {
         match *with {
             Update::ObservationWithValue(_, _) => self.inner_meter.mark(1),
             Update::Observations(n, _) => self.inner_meter.mark(n as i64),
+            Update::Observation(_) => self.inner_meter.mark(1),
             _ => (),
         }
     }
