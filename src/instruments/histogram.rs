@@ -4,7 +4,7 @@ use exponential_decay_histogram::ExponentialDecayHistogram;
 
 use snapshot::{ItemKind, Snapshot};
 use {Descriptive, PutsSnapshot};
-use instruments::{Update, Updates};
+use instruments::{Instrument, Update, Updates};
 
 use util;
 
@@ -67,6 +67,8 @@ impl Histogram {
         histo_snapshot.put_snapshot(into);
     }
 }
+
+impl Instrument for Histogram {}
 
 impl PutsSnapshot for Histogram {
     fn put_snapshot(&self, into: &mut Snapshot, descriptive: bool) {

@@ -1,4 +1,4 @@
-use instruments::{Update, Updates};
+use instruments::{Instrument, Update, Updates};
 
 use snapshot::Snapshot;
 use {Descriptive, PutsSnapshot};
@@ -74,6 +74,8 @@ impl Gauge {
         self.description = Some(description.into())
     }
 }
+
+impl Instrument for Gauge {}
 
 impl PutsSnapshot for Gauge {
     fn put_snapshot(&self, into: &mut Snapshot, descriptive: bool) {

@@ -1,6 +1,6 @@
 use std::time::{Duration, Instant};
 
-use instruments::{Update, Updates};
+use instruments::{Instrument, Update, Updates};
 use snapshot::Snapshot;
 use {Descriptive, PutsSnapshot};
 use util;
@@ -110,6 +110,8 @@ impl StaircaseTimer {
         }
     }
 }
+
+impl Instrument for StaircaseTimer {}
 
 impl PutsSnapshot for StaircaseTimer {
     fn put_snapshot(&self, into: &mut Snapshot, descriptive: bool) {

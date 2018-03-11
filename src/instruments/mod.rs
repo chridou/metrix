@@ -99,6 +99,9 @@ pub trait Updates {
     fn update(&mut self, with: &Update);
 }
 
+/// Requirement for an instrument
+pub trait Instrument: Updates + PutsSnapshot {}
+
 /// The panel shows recorded
 /// observations with the same label
 /// in different representations.
@@ -147,7 +150,7 @@ pub struct Panel<L> {
     gauge: Option<Gauge>,
     meter: Option<Meter>,
     histogram: Option<Histogram>,
-    staircase_timer: Option<StaircaseTimer>,
+    instruments: Vec<Box<Instrument>>,
     snapshooters: Vec<Box<PutsSnapshot>>,
     value_scaling: Option<ValueScaling>,
 }
@@ -164,8 +167,8 @@ impl<L> Panel<L> {
             gauge: None,
             meter: None,
             histogram: None,
-            staircase_timer: None,
             value_scaling: None,
+            instruments: Vec::new(),
             snapshooters: Vec::new(),
         }
     }
@@ -209,12 +212,14 @@ impl<L> Panel<L> {
         self.histogram.as_ref()
     }
 
+    #[deprecated(since = "0.6.0", note = "use add_instrument")]
     pub fn set_staircase_timer(&mut self, timer: StaircaseTimer) {
-        self.staircase_timer = Some(timer);
+        self.add_instrument(timer);
     }
 
+    #[deprecated(since = "0.6.0", note = "there will be no replacement")]
     pub fn staircase_timer(&self) -> Option<&StaircaseTimer> {
-        self.staircase_timer.as_ref()
+        None
     }
 
     pub fn add_snapshooter<T: PutsSnapshot>(&mut self, snapshooter: T) {
@@ -223,6 +228,14 @@ impl<L> Panel<L> {
 
     pub fn snapshooters(&self) -> Vec<&PutsSnapshot> {
         self.snapshooters.iter().map(|p| &**p).collect()
+    }
+
+    pub fn add_instrument<I: Instrument>(&mut self, instrument: I) {
+        self.instruments.push(Box::new(instrument));
+    }
+
+    pub fn instruments(&self) -> Vec<&Instrument> {
+        self.instruments.iter().map(|p| &**p).collect()
     }
 
     pub fn set_value_scaling(&mut self, value_scaling: ValueScaling) {
@@ -277,11 +290,10 @@ impl<L> Panel<L> {
             .as_ref()
             .iter()
             .for_each(|x| x.put_snapshot(into, descriptive));
-        self.staircase_timer
-            .as_ref()
-            .iter()
-            .for_each(|x| x.put_snapshot(into, descriptive));
         self.snapshooters
+            .iter()
+            .for_each(|p| p.put_snapshot(into, descriptive));
+        self.instruments
             .iter()
             .for_each(|p| p.put_snapshot(into, descriptive));
     }
@@ -314,9 +326,7 @@ impl<L> Updates for Panel<L> {
         self.gauge.iter_mut().for_each(|x| x.update(&with));
         self.meter.iter_mut().for_each(|x| x.update(&with));
         self.histogram.iter_mut().for_each(|x| x.update(&with));
-        self.staircase_timer
-            .iter_mut()
-            .for_each(|x| x.update(&with));
+        self.instruments.iter_mut().for_each(|x| x.update(&with));
     }
 }
 

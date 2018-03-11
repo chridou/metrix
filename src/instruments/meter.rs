@@ -1,8 +1,8 @@
-use instruments::Update;
-use instruments::Updates;
 use std::time::{Duration, Instant};
 
 use metrics::metrics::{Meter as MMeter, StdMeter};
+
+use instruments::{Instrument, Update, Updates};
 
 use {Descriptive, PutsSnapshot};
 use snapshot::{ItemKind, Snapshot};
@@ -68,6 +68,8 @@ impl Meter {
         meter_snapshot.put_snapshot(into);
     }
 }
+
+impl Instrument for Meter {}
 
 impl PutsSnapshot for Meter {
     fn put_snapshot(&self, into: &mut Snapshot, descriptive: bool) {

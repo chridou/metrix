@@ -1,5 +1,4 @@
-use instruments::Update;
-use instruments::Updates;
+use instruments::{Instrument, Update, Updates};
 
 use snapshot::Snapshot;
 use {Descriptive, PutsSnapshot};
@@ -83,6 +82,8 @@ impl Counter {
         self.description = Some(description.into())
     }
 }
+
+impl Instrument for Counter {}
 
 impl PutsSnapshot for Counter {
     fn put_snapshot(&self, into: &mut Snapshot, descriptive: bool) {
