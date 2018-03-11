@@ -95,7 +95,6 @@ impl Updates for Meter {
             Update::ObservationWithValue(_, _) => self.inner_meter.mark(1),
             Update::Observations(n, _) => self.inner_meter.mark(n as i64),
             Update::Observation(_) => self.inner_meter.mark(1),
-            _ => (),
         }
     }
 }
