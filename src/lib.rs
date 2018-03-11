@@ -21,7 +21,8 @@
 //! Applications/services can have a lot of metrics and one of the greatest challenges is
 //! organizing them. This is what `metrix` tries to help with.
 //!
-//! **Metrix** does not aim for providing exact numbers for scientific or financial analysis.
+//! **Metrix** does not aim for providing exact numbers and aims for applications monitoring
+//! only.
 //!
 //! This crate is in a very **early** stage and the API might still change. There may be
 //! backends provided for monitoring solutions in the future

@@ -5,12 +5,12 @@ use snapshot::Snapshot;
 use {Descriptive, PutsSnapshot};
 use util;
 
-/// Changes the state based on the occurance of an observation
+/// Changes the state based on the occurrence of an observation
 /// within a given time.
 ///
 /// Can be used for alerting, e.g. if something
 /// bad was observed within a given timeframe.
-pub struct OccuranceIndicator {
+pub struct OccurrenceIndicator {
     name: String,
     title: Option<String>,
     description: Option<String>,
@@ -19,9 +19,9 @@ pub struct OccuranceIndicator {
     invert: bool,
 }
 
-impl OccuranceIndicator {
-    pub fn new_with_defaults<T: Into<String>>(name: T) -> OccuranceIndicator {
-        OccuranceIndicator {
+impl OccurrenceIndicator {
+    pub fn new_with_defaults<T: Into<String>>(name: T) -> OccurrenceIndicator {
+        OccurrenceIndicator {
             name: name.into(),
             title: None,
             description: None,
@@ -31,26 +31,26 @@ impl OccuranceIndicator {
         }
     }
 
-    /// Gets the name of this `OccuranceIndicator`
+    /// Gets the name of this `OccurenceIndicator`
     pub fn name(&self) -> &str {
         &self.name
     }
 
-    /// Set the name if this `OccuranceIndicator`.
+    /// Set the name if this `OccurenceIndicator`.
     ///
     /// The name is a path segment within a `Snapshot`
     pub fn set_name<T: Into<String>>(&mut self, name: T) {
         self.name = name.into();
     }
 
-    /// Sets the `title` of this `OccuranceIndicator`.
+    /// Sets the `title` of this `OccurenceIndicator`.
     ///
     /// A title can be part of a descriptive `Snapshot`
     pub fn set_title<T: Into<String>>(&mut self, title: T) {
         self.title = Some(title.into())
     }
 
-    /// Sets the `description` of this `OccuranceIndicator`.
+    /// Sets the `description` of this `OccurenceIndicator`.
     ///
     /// A description can be part of a descriptive `Snapshot`
     pub fn set_description<T: Into<String>>(&mut self, description: T) {
@@ -97,9 +97,9 @@ impl OccuranceIndicator {
     }
 }
 
-impl Instrument for OccuranceIndicator {}
+impl Instrument for OccurrenceIndicator {}
 
-impl PutsSnapshot for OccuranceIndicator {
+impl PutsSnapshot for OccurrenceIndicator {
     fn put_snapshot(&self, into: &mut Snapshot, descriptive: bool) {
         util::put_postfixed_descriptives(self, &self.name, into, descriptive);
 
@@ -107,13 +107,13 @@ impl PutsSnapshot for OccuranceIndicator {
     }
 }
 
-impl Updates for OccuranceIndicator {
+impl Updates for OccurrenceIndicator {
     fn update(&mut self, _: &Update) {
         self.happened_last = Instant::now()
     }
 }
 
-impl Descriptive for OccuranceIndicator {
+impl Descriptive for OccurrenceIndicator {
     fn title(&self) -> Option<&str> {
         self.title.as_ref().map(|n| &**n)
     }

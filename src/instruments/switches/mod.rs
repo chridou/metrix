@@ -4,9 +4,9 @@
 //! Switches can be used to attach alerts.
 
 mod staircase_timer;
-mod occurance_indicator;
-mod non_occurance_indicator;
+mod occurrence_indicator;
+mod non_occurrence_indicator;
 
-pub use self::staircase_timer::*;
-pub use self::occurance_indicator::*;
-pub use self::non_occurance_indicator::*;
+pub use self::staircase_timer::StaircaseTimer;
+pub use self::occurrence_indicator::OccurrenceIndicator;
+pub use self::non_occurrence_indicator::NonOccurrenceIndicator;

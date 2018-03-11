@@ -1,7 +1,7 @@
 //! Other instruments
-pub use self::last_occurance_tracker::*;
+pub use self::last_occurrence_tracker::LastOccurrenceTracker;
 
-mod last_occurance_tracker {
+mod last_occurrence_tracker {
     use std::time::Instant;
 
     use instruments::{Instrument, Update, Updates};
@@ -10,7 +10,7 @@ mod last_occurance_tracker {
     use util;
 
     /// Tracks how much many seconds elapsed since the last occurence
-    pub struct LastOccuranceTracker {
+    pub struct LastOccurrenceTracker {
         name: String,
         title: Option<String>,
         description: Option<String>,
@@ -19,9 +19,9 @@ mod last_occurance_tracker {
         make_none_zero: bool,
     }
 
-    impl LastOccuranceTracker {
-        pub fn new_with_defaults<T: Into<String>>(name: T) -> LastOccuranceTracker {
-            LastOccuranceTracker {
+    impl LastOccurrenceTracker {
+        pub fn new_with_defaults<T: Into<String>>(name: T) -> LastOccurrenceTracker {
+            LastOccurrenceTracker {
                 name: name.into(),
                 title: None,
                 description: None,
@@ -31,26 +31,26 @@ mod last_occurance_tracker {
             }
         }
 
-        /// Gets the name of this `OccuranceTracker`
+        /// Gets the name of this `OccurenceTracker`
         pub fn name(&self) -> &str {
             &self.name
         }
 
-        /// Set the name if this `OccuranceTracker`.
+        /// Set the name if this `OccurenceTracker`.
         ///
         /// The name is a path segment within a `Snapshot`
         pub fn set_name<T: Into<String>>(&mut self, name: T) {
             self.name = name.into();
         }
 
-        /// Sets the `title` of this `OccuranceTracker`.
+        /// Sets the `title` of this `OccurenceTracker`.
         ///
         /// A title can be part of a descriptive `Snapshot`
         pub fn set_title<T: Into<String>>(&mut self, title: T) {
             self.title = Some(title.into())
         }
 
-        /// Sets the `description` of this `OccuranceTracker`.
+        /// Sets the `description` of this `OccurenceTracker`.
         ///
         /// A description can be part of a descriptive `Snapshot`
         pub fn set_description<T: Into<String>>(&mut self, description: T) {
@@ -75,7 +75,7 @@ mod last_occurance_tracker {
         /// be returned will instead be `0`.
         ///
         /// Hint: This instrument will return `None` unless there
-        /// was at least one occurance recorded.
+        /// was at least one Occurence recorded.
         pub fn set_make_none_zero(&mut self, make_zero: bool) {
             self.make_none_zero = make_zero
         }
@@ -86,19 +86,19 @@ mod last_occurance_tracker {
         }
 
         /// Returns the current state
-        pub fn elapsed_since_last_occurance(&self) -> Option<u64> {
+        pub fn elapsed_since_last_occurrence(&self) -> Option<u64> {
             self.happened_last
                 .map(|last| (Instant::now() - last).as_secs())
         }
     }
 
-    impl Instrument for LastOccuranceTracker {}
+    impl Instrument for LastOccurrenceTracker {}
 
-    impl PutsSnapshot for LastOccuranceTracker {
+    impl PutsSnapshot for LastOccurrenceTracker {
         fn put_snapshot(&self, into: &mut Snapshot, descriptive: bool) {
             util::put_postfixed_descriptives(self, &self.name, into, descriptive);
 
-            if let Some(v) = self.elapsed_since_last_occurance() {
+            if let Some(v) = self.elapsed_since_last_occurrence() {
                 into.items.push((self.name.clone(), v.into()));
             } else {
                 if self.make_none_zero() {
@@ -108,13 +108,13 @@ mod last_occurance_tracker {
         }
     }
 
-    impl Updates for LastOccuranceTracker {
+    impl Updates for LastOccurrenceTracker {
         fn update(&mut self, _: &Update) {
             self.happened_last = Some(Instant::now())
         }
     }
 
-    impl Descriptive for LastOccuranceTracker {
+    impl Descriptive for LastOccurrenceTracker {
         fn title(&self) -> Option<&str> {
             self.title.as_ref().map(|n| &**n)
         }

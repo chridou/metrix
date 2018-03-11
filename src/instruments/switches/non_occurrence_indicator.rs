@@ -5,17 +5,18 @@ use snapshot::Snapshot;
 use {Descriptive, PutsSnapshot};
 use util;
 
-/// Changes the state based on the non occurance of an observation
+/// Changes the state based on the abscence of
+/// an observation
 /// within a given time.
 ///
 /// Can be used for alerting, e.g. if something
 /// expected was not observed within a given timeframe.
 ///
 /// Note:
-/// The first occurance will be when this instrument is
+/// The first occurrence will be when this instrument is
 /// created so that the indicator does not turn on
 /// right from the start.
-pub struct NonOccuranceIndicator {
+pub struct NonOccurrenceIndicator {
     name: String,
     title: Option<String>,
     description: Option<String>,
@@ -24,9 +25,9 @@ pub struct NonOccuranceIndicator {
     invert: bool,
 }
 
-impl NonOccuranceIndicator {
-    pub fn new_with_defaults<T: Into<String>>(name: T) -> NonOccuranceIndicator {
-        NonOccuranceIndicator {
+impl NonOccurrenceIndicator {
+    pub fn new_with_defaults<T: Into<String>>(name: T) -> NonOccurrenceIndicator {
+        NonOccurrenceIndicator {
             name: name.into(),
             title: None,
             description: None,
@@ -36,26 +37,26 @@ impl NonOccuranceIndicator {
         }
     }
 
-    /// Gets the name of this `NonOccuranceIndicator`
+    /// Gets the name of this `NonOccurenceIndicator`
     pub fn name(&self) -> &str {
         &self.name
     }
 
-    /// Set the name if this `NonOccuranceIndicator`.
+    /// Set the name if this `NonOccurenceIndicator`.
     ///
     /// The name is a path segment within a `Snapshot`
     pub fn set_name<T: Into<String>>(&mut self, name: T) {
         self.name = name.into();
     }
 
-    /// Sets the `title` of this `NonOccuranceIndicator`.
+    /// Sets the `title` of this `NonOccurenceIndicator`.
     ///
     /// A title can be part of a descriptive `Snapshot`
     pub fn set_title<T: Into<String>>(&mut self, title: T) {
         self.title = Some(title.into())
     }
 
-    /// Sets the `description` of this `NonOccuranceIndicator`.
+    /// Sets the `description` of this `NonOccurenceIndicator`.
     ///
     /// A description can be part of a descriptive `Snapshot`
     pub fn set_description<T: Into<String>>(&mut self, description: T) {
@@ -101,9 +102,9 @@ impl NonOccuranceIndicator {
     }
 }
 
-impl Instrument for NonOccuranceIndicator {}
+impl Instrument for NonOccurrenceIndicator {}
 
-impl PutsSnapshot for NonOccuranceIndicator {
+impl PutsSnapshot for NonOccurrenceIndicator {
     fn put_snapshot(&self, into: &mut Snapshot, descriptive: bool) {
         util::put_postfixed_descriptives(self, &self.name, into, descriptive);
 
@@ -111,13 +112,13 @@ impl PutsSnapshot for NonOccuranceIndicator {
     }
 }
 
-impl Updates for NonOccuranceIndicator {
+impl Updates for NonOccurrenceIndicator {
     fn update(&mut self, _: &Update) {
         self.happened_last = Instant::now()
     }
 }
 
-impl Descriptive for NonOccuranceIndicator {
+impl Descriptive for NonOccurrenceIndicator {
     fn title(&self) -> Option<&str> {
         self.title.as_ref().map(|n| &**n)
     }

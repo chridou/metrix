@@ -8,10 +8,10 @@ use {Descriptive, PutsSnapshot};
 use self::switches::*;
 use util;
 
-pub use self::counter::*;
-pub use self::gauge::*;
-pub use self::meter::*;
-pub use self::histogram::*;
+pub use self::counter::Counter;
+pub use self::gauge::Gauge;
+pub use self::meter::Meter;
+pub use self::histogram::Histogram;
 
 mod counter;
 mod gauge;
