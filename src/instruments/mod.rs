@@ -19,6 +19,7 @@ mod meter;
 mod histogram;
 pub mod switches;
 pub mod polled;
+pub mod other_instruments;
 
 /// Scales incoming values.
 ///
