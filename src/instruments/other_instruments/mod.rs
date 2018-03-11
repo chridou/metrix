@@ -4,6 +4,7 @@ pub use self::value_meter::ValueMeter;
 
 mod value_meter {
     use std::time::{Duration, Instant};
+    use std::cell::Cell;
 
     use metrics::metrics::{Meter as MMeter, StdMeter};
 
@@ -18,7 +19,7 @@ mod value_meter {
         name: String,
         title: Option<String>,
         description: Option<String>,
-        last_tick: Instant,
+        last_tick: Cell<Instant>,
         inner_meter: StdMeter,
     }
 
@@ -28,7 +29,7 @@ mod value_meter {
                 name: name.into(),
                 title: None,
                 description: None,
-                last_tick: Instant::now(),
+                last_tick: Cell::new(Instant::now()),
                 inner_meter: StdMeter::default(),
             }
         }
@@ -50,8 +51,9 @@ mod value_meter {
         }
 
         fn put_values_into_snapshot(&self, into: &mut Snapshot) {
-            if self.last_tick.elapsed() >= Duration::from_secs(5) {
-                self.inner_meter.tick()
+            if self.last_tick.get().elapsed() >= Duration::from_secs(5) {
+                self.inner_meter.tick();
+                self.last_tick.set(Instant::now());
             }
 
             let snapshot = self.inner_meter.snapshot();
@@ -87,8 +89,9 @@ mod value_meter {
 
     impl Updates for ValueMeter {
         fn update(&mut self, with: &Update) {
-            if self.last_tick.elapsed() >= Duration::from_secs(5) {
-                self.inner_meter.tick()
+            if self.last_tick.get().elapsed() >= Duration::from_secs(5) {
+                self.inner_meter.tick();
+                self.last_tick.set(Instant::now());
             }
 
             match *with {
