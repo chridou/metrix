@@ -96,7 +96,7 @@ mod value_meter {
 
             match *with {
                 Update::ObservationWithValue(v, _) => {
-                    if v <= ::std::i64::MAX as u64 {
+                    if v <= ::std::i64::MAX as u64 && v != 0 {
                         self.inner_meter.mark(v as i64)
                     }
                 }

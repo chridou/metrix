@@ -96,7 +96,11 @@ impl Updates for Meter {
 
         match *with {
             Update::ObservationWithValue(_, _) => self.inner_meter.mark(1),
-            Update::Observations(n, _) => self.inner_meter.mark(n as i64),
+            Update::Observations(n, _) => {
+                if n <= ::std::i64::MAX as u64 && n != 0 {
+                    self.inner_meter.mark(n as i64)
+                }
+            }
             Update::Observation(_) => self.inner_meter.mark(1),
         }
     }
