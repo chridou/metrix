@@ -214,12 +214,12 @@ impl<L> Observation<L> {
 /// to interfere to much with the actual task being measured/observed
 pub trait TransmitsTelemetryData<L> {
     /// Transit an observation to the backend.
-    fn transmit(&self, observation: Observation<L>);
+    fn transmit(&self, observation: Observation<L>) -> &Self;
 
     /// Observed `count` occurences at time `timestamp`
     ///
     /// Convinience method. Simply calls `transmit`
-    fn observed(&self, label: L, count: u64, timestamp: Instant) {
+    fn observed(&self, label: L, count: u64, timestamp: Instant) -> &Self {
         self.transmit(Observation::Observed {
             label,
             count,
@@ -230,14 +230,14 @@ pub trait TransmitsTelemetryData<L> {
     /// Observed one occurence at time `timestamp`
     ///
     /// Convinience method. Simply calls `transmit`
-    fn observed_one(&self, label: L, timestamp: Instant) {
+    fn observed_one(&self, label: L, timestamp: Instant) -> &Self {
         self.transmit(Observation::ObservedOne { label, timestamp })
     }
 
     /// Observed one occurence with value `value` at time `timestamp`
     ///
     /// Convinience method. Simply calls `transmit`
-    fn observed_one_value(&self, label: L, value: u64, timestamp: Instant) {
+    fn observed_one_value(&self, label: L, value: u64, timestamp: Instant) -> &Self {
         self.transmit(Observation::ObservedOneValue {
             label,
             value,
@@ -247,7 +247,7 @@ pub trait TransmitsTelemetryData<L> {
 
     /// Sends a `Duration` as an observed value observed at `timestamp`.
     /// The `Duration` is converted to nanoseconds.
-    fn observed_duration(&self, label: L, duration: Duration, timestamp: Instant) {
+    fn observed_duration(&self, label: L, duration: Duration, timestamp: Instant) -> &Self {
         let nanos = (duration.as_secs() * 1_000_000_000) + (duration.subsec_nanos() as u64);
         self.observed_one_value(label, nanos, timestamp)
     }
@@ -256,7 +256,7 @@ pub trait TransmitsTelemetryData<L> {
     ///
     /// Convinience method. Simply calls `observed` with
     /// the current timestamp.
-    fn observed_now(&self, label: L, count: u64) {
+    fn observed_now(&self, label: L, count: u64) -> &Self {
         self.observed(label, count, Instant::now())
     }
 
@@ -264,7 +264,7 @@ pub trait TransmitsTelemetryData<L> {
     ///
     /// Convinience method. Simply calls `observed_one` with
     /// the current timestamp.
-    fn observed_one_now(&self, label: L) {
+    fn observed_one_now(&self, label: L) -> &Self {
         self.observed_one(label, Instant::now())
     }
 
@@ -272,7 +272,7 @@ pub trait TransmitsTelemetryData<L> {
     ///
     /// Convinience method. Simply calls `observed_one_value` with
     /// the current timestamp.
-    fn observed_one_value_now(&self, label: L, value: u64) {
+    fn observed_one_value_now(&self, label: L, value: u64) -> &Self {
         self.observed_one_value(label, value, Instant::now())
     }
 
@@ -280,30 +280,32 @@ pub trait TransmitsTelemetryData<L> {
     /// timestamp.
     ///
     /// The `Duration` is converted to nanoseconds.
-    fn observed_one_duration_now(&self, label: L, duration: Duration) {
-        self.observed_duration(label, duration, Instant::now());
+    fn observed_one_duration_now(&self, label: L, duration: Duration) -> &Self {
+        self.observed_duration(label, duration, Instant::now())
     }
 
     /// Measures the time from `from` until now.
     ///
     /// The resultiong duration is an observed value
     /// with the measured duration in nanoseconds.
-    fn measure_time(&self, label: L, from: Instant) {
+    fn measure_time(&self, label: L, from: Instant) -> &Self {
         let now = Instant::now();
         if from <= now {
-            self.observed_duration(label, now - from, now)
+            self.observed_duration(label, now - from, now);
         }
+
+        self
     }
 
     /// Add a handler.
-    fn add_handler(&self, handler: Box<HandlesObservations<Label = L>>);
+    fn add_handler(&self, handler: Box<HandlesObservations<Label = L>>) -> &Self;
 
     /// Add a `Copckpit`
-    fn add_cockpit(&self, cockpit: Cockpit<L>);
+    fn add_cockpit(&self, cockpit: Cockpit<L>) -> &Self;
 
     /// Add a `Panel` to a `Cockpit` if that `Cockpit` has the
     /// given name.
-    fn add_panel_to_cockpit(&self, cockpit_name: String, panel: Panel<L>);
+    fn add_panel_to_cockpit(&self, cockpit_name: String, panel: Panel<L>) -> &Self;
 }
 
 /// Transmits `Observation`s to the backend
@@ -329,31 +331,39 @@ where
 }
 
 impl<L> TransmitsTelemetryData<L> for TelemetryTransmitter<L> {
-    fn transmit(&self, observation: Observation<L>) {
+    fn transmit(&self, observation: Observation<L>) -> &Self {
         if let Err(_err) = self.sender.send(TelemetryMessage::Observation(observation)) {
             // maybe log...
         }
+
+        self
     }
 
-    fn add_handler(&self, handler: Box<HandlesObservations<Label = L>>) {
+    fn add_handler(&self, handler: Box<HandlesObservations<Label = L>>) -> &Self {
         if let Err(_err) = self.sender.send(TelemetryMessage::AddHandler(handler)) {
             // maybe log...
         }
+
+        self
     }
 
-    fn add_cockpit(&self, cockpit: Cockpit<L>) {
+    fn add_cockpit(&self, cockpit: Cockpit<L>) -> &Self {
         if let Err(_err) = self.sender.send(TelemetryMessage::AddCockpit(cockpit)) {
             // maybe log...
         }
+
+        self
     }
 
-    fn add_panel_to_cockpit(&self, cockpit_name: String, panel: Panel<L>) {
+    fn add_panel_to_cockpit(&self, cockpit_name: String, panel: Panel<L>) -> &Self {
         if let Err(_err) = self.sender.send(TelemetryMessage::AddPanel {
             cockpit_name,
             panel,
         }) {
             // maybe log...
         }
+
+        self
     }
 }
 
@@ -376,7 +386,7 @@ where
 }
 
 impl<L> TransmitsTelemetryData<L> for TelemetryTransmitterSync<L> {
-    fn transmit(&self, observation: Observation<L>) {
+    fn transmit(&self, observation: Observation<L>) -> &Self {
         if let Err(_err) = self.sender
             .lock()
             .unwrap()
@@ -384,9 +394,11 @@ impl<L> TransmitsTelemetryData<L> for TelemetryTransmitterSync<L> {
         {
             // maybe log...
         }
+
+        self
     }
 
-    fn add_handler(&self, handler: Box<HandlesObservations<Label = L>>) {
+    fn add_handler(&self, handler: Box<HandlesObservations<Label = L>>) -> &Self {
         if let Err(_err) = self.sender
             .lock()
             .unwrap()
@@ -394,9 +406,11 @@ impl<L> TransmitsTelemetryData<L> for TelemetryTransmitterSync<L> {
         {
             // maybe log...
         }
+
+        self
     }
 
-    fn add_cockpit(&self, cockpit: Cockpit<L>) {
+    fn add_cockpit(&self, cockpit: Cockpit<L>) -> &Self {
         if let Err(_err) = self.sender
             .lock()
             .unwrap()
@@ -404,9 +418,11 @@ impl<L> TransmitsTelemetryData<L> for TelemetryTransmitterSync<L> {
         {
             // maybe log...
         }
+
+        self
     }
 
-    fn add_panel_to_cockpit(&self, cockpit_name: String, panel: Panel<L>) {
+    fn add_panel_to_cockpit(&self, cockpit_name: String, panel: Panel<L>) -> &Self {
         if let Err(_err) = self.sender
             .lock()
             .unwrap()
@@ -416,6 +432,8 @@ impl<L> TransmitsTelemetryData<L> for TelemetryTransmitterSync<L> {
             }) {
             // maybe log...
         }
+
+        self
     }
 }
 
