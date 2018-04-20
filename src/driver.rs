@@ -18,13 +18,24 @@ use util;
 /// A `TelemetryDriver` can be 'mounted' into the hierarchy.
 /// If done so, it will still poll its children on its own thread
 /// independently.
+#[derive(Clone)]
 pub struct TelemetryDriver {
     name: Option<String>,
     title: Option<String>,
     description: Option<String>,
     processors: Arc<Mutex<Vec<Box<ProcessesTelemetryMessages>>>>,
     snapshooters: Arc<Mutex<Vec<Box<PutsSnapshot>>>>,
-    is_running: Arc<AtomicBool>,
+    drop_guard: Arc<DropGuard>,
+}
+
+struct DropGuard {
+    pub is_running: Arc<AtomicBool>,
+}
+
+impl Drop for DropGuard {
+    fn drop(&mut self) {
+        self.is_running.store(false, Ordering::Relaxed);
+    }
 }
 
 impl TelemetryDriver {
@@ -38,18 +49,22 @@ impl TelemetryDriver {
         name: Option<T>,
         max_observation_age: Option<Duration>,
     ) -> TelemetryDriver {
+        let is_running = Arc::new(AtomicBool::new(true));
+
         let driver = TelemetryDriver {
             name: name.map(Into::into),
             title: None,
             description: None,
-            is_running: Arc::new(AtomicBool::new(true)),
+            drop_guard: Arc::new(DropGuard {
+                is_running: is_running.clone(),
+            }),
             processors: Arc::new(Mutex::new(Vec::new())),
             snapshooters: Arc::new(Mutex::new(Vec::new())),
         };
 
         start_telemetry_loop(
             driver.processors.clone(),
-            driver.is_running.clone(),
+            is_running,
             max_observation_age.unwrap_or(Duration::from_secs(60)),
         );
 
@@ -130,12 +145,6 @@ impl AggregatesProcessors for TelemetryDriver {
             .lock()
             .unwrap()
             .push(Box::new(snapshooter));
-    }
-}
-
-impl Drop for TelemetryDriver {
-    fn drop(&mut self) {
-        self.is_running.store(false, Ordering::Relaxed);
     }
 }
 
