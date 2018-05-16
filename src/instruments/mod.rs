@@ -2,24 +2,24 @@
 //! from observations.
 use std::time::Instant;
 
+use self::switches::*;
 use Observation;
 use snapshot::{ItemKind, Snapshot};
-use {Descriptive, PutsSnapshot};
-use self::switches::*;
 use util;
+use {Descriptive, PutsSnapshot};
 
 pub use self::counter::Counter;
 pub use self::gauge::Gauge;
-pub use self::meter::Meter;
 pub use self::histogram::Histogram;
+pub use self::meter::Meter;
 
 mod counter;
 mod gauge;
-mod meter;
 mod histogram;
-pub mod switches;
-pub mod polled;
+mod meter;
 pub mod other_instruments;
+pub mod polled;
+pub mod switches;
 
 /// Scales incoming values.
 ///

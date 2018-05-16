@@ -1,9 +1,9 @@
 //! Cockpits are used to monitor different aspects of a component
 
-use {Observation, PutsSnapshot};
 use instruments::*;
 use snapshot::{ItemKind, Snapshot};
 use util;
+use {Observation, PutsSnapshot};
 
 /// Something that can react on `Observation`s where
 /// the `Label` is the type of the label.
@@ -46,8 +46,8 @@ pub trait HandlesObservations: PutsSnapshot + Send + 'static {
 /// assert_eq!(0, counter.get());
 /// assert_eq!(None, gauge.get());
 ///
-/// let mut success_panel = Panel::with_name(Request::Successful, "succesful_requests");
-/// success_panel.set_counter(counter);
+/// let mut success_panel = Panel::with_name(Request::Successful,
+/// "succesful_requests"); success_panel.set_counter(counter);
 /// success_panel.set_gauge(gauge);
 /// success_panel.set_meter(meter);
 /// success_panel.set_histogram(histogram);
@@ -164,7 +164,8 @@ where
 
     /// Returns the name of this cockpit.
     ///
-    /// If there is a name set, this will group the inner components in the snapshot.
+    /// If there is a name set, this will group the inner components in the
+    /// snapshot.
     pub fn name(&self) -> Option<&str> {
         self.name.as_ref().map(|n| &**n)
     }

@@ -1,16 +1,16 @@
 extern crate metrix;
 
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::thread;
 use std::time::{Duration, Instant};
-use std::sync::atomic::{AtomicUsize, Ordering};
 
-use metrix::*;
-use metrix::instruments::*;
-use metrix::instruments::polled::*;
-use metrix::processor::*;
-use metrix::driver::*;
-use metrix::snapshot::*;
 use metrix::cockpit::*;
+use metrix::driver::*;
+use metrix::instruments::polled::*;
+use metrix::instruments::*;
+use metrix::processor::*;
+use metrix::snapshot::*;
+use metrix::*;
 
 #[derive(Clone, PartialEq, Eq)]
 enum FooLabel {
@@ -144,7 +144,7 @@ fn create_bar_metrics() -> (TelemetryTransmitterSync<BarLabel>, ProcessorMount) 
 }
 
 fn main() {
-    let mut driver = TelemetryDriver::new(Some("demo"), None);
+    let mut driver = TelemetryDriver::with_metrics(Some("demo"), None);
 
     let (foo_transmitter, foo_processor) = create_foo_metrics();
     let (bar_transmitter, bar_processor) = create_bar_metrics();
@@ -207,13 +207,13 @@ fn main() {
     handle3.join().unwrap();
 
     println!(
-        "Sending observations took {:?}. Sleeping 3 secs to collect remaining data. \
+        "Sending observations took {:?}. Sleeping 5 secs to collect remaining data. \
          Depending on your machine you might see that not all metrics have a count \
          of 5 million obseravtions.",
         start.elapsed()
     );
 
-    thread::sleep(Duration::from_secs(3));
+    thread::sleep(Duration::from_secs(5));
 
     println!("\n\n\n=======================\n\n");
 

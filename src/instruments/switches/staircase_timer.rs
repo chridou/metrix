@@ -2,8 +2,8 @@ use std::time::{Duration, Instant};
 
 use instruments::{Instrument, Update, Updates};
 use snapshot::Snapshot;
-use {Descriptive, PutsSnapshot};
 use util;
+use {Descriptive, PutsSnapshot};
 
 /// A `StaircaseTimer` is 'tapped' by an `Observation`
 /// and then stays on for some time.

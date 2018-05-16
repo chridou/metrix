@@ -1,13 +1,14 @@
 //! The thing that makes it happen... You need it!
-use std::sync::{Arc, Mutex};
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
 
+use instruments::*;
 use processor::{AggregatesProcessors, ProcessesTelemetryMessages, ProcessingOutcome};
 use snapshot::{ItemKind, Snapshot};
-use {Descriptive, PutsSnapshot};
 use util;
+use {Descriptive, PutsSnapshot};
 
 /// Triggers registered `ProcessesTelemetryMessages` to
 /// poll for messages.
@@ -26,6 +27,7 @@ pub struct TelemetryDriver {
     processors: Arc<Mutex<Vec<Box<ProcessesTelemetryMessages>>>>,
     snapshooters: Arc<Mutex<Vec<Box<PutsSnapshot>>>>,
     drop_guard: Arc<DropGuard>,
+    driver_metrics: Option<DriverMetrics>,
 }
 
 struct DropGuard {
@@ -43,13 +45,47 @@ impl TelemetryDriver {
     ///
     /// `max_observation_age` is the maximum age of an `Observation`
     /// to be taken into account. This is determined by the `timestamp`
-    /// field of an `Observation`. `Observations` that are too old are simply dropped.
-    /// The default is **60 seconds**.
+    /// field of an `Observation`. `Observations` that are too old are simply
+    /// dropped. The default is **60 seconds**.
     pub fn new<T: Into<String>>(
         name: Option<T>,
         max_observation_age: Option<Duration>,
     ) -> TelemetryDriver {
+        TelemetryDriver::create(name, max_observation_age, false)
+    }
+
+    /// Creates a new `TelemetryDriver` which has its own metrics.
+    ///
+    /// `max_observation_age` is the maximum age of an `Observation`
+    /// to be taken into account. This is determined by the `timestamp`
+    /// field of an `Observation`. `Observations` that are too old are simply
+    /// dropped. The default is **60 seconds**.
+    ///
+    /// # Metrics
+    ///
+    /// * observations processed per second
+    /// * observations dropped per second
+    pub fn with_metrics<T: Into<String>>(
+        name: Option<T>,
+        max_observation_age: Option<Duration>,
+    ) -> TelemetryDriver {
+        TelemetryDriver::create(name, max_observation_age, true)
+    }
+
+    fn create<T: Into<String>>(
+        name: Option<T>,
+        max_observation_age: Option<Duration>,
+        with_driver_metrics: bool,
+    ) -> TelemetryDriver {
         let is_running = Arc::new(AtomicBool::new(true));
+
+        let driver_metrics = if with_driver_metrics {
+            Some(DriverMetrics {
+                instruments: Arc::new(Mutex::new(DriverInstruments::default())),
+            })
+        } else {
+            None
+        };
 
         let driver = TelemetryDriver {
             name: name.map(Into::into),
@@ -60,12 +96,14 @@ impl TelemetryDriver {
             }),
             processors: Arc::new(Mutex::new(Vec::new())),
             snapshooters: Arc::new(Mutex::new(Vec::new())),
+            driver_metrics: driver_metrics.clone(),
         };
 
         start_telemetry_loop(
             driver.processors.clone(),
             is_running,
             max_observation_age.unwrap_or(Duration::from_secs(60)),
+            driver_metrics,
         );
 
         driver
@@ -94,6 +132,8 @@ impl TelemetryDriver {
     }
 
     fn put_values_into_snapshot(&self, into: &mut Snapshot, descriptive: bool) {
+        let started = Instant::now();
+
         util::put_default_descriptives(self, into, descriptive);
         self.processors
             .lock()
@@ -106,6 +146,11 @@ impl TelemetryDriver {
             .unwrap()
             .iter()
             .for_each(|s| s.put_snapshot(into, descriptive));
+
+        if let Some(ref driver_metrics) = self.driver_metrics {
+            driver_metrics.update_post_snapshot(started);
+            driver_metrics.put_snapshot(into, descriptive);
+        }
     }
 }
 
@@ -162,15 +207,26 @@ fn start_telemetry_loop(
     processors: Arc<Mutex<Vec<Box<ProcessesTelemetryMessages>>>>,
     is_running: Arc<AtomicBool>,
     max_observation_age: Duration,
+    driver_metrics: Option<DriverMetrics>,
 ) {
-    thread::spawn(move || telemetry_loop(&processors, &is_running, max_observation_age));
+    thread::spawn(move || {
+        telemetry_loop(
+            &processors,
+            &is_running,
+            max_observation_age,
+            driver_metrics,
+        )
+    });
 }
 
 fn telemetry_loop(
     processors: &Mutex<Vec<Box<ProcessesTelemetryMessages>>>,
     is_running: &AtomicBool,
     max_observation_age: Duration,
+    mut driver_metrics: Option<DriverMetrics>,
 ) {
+    let mut last_outcome_logged = Instant::now() - Duration::from_secs(60);
+    let mut dropped_since_last_logged = 0usize;
     loop {
         if !is_running.load(Ordering::Relaxed) {
             break;
@@ -178,6 +234,19 @@ fn telemetry_loop(
 
         let started = Instant::now();
         let outcome = do_a_run(processors, 1_000, max_observation_age);
+
+        dropped_since_last_logged += outcome.dropped;
+
+        if dropped_since_last_logged > 0 && last_outcome_logged.elapsed() > Duration::from_secs(5) {
+            log_outcome(dropped_since_last_logged);
+            last_outcome_logged = Instant::now();
+            dropped_since_last_logged = 0;
+        }
+
+        if let Some(ref mut driver_metrics) = driver_metrics {
+            driver_metrics.update_post_collection(&outcome, started);
+        }
+
         if outcome.dropped > 0 || outcome.processed > 100 {
             continue;
         }
@@ -205,4 +274,144 @@ fn do_a_run(
     }
 
     outcome
+}
+
+#[cfg(feature = "log")]
+#[inline]
+fn log_outcome(dropped: usize) {
+    warn!("{} observations have been dropped.", dropped);
+}
+
+#[cfg(not(feature = "log"))]
+#[inline]
+fn log_outcome(_dropped: usize) {}
+
+#[derive(Clone)]
+struct DriverMetrics {
+    instruments: Arc<Mutex<DriverInstruments>>,
+}
+
+impl DriverMetrics {
+    pub fn update_post_collection(&self, outcome: &ProcessingOutcome, collection_started: Instant) {
+        self.instruments
+            .lock()
+            .unwrap()
+            .update_post_collection(outcome, collection_started);
+    }
+
+    pub fn update_post_snapshot(&self, snapshot_started: Instant) {
+        self.instruments
+            .lock()
+            .unwrap()
+            .update_post_snapshot(snapshot_started);
+    }
+
+    pub fn put_snapshot(&self, into: &mut Snapshot, descriptive: bool) {
+        self.instruments
+            .lock()
+            .unwrap()
+            .put_snapshot(into, descriptive);
+    }
+}
+
+struct DriverInstruments {
+    collections_per_second: Meter,
+    collection_times_us: Histogram,
+    observations_processed_per_second: Meter,
+    observations_processed_per_collection: Histogram,
+    observations_dropped_per_second: Meter,
+    observations_dropped_per_collection: Histogram,
+    snapshots_per_second: Meter,
+    snapshots_times_us: Histogram,
+}
+
+impl Default for DriverInstruments {
+    fn default() -> Self {
+        DriverInstruments {
+            collections_per_second: Meter::new_with_defaults("collections_per_second"),
+            collection_times_us: Histogram::new_with_defaults("collection_times_us"),
+            observations_processed_per_second: Meter::new_with_defaults(
+                "observations_processed_per_second",
+            ),
+            observations_processed_per_collection: Histogram::new_with_defaults(
+                "observations_processed_per_collection",
+            ),
+            observations_dropped_per_second: Meter::new_with_defaults(
+                "observations_dropped_per_second",
+            ),
+            observations_dropped_per_collection: Histogram::new_with_defaults(
+                "observations_dropped_per_collection",
+            ),
+            snapshots_per_second: Meter::new_with_defaults("snapshots_per_second"),
+            snapshots_times_us: Histogram::new_with_defaults("snapshots_times_us"),
+        }
+    }
+}
+
+impl DriverInstruments {
+    pub fn update_post_collection(
+        &mut self,
+        outcome: &ProcessingOutcome,
+        collection_started: Instant,
+    ) {
+        let now = Instant::now();
+        self.collections_per_second
+            .update(&Update::Observation(now));
+        self.collection_times_us
+            .update(&Update::ObservationWithValue(
+                duration_to_micros(now - collection_started),
+                now,
+            ));
+        if outcome.processed > 0 {
+            self.observations_processed_per_second
+                .update(&Update::Observations(outcome.processed as u64, now));
+            self.observations_processed_per_collection
+                .update(&Update::ObservationWithValue(outcome.processed as u64, now));
+        }
+        if outcome.dropped > 0 {
+            self.observations_dropped_per_second
+                .update(&Update::Observations(outcome.dropped as u64, now));
+            self.observations_dropped_per_collection
+                .update(&Update::ObservationWithValue(outcome.dropped as u64, now));
+        }
+    }
+
+    pub fn update_post_snapshot(&mut self, snapshot_started: Instant) {
+        let now = Instant::now();
+        self.snapshots_per_second.update(&Update::Observation(now));
+        self.snapshots_times_us
+            .update(&Update::ObservationWithValue(
+                duration_to_micros(now - snapshot_started),
+                now,
+            ));
+    }
+
+    pub fn put_snapshot(&self, into: &mut Snapshot, descriptive: bool) {
+        let mut container = Snapshot::default();
+        self.collections_per_second
+            .put_snapshot(&mut container, descriptive);
+        self.collection_times_us
+            .put_snapshot(&mut container, descriptive);
+        self.observations_processed_per_second
+            .put_snapshot(&mut container, descriptive);
+        self.observations_processed_per_collection
+            .put_snapshot(&mut container, descriptive);
+        self.observations_dropped_per_second
+            .put_snapshot(&mut container, descriptive);
+        self.observations_dropped_per_collection
+            .put_snapshot(&mut container, descriptive);
+        self.snapshots_per_second
+            .put_snapshot(&mut container, descriptive);
+        self.snapshots_times_us
+            .put_snapshot(&mut container, descriptive);
+
+        into.items
+            .push(("_metrix".into(), ItemKind::Snapshot(container)));
+    }
+}
+
+#[inline]
+fn duration_to_micros(d: Duration) -> u64 {
+    let nanos = (d.as_secs() * 1_000_000_000) + (d.subsec_nanos() as u64);
+    nanos / 1000
 }

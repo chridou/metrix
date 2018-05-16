@@ -3,9 +3,9 @@
 //! This is useful when you need to query values like currently opened DB
 //! connections etc.
 
-use {Descriptive, PutsSnapshot};
 use snapshot::*;
 use util;
+use {Descriptive, PutsSnapshot};
 
 /// Create an instrument that delivers metrics based on querying values
 /// when a `Snapshot` is requested.

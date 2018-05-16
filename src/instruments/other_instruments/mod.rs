@@ -3,16 +3,16 @@ pub use self::last_occurrence_tracker::LastOccurrenceTracker;
 pub use self::value_meter::ValueMeter;
 
 mod value_meter {
-    use std::time::{Duration, Instant};
     use std::cell::Cell;
+    use std::time::{Duration, Instant};
 
     use metrics::metrics::{Meter as MMeter, StdMeter};
 
     use instruments::{Instrument, Update, Updates};
 
-    use {Descriptive, PutsSnapshot};
     use snapshot::{ItemKind, Snapshot};
     use util;
+    use {Descriptive, PutsSnapshot};
 
     /// A meter that is ticked by values instead of observations
     pub struct ValueMeter {
@@ -159,8 +159,8 @@ mod last_occurrence_tracker {
 
     use instruments::{Instrument, Update, Updates};
     use snapshot::Snapshot;
-    use {Descriptive, PutsSnapshot};
     use util;
+    use {Descriptive, PutsSnapshot};
 
     /// Tracks how much many seconds elapsed since the last occurence
     pub struct LastOccurrenceTracker {
@@ -210,7 +210,8 @@ mod last_occurrence_tracker {
             self.description = Some(description.into())
         }
 
-        /// Set whether the current value should be inverted in a snapshot or not
+        /// Set whether the current value should be inverted in a snapshot or
+        /// not
         ///
         /// Default is `false`
         pub fn set_invert(&mut self, invert: bool) {

@@ -2,12 +2,12 @@
 use std::sync::mpsc;
 use std::time::Instant;
 
-use {Observation, PutsSnapshot, TelemetryTransmitter};
 use Descriptive;
-use instruments::Panel;
 use cockpit::{Cockpit, HandlesObservations};
+use instruments::Panel;
 use snapshot::{ItemKind, Snapshot};
 use util;
+use {Observation, PutsSnapshot, TelemetryTransmitter};
 
 /// Implementors can group everything that can process
 /// `TelemetryMessage`s.
@@ -98,7 +98,8 @@ impl<L> TelemetryProcessor<L>
 where
     L: Clone + Eq + Send + 'static,
 {
-    /// Creates a `TelemetryTransmitter` and the corresponding `TelemetryProcessor`
+    /// Creates a `TelemetryTransmitter` and the corresponding
+    /// `TelemetryProcessor`
     ///
     /// The `name` will cause a grouping in the `Snapshot`.
     pub fn new_pair<T: Into<String>>(name: T) -> (TelemetryTransmitter<L>, TelemetryProcessor<L>) {
@@ -119,7 +120,8 @@ where
         (transmitter, receiver)
     }
 
-    /// Creates a `TelemetryTransmitter` and the corresponding `TelemetryProcessor`
+    /// Creates a `TelemetryTransmitter` and the corresponding
+    /// `TelemetryProcessor`
     ///
     /// No grouping will occur unless the name is set.
     pub fn new_pair_without_name() -> (TelemetryTransmitter<L>, TelemetryProcessor<L>) {

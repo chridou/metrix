@@ -2,8 +2,8 @@ use std::time::{Duration, Instant};
 
 use instruments::{Instrument, Update, Updates};
 use snapshot::Snapshot;
-use {Descriptive, PutsSnapshot};
 use util;
+use {Descriptive, PutsSnapshot};
 
 /// Changes the state based on the occurrence of an observation
 /// within a given time.

@@ -2,9 +2,9 @@ use std::time::Instant;
 
 use exponential_decay_histogram::ExponentialDecayHistogram;
 
+use instruments::{Instrument, Update, Updates};
 use snapshot::{ItemKind, Snapshot};
 use {Descriptive, PutsSnapshot};
-use instruments::{Instrument, Update, Updates};
 
 use util;
 

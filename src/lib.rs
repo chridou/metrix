@@ -18,14 +18,14 @@
 //!
 //! ## Goal
 //!
-//! Applications/services can have a lot of metrics and one of the greatest challenges is
-//! organizing them. This is what `metrix` tries to help with.
+//! Applications/services can have a lot of metrics and one of the greatest
+//! challenges is organizing them. This is what `metrix` tries to help with.
 //!
-//! **Metrix** does not aim for providing exact numbers and aims for applications monitoring
-//! only.
+//! **Metrix** does not aim for providing exact numbers and aims for
+//! applications monitoring only.
 //!
-//! This crate is in a very **early** stage and the API might still change. There may be
-//! backends provided for monitoring solutions in the future
+//! This crate is in a very **early** stage and the API might still change.
+//! There may be backends provided for monitoring solutions in the future
 //! but currently only a snapshot that can be
 //! serialized to JSON is provided.
 //!
@@ -36,33 +36,36 @@
 //! the actual metrics(counters etc.) are updated. For the metrics configured
 //! a snapshot can be queried.
 //!
-//! The primary focus of **metrix** is to organize these metrics. There are several
-//! building blocks available. Most of them can have a name that will then be part
-//! of a path within a snapshot.
+//! The primary focus of **metrix** is to organize these metrics. There are
+//! several building blocks available. Most of them can have a name that will
+//! then be part of a path within a snapshot.
 //!
 //! ### Labels
 //!
-//! Labels link observations to panels. Labels can be of any type that implements
-//! `Clone + Eq + Send + 'static`. An `enum` is a good choice for a label.
+//! Labels link observations to panels. Labels can be of any type that
+//! implements `Clone + Eq + Send + 'static`. An `enum` is a good choice for a
+//! label.
 //!
 //! ### Observations
 //!
-//! An abservation is made somewhere within your application. When an observation
-//! is sent to the backend it must have a label attached. This label
-//! is then matched against the label of a panel to determine whether an observation is
-//! handled for updating or not.
+//! An abservation is made somewhere within your application. When an
+//! observation is sent to the backend it must have a label attached. This label
+//! is then matched against the label of a panel to determine whether an
+//! observation is handled for updating or not.
 //!
 //! ### Instruments
 //!
-//! Instruments are gauges, meters, etc. An instrument gets updated by an observation
-//! where an update is meaningful. Instruments are grouped by `Panel`s.
+//! Instruments are gauges, meters, etc. An instrument gets updated by an
+//! observation where an update is meaningful. Instruments are grouped by
+//! `Panel`s.
 //!
 //! You can find instruments in the module `instruments`.
 //!
 //! ### Panels
 //!
-//! A `Panel` groups instruments under same same label. So each instrument within
-//! a panel will be updated by observations that have the same label as the panel.
+//! A `Panel` groups instruments under same same label. So each instrument
+//! within a panel will be updated by observations that have the same label as
+//! the panel.
 //!
 //! Lets say you defined a label `OutgoingRequests`. If you are interested
 //! in the request rate and the latencies. You would then create a panel with a
@@ -123,22 +126,25 @@
 
 extern crate exponential_decay_histogram;
 extern crate json;
+#[cfg(feature = "log")]
+#[macro_use]
+extern crate log;
 extern crate metrics;
 
-use std::sync::{Arc, Mutex};
-use std::sync::mpsc;
-use std::time::{Duration, Instant};
 use snapshot::Snapshot;
+use std::sync::mpsc;
+use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant};
 
-use processor::TelemetryMessage;
-use instruments::{Panel, ValueScaling};
 use cockpit::{Cockpit, HandlesObservations};
+use instruments::{Panel, ValueScaling};
+use processor::TelemetryMessage;
 
-pub mod instruments;
-pub mod snapshot;
-pub mod processor;
-pub mod driver;
 pub mod cockpit;
+pub mod driver;
+pub mod instruments;
+pub mod processor;
+pub mod snapshot;
 pub(crate) mod util;
 
 /// An observation that has been made.
@@ -473,7 +479,8 @@ pub trait Descriptive {
 /// suffixes "_title" and "_description" to its name.
 ///
 /// Implementors of this trait can be added to almost all components via
-/// the `add_snapshooter` method which is also defined on trait `AggregatesProcessors`.
+/// the `add_snapshooter` method which is also defined on trait
+/// `AggregatesProcessors`.
 pub trait PutsSnapshot: Send + 'static {
     /// Puts the current snapshot values into the given `Snapshot` thereby
     /// following the guidelines of `PutsSnapshot`.

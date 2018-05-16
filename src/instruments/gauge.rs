@@ -1,8 +1,8 @@
 use instruments::{Instrument, Update, Updates};
 
 use snapshot::Snapshot;
-use {Descriptive, PutsSnapshot};
 use util;
+use {Descriptive, PutsSnapshot};
 
 /// Simply returns the value that has been observed last.
 ///

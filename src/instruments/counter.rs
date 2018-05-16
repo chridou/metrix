@@ -1,8 +1,8 @@
 use instruments::{Instrument, Update, Updates};
 
 use snapshot::Snapshot;
-use {Descriptive, PutsSnapshot};
 use util;
+use {Descriptive, PutsSnapshot};
 
 /// A simple ever increasing counter
 ///

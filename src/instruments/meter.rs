@@ -1,13 +1,13 @@
-use std::time::{Duration, Instant};
 use std::cell::Cell;
+use std::time::{Duration, Instant};
 
 use metrics::metrics::{Meter as MMeter, StdMeter};
 
 use instruments::{Instrument, Update, Updates};
 
-use {Descriptive, PutsSnapshot};
 use snapshot::{ItemKind, Snapshot};
 use util;
+use {Descriptive, PutsSnapshot};
 
 /// For measuring rates, e.g. request/s
 ///
