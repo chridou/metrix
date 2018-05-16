@@ -144,7 +144,7 @@ fn create_bar_metrics() -> (TelemetryTransmitterSync<BarLabel>, ProcessorMount) 
 }
 
 fn main() {
-    let mut driver = TelemetryDriver::with_metrics(Some("demo"), None);
+    let mut driver = TelemetryDriver::with_default_metrics(Some("demo"), None);
 
     let (foo_transmitter, foo_processor) = create_foo_metrics();
     let (bar_transmitter, bar_processor) = create_bar_metrics();

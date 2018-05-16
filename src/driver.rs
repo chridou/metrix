@@ -4,6 +4,7 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
 
+use instruments::switches::*;
 use instruments::*;
 use processor::{AggregatesProcessors, ProcessesTelemetryMessages, ProcessingOutcome};
 use snapshot::{ItemKind, Snapshot};
@@ -19,6 +20,45 @@ use {Descriptive, PutsSnapshot};
 /// A `TelemetryDriver` can be 'mounted' into the hierarchy.
 /// If done so, it will still poll its children on its own thread
 /// independently.
+///
+/// # Optional Metrics
+///
+/// The driver can be configured to collect metrics on
+/// its own activities.
+///
+/// The metrics will be added to all snapshots
+/// under a field named `_metrix` which contains the
+/// following fields:
+///  
+/// * `collections_per_second`: The number of observation collection runs
+/// done per second
+///
+/// * `collection_times_us`: A histogram of the time each observation collection
+/// took in microseconds.
+///
+/// * `observations_processed_per_second`: The number of observations processed
+/// per second.
+///
+/// * `observations_processed_per_collection`: A histogram of the
+/// number of observations processed during each run
+///
+/// * `observations_dropped_per_second`: The number of observations dropped
+/// per second. See also `max_observation_age`.
+///
+/// * `observations_dropped_per_collection`: A histogram of the
+/// number of observations dropped during each run. See also
+/// `max_observation_age`.
+///
+/// * `snapshots_per_second`: The number of snapshots taken per second.
+///
+/// * `snapshots_times_us`: A histogram of the times it took to take a snapshot
+/// in microseconds
+///
+/// * `dropped_observations_alarm`: Will be `true` if observations have been
+/// dropped. Will by default stay `true` for 60 seconds once triggered.
+///  
+/// * `inactivity_alarm`: Will be `true` if no observations have been made for
+/// a certain amount of time. The default is 60 seconds.
 #[derive(Clone)]
 pub struct TelemetryDriver {
     name: Option<String>,
@@ -60,12 +100,7 @@ impl TelemetryDriver {
     /// to be taken into account. This is determined by the `timestamp`
     /// field of an `Observation`. `Observations` that are too old are simply
     /// dropped. The default is **60 seconds**.
-    ///
-    /// # Metrics
-    ///
-    /// * observations processed per second
-    /// * observations dropped per second
-    pub fn with_metrics<T: Into<String>>(
+    pub fn with_default_metrics<T: Into<String>>(
         name: Option<T>,
         max_observation_age: Option<Duration>,
     ) -> TelemetryDriver {
@@ -323,6 +358,8 @@ struct DriverInstruments {
     observations_dropped_per_collection: Histogram,
     snapshots_per_second: Meter,
     snapshots_times_us: Histogram,
+    dropped_observations_alarm: StaircaseTimer,
+    inactivity_alarm: NonOccurrenceIndicator,
 }
 
 impl Default for DriverInstruments {
@@ -344,6 +381,10 @@ impl Default for DriverInstruments {
             ),
             snapshots_per_second: Meter::new_with_defaults("snapshots_per_second"),
             snapshots_times_us: Histogram::new_with_defaults("snapshots_times_us"),
+            dropped_observations_alarm: StaircaseTimer::new_with_defaults(
+                "dropped_observations_alarm",
+            ),
+            inactivity_alarm: NonOccurrenceIndicator::new_with_defaults("inactivity_alarm"),
         }
     }
 }
@@ -373,7 +414,10 @@ impl DriverInstruments {
                 .update(&Update::Observations(outcome.dropped as u64, now));
             self.observations_dropped_per_collection
                 .update(&Update::ObservationWithValue(outcome.dropped as u64, now));
+            self.dropped_observations_alarm
+                .update(&Update::Observation(now));
         }
+        self.inactivity_alarm.update(&Update::Observation(now));
     }
 
     pub fn update_post_snapshot(&mut self, snapshot_started: Instant) {
@@ -403,6 +447,10 @@ impl DriverInstruments {
         self.snapshots_per_second
             .put_snapshot(&mut container, descriptive);
         self.snapshots_times_us
+            .put_snapshot(&mut container, descriptive);
+        self.dropped_observations_alarm
+            .put_snapshot(&mut container, descriptive);
+        self.inactivity_alarm
             .put_snapshot(&mut container, descriptive);
 
         into.items
