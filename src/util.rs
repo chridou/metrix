@@ -1,5 +1,5 @@
-use Descriptive;
 use snapshot::{ItemKind, Snapshot};
+use Descriptive;
 
 const TITLE_FIELD_LABEL: &'static str = "_title";
 const DESCRIPTION_FIELD_LABEL: &'static str = "_description";

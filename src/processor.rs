@@ -1,12 +1,12 @@
 //! Transmitting observations and grouping metrics.
 use std::sync::mpsc;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
-use Descriptive;
 use cockpit::{Cockpit, HandlesObservations};
 use instruments::Panel;
 use snapshot::{ItemKind, Snapshot};
 use util;
+use Descriptive;
 use {Observation, PutsSnapshot, TelemetryTransmitter};
 
 /// Implementors can group everything that can process
@@ -54,6 +54,10 @@ impl ProcessingOutcome {
         self.processed += other.processed;
         self.dropped += other.dropped;
     }
+
+    pub fn something_happened(&self) -> bool {
+        self.processed > 0 || self.dropped > 0
+    }
 }
 
 impl Default for ProcessingOutcome {
@@ -92,6 +96,8 @@ pub struct TelemetryProcessor<L> {
     handlers: Vec<Box<HandlesObservations<Label = L>>>,
     receiver: mpsc::Receiver<TelemetryMessage<L>>,
     snapshooters: Vec<Box<PutsSnapshot>>,
+    last_activity_at: Instant,
+    max_inactivity_duration: Option<Duration>,
 }
 
 impl<L> TelemetryProcessor<L>
@@ -107,6 +113,9 @@ where
 
         let transmitter = TelemetryTransmitter { sender: tx };
 
+        let last_activity_at = Instant::now();
+        let max_inactivity_duration = None;
+
         let receiver = TelemetryProcessor {
             name: Some(name.into()),
             title: None,
@@ -115,6 +124,8 @@ where
             handlers: Vec::new(),
             snapshooters: Vec::new(),
             receiver: rx,
+            last_activity_at,
+            max_inactivity_duration,
         };
 
         (transmitter, receiver)
@@ -129,6 +140,9 @@ where
 
         let transmitter = TelemetryTransmitter { sender: tx };
 
+        let last_activity_at = Instant::now();
+        let max_inactivity_duration = None;
+
         let receiver = TelemetryProcessor {
             name: None,
             title: None,
@@ -137,6 +151,8 @@ where
             handlers: Vec::new(),
             snapshooters: Vec::new(),
             receiver: rx,
+            last_activity_at,
+            max_inactivity_duration,
         };
 
         (transmitter, receiver)
@@ -180,6 +196,12 @@ where
     /// Sets the name which will cause a grouoing in the `Snapshot`
     pub fn set_name<T: Into<String>>(&mut self, name: T) {
         self.name = Some(name.into())
+    }
+
+    /// Sets the maximum amount of time this processor may be
+    /// inactive until no more snapshots are taken
+    pub fn set_inactivity_limit(&mut self, limit: Duration) {
+        self.max_inactivity_duration = Some(limit);
     }
 
     fn put_values_into_snapshot(&self, into: &mut Snapshot, descriptive: bool) {
@@ -248,7 +270,13 @@ where
             num_received += 1;
         }
 
-        ProcessingOutcome { processed, dropped }
+        let outcome = ProcessingOutcome { processed, dropped };
+
+        if outcome.something_happened() {
+            self.last_activity_at = Instant::now();
+        }
+
+        outcome
     }
 }
 
@@ -257,6 +285,14 @@ where
     L: Clone + Eq + Send + 'static,
 {
     fn put_snapshot(&self, into: &mut Snapshot, descriptive: bool) {
+        if let Some(d) = self.max_inactivity_duration {
+            if self.last_activity_at.elapsed() > d {
+                into.items
+                    .push(("_inactive".to_string(), ItemKind::Boolean(true)));
+                return;
+            }
+        };
+
         if let Some(ref name) = self.name {
             let mut new_level = Snapshot::default();
             self.put_values_into_snapshot(&mut new_level, descriptive);

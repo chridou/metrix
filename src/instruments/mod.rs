@@ -3,9 +3,9 @@
 use std::time::Instant;
 
 use self::switches::*;
-use Observation;
 use snapshot::{ItemKind, Snapshot};
 use util;
+use Observation;
 use {Descriptive, PutsSnapshot};
 
 pub use self::counter::Counter;
