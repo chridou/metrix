@@ -207,6 +207,21 @@ where
     fn put_values_into_snapshot(&self, into: &mut Snapshot, descriptive: bool) {
         util::put_default_descriptives(self, into, descriptive);
 
+        if let Some(d) = self.max_inactivity_duration {
+            if self.last_activity_at.elapsed() > d {
+                into.items
+                    .push(("_inactive".to_string(), ItemKind::Boolean(true)));
+                into.items
+                    .push(("_active".to_string(), ItemKind::Boolean(false)));
+                return;
+            } else {
+                into.items
+                    .push(("_inactive".to_string(), ItemKind::Boolean(false)));
+                into.items
+                    .push(("_active".to_string(), ItemKind::Boolean(true)));
+            }
+        };
+
         self.cockpits
             .iter()
             .for_each(|c| c.put_snapshot(into, descriptive));
@@ -285,14 +300,6 @@ where
     L: Clone + Eq + Send + 'static,
 {
     fn put_snapshot(&self, into: &mut Snapshot, descriptive: bool) {
-        if let Some(d) = self.max_inactivity_duration {
-            if self.last_activity_at.elapsed() > d {
-                into.items
-                    .push(("_inactive".to_string(), ItemKind::Boolean(true)));
-                return;
-            }
-        };
-
         if let Some(ref name) = self.name {
             let mut new_level = Snapshot::default();
             self.put_values_into_snapshot(&mut new_level, descriptive);
@@ -321,6 +328,8 @@ pub struct ProcessorMount {
     description: Option<String>,
     processors: Vec<Box<ProcessesTelemetryMessages>>,
     snapshooters: Vec<Box<PutsSnapshot>>,
+    last_activity_at: Instant,
+    max_inactivity_duration: Option<Duration>,
 }
 
 impl ProcessorMount {
@@ -345,6 +354,12 @@ impl ProcessorMount {
         self.name = Some(name.into())
     }
 
+    /// Sets the maximum amount of time this processor may be
+    /// inactive until no more snapshots are taken
+    pub fn set_inactivity_limit(&mut self, limit: Duration) {
+        self.max_inactivity_duration = Some(limit);
+    }
+
     /// Returns the processors in this `ProcessorMount`
     pub fn processors(&self) -> Vec<&ProcessesTelemetryMessages> {
         self.processors.iter().map(|p| &**p).collect()
@@ -357,6 +372,22 @@ impl ProcessorMount {
 
     fn put_values_into_snapshot(&self, into: &mut Snapshot, descriptive: bool) {
         util::put_default_descriptives(self, into, descriptive);
+
+        if let Some(d) = self.max_inactivity_duration {
+            if self.last_activity_at.elapsed() > d {
+                into.items
+                    .push(("_inactive".to_string(), ItemKind::Boolean(true)));
+                into.items
+                    .push(("_active".to_string(), ItemKind::Boolean(false)));
+                return;
+            } else {
+                into.items
+                    .push(("_inactive".to_string(), ItemKind::Boolean(false)));
+                into.items
+                    .push(("_active".to_string(), ItemKind::Boolean(true)));
+            }
+        };
+
         self.processors
             .iter()
             .for_each(|p| p.put_snapshot(into, descriptive));
@@ -375,6 +406,8 @@ impl Default for ProcessorMount {
             description: None,
             processors: Vec::new(),
             snapshooters: Vec::new(),
+            last_activity_at: Instant::now(),
+            max_inactivity_duration: None,
         }
     }
 }
@@ -391,13 +424,17 @@ impl AggregatesProcessors for ProcessorMount {
 
 impl ProcessesTelemetryMessages for ProcessorMount {
     fn process(&mut self, max: usize, drop_deadline: Instant) -> ProcessingOutcome {
-        let mut aggregated = ProcessingOutcome::default();
+        let mut outcome = ProcessingOutcome::default();
 
         for processor in self.processors.iter_mut() {
-            aggregated.combine_with(&processor.process(max, drop_deadline));
+            outcome.combine_with(&processor.process(max, drop_deadline));
         }
 
-        aggregated
+        if outcome.something_happened() {
+            self.last_activity_at = Instant::now();
+        }
+
+        outcome
     }
 }
 

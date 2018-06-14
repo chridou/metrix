@@ -1,4 +1,5 @@
 //! Cockpits are used to monitor different aspects of a component
+use std::time::{Duration, Instant};
 
 use instruments::*;
 use snapshot::{ItemKind, Snapshot};
@@ -114,6 +115,8 @@ pub struct Cockpit<L> {
     value_scaling: Option<ValueScaling>,
     handlers: Vec<Box<HandlesObservations<Label = L>>>,
     snapshooters: Vec<Box<PutsSnapshot>>,
+    last_activity_at: Instant,
+    max_inactivity_duration: Option<Duration>,
 }
 
 impl<L> Cockpit<L>
@@ -192,6 +195,12 @@ where
         self.value_scaling = Some(value_scaling)
     }
 
+    /// Sets the maximum amount of time this cockpit may be
+    /// inactive until no more snapshots are taken
+    pub fn set_inactivity_limit(&mut self, limit: Duration) {
+        self.max_inactivity_duration = Some(limit);
+    }
+
     /// Add a `Panel` to this cockpit.
     ///
     /// A `Panel` will receive only those `Observation`s wher
@@ -246,6 +255,21 @@ where
     fn put_values_into_snapshot(&self, into: &mut Snapshot, descriptive: bool) {
         util::put_default_descriptives(self, into, descriptive);
 
+        if let Some(d) = self.max_inactivity_duration {
+            if self.last_activity_at.elapsed() > d {
+                into.items
+                    .push(("_inactive".to_string(), ItemKind::Boolean(true)));
+                into.items
+                    .push(("_active".to_string(), ItemKind::Boolean(false)));
+                return;
+            } else {
+                into.items
+                    .push(("_inactive".to_string(), ItemKind::Boolean(false)));
+                into.items
+                    .push(("_active".to_string(), ItemKind::Boolean(true)));
+            }
+        };
+
         self.panels
             .iter()
             .for_each(|p| p.put_snapshot(into, descriptive));
@@ -289,6 +313,8 @@ where
             value_scaling: None,
             handlers: Vec::new(),
             snapshooters: Vec::new(),
+            last_activity_at: Instant::now(),
+            max_inactivity_duration: None,
         }
     }
 }
@@ -300,6 +326,8 @@ where
     type Label = L;
 
     fn handle_observation(&mut self, observation: &Observation<Self::Label>) {
+        self.last_activity_at = Instant::now();
+
         let observation = if let Some(scaling) = self.value_scaling {
             observation.scaled(scaling)
         } else {
