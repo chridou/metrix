@@ -1,4 +1,4 @@
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use exponential_decay_histogram::ExponentialDecayHistogram;
 
@@ -15,6 +15,7 @@ pub struct Histogram {
     description: Option<String>,
     inner_histogram: ExponentialDecayHistogram,
     last_update: Instant,
+    max_inactivity_duration: Option<Duration>,
 }
 
 impl Histogram {
@@ -26,6 +27,7 @@ impl Histogram {
             description: None,
             inner_histogram,
             last_update: Instant::now(),
+            max_inactivity_duration: None,
         }
     }
 
@@ -45,7 +47,28 @@ impl Histogram {
         self.description = Some(description.into())
     }
 
+    /// Sets the maximum amount of time this histogram may be
+    /// inactive until no more snapshots are taken
+    pub fn set_inactivity_limit(&mut self, limit: Duration) {
+        self.max_inactivity_duration = Some(limit);
+    }
+
     fn put_values_into_snapshot(&self, into: &mut Snapshot) {
+        if let Some(d) = self.max_inactivity_duration {
+            if self.last_update.elapsed() > d {
+                into.items
+                    .push(("_inactive".to_string(), ItemKind::Boolean(true)));
+                into.items
+                    .push(("_active".to_string(), ItemKind::Boolean(false)));
+                return;
+            } else {
+                into.items
+                    .push(("_inactive".to_string(), ItemKind::Boolean(false)));
+                into.items
+                    .push(("_active".to_string(), ItemKind::Boolean(true)));
+            }
+        };
+
         let snapshot = self.inner_histogram.snapshot();
 
         let quantiles = vec![
