@@ -8,6 +8,7 @@ mod value_meter {
 
     use metrics::metrics::{Meter as MMeter, StdMeter};
 
+    use instruments::meter::{MeterRate, MeterSnapshot};
     use instruments::{Instrument, Update, Updates};
 
     use snapshot::{ItemKind, Snapshot};
@@ -21,6 +22,10 @@ mod value_meter {
         description: Option<String>,
         last_tick: Cell<Instant>,
         inner_meter: StdMeter,
+        lower_cutoff: f64,
+        one_minute_rate_enabled: bool,
+        five_minute_rate_enabled: bool,
+        fifteen_minute_rate_enabled: bool,
     }
 
     impl ValueMeter {
@@ -31,6 +36,10 @@ mod value_meter {
                 description: None,
                 last_tick: Cell::new(Instant::now()),
                 inner_meter: StdMeter::default(),
+                lower_cutoff: 0.001,
+                one_minute_rate_enabled: true,
+                five_minute_rate_enabled: false,
+                fifteen_minute_rate_enabled: false,
             }
         }
 
@@ -50,6 +59,34 @@ mod value_meter {
             self.description = Some(description.into())
         }
 
+        /// Rates nbelow this value will be shown as zero.
+        ///
+        /// Default is 0.001
+        pub fn set_lower_cuttoff(&mut self, cutoff: f64) {
+            self.lower_cutoff = cutoff
+        }
+
+        /// Enable tracking of one minute rates.
+        ///
+        /// Default: enabled
+        pub fn set_one_minute_rate_enabled(&mut self, enabled: bool) {
+            self.one_minute_rate_enabled = enabled;
+        }
+
+        /// Enable tracking of five minute rates.
+        ///
+        /// Default: enabled
+        pub fn set_five_minute_rate_enabled(&mut self, enabled: bool) {
+            self.five_minute_rate_enabled = enabled;
+        }
+
+        /// Enable tracking of one minute rates.
+        ///
+        /// Default: enabled
+        pub fn set_fifteen_minute_rate_enabled(&mut self, enabled: bool) {
+            self.fifteen_minute_rate_enabled = enabled;
+        }
+
         fn put_values_into_snapshot(&self, into: &mut Snapshot) {
             if self.last_tick.get().elapsed() >= Duration::from_secs(5) {
                 self.inner_meter.tick();
@@ -59,17 +96,39 @@ mod value_meter {
             let snapshot = self.inner_meter.snapshot();
 
             let meter_snapshot = MeterSnapshot {
-                one_minute: MeterRate {
-                    count: snapshot.count as u64,
-                    rate: snapshot.rates[0],
+                count: snapshot.count as u64,
+                one_minute: if self.one_minute_rate_enabled {
+                    Some(MeterRate {
+                        rate: if snapshot.rates[0] < self.lower_cutoff {
+                            0.0
+                        } else {
+                            snapshot.rates[0]
+                        },
+                    })
+                } else {
+                    None
                 },
-                five_minutes: MeterRate {
-                    count: snapshot.count as u64,
-                    rate: snapshot.rates[1],
+                five_minutes: if self.one_minute_rate_enabled {
+                    Some(MeterRate {
+                        rate: if snapshot.rates[1] < self.lower_cutoff {
+                            0.0
+                        } else {
+                            snapshot.rates[1]
+                        },
+                    })
+                } else {
+                    None
                 },
-                fifteen_minutes: MeterRate {
-                    count: snapshot.count as u64,
-                    rate: snapshot.rates[2],
+                fifteen_minutes: if self.one_minute_rate_enabled {
+                    Some(MeterRate {
+                        rate: if snapshot.rates[2] < self.lower_cutoff {
+                            0.0
+                        } else {
+                            snapshot.rates[2]
+                        },
+                    })
+                } else {
+                    None
                 },
             };
             meter_snapshot.put_snapshot(into);
@@ -112,43 +171,6 @@ mod value_meter {
 
         fn description(&self) -> Option<&str> {
             self.description.as_ref().map(|n| &**n)
-        }
-    }
-
-    struct MeterSnapshot {
-        pub one_minute: MeterRate,
-        pub five_minutes: MeterRate,
-        pub fifteen_minutes: MeterRate,
-    }
-
-    impl MeterSnapshot {
-        pub fn put_snapshot(&self, into: &mut Snapshot) {
-            let mut one_minute = Snapshot::default();
-            self.one_minute.put_snapshot(&mut one_minute);
-            into.items
-                .push(("one_minute".to_string(), ItemKind::Snapshot(one_minute)));
-            let mut five_minutes = Snapshot::default();
-            self.five_minutes.put_snapshot(&mut five_minutes);
-            into.items
-                .push(("five_minutes".to_string(), ItemKind::Snapshot(five_minutes)));
-            let mut fifteen_minutes = Snapshot::default();
-            self.fifteen_minutes.put_snapshot(&mut fifteen_minutes);
-            into.items.push((
-                "fifteen_minutes".to_string(),
-                ItemKind::Snapshot(fifteen_minutes),
-            ));
-        }
-    }
-
-    struct MeterRate {
-        pub rate: f64,
-        pub count: u64,
-    }
-
-    impl MeterRate {
-        fn put_snapshot(&self, into: &mut Snapshot) {
-            into.items.push(("rate".to_string(), self.rate.into()));
-            into.items.push(("count".to_string(), self.count.into()));
         }
     }
 
