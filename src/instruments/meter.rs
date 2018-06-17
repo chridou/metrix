@@ -21,10 +21,13 @@ pub struct Meter {
     description: Option<String>,
     last_tick: Cell<Instant>,
     inner_meter: StdMeter,
+    last_update: Instant,
+    max_inactivity_duration: Option<Duration>,
     lower_cutoff: f64,
     one_minute_rate_enabled: bool,
     five_minute_rate_enabled: bool,
     fifteen_minute_rate_enabled: bool,
+    reset_after_inactivity: bool,
 }
 
 impl Meter {
@@ -36,9 +39,12 @@ impl Meter {
             last_tick: Cell::new(Instant::now()),
             inner_meter: StdMeter::default(),
             lower_cutoff: 0.001,
+            last_update: Instant::now(),
+            max_inactivity_duration: None,
             one_minute_rate_enabled: true,
             five_minute_rate_enabled: false,
             fifteen_minute_rate_enabled: false,
+            reset_after_inactivity: true,
         }
     }
 
@@ -59,6 +65,12 @@ impl Meter {
     /// Default is 0.001
     pub fn set_lower_cuttoff(&mut self, cutoff: f64) {
         self.lower_cutoff = cutoff
+    }
+
+    /// Sets the maximum amount of time this meter may be
+    /// inactive until no more snapshots are taken
+    pub fn set_inactivity_limit(&mut self, limit: Duration) {
+        self.max_inactivity_duration = Some(limit);
     }
 
     /// Enable tracking of one minute rates.
@@ -82,11 +94,34 @@ impl Meter {
         self.fifteen_minute_rate_enabled = enabled;
     }
 
+    /// Reset the meter if inactivity tracking was enabled
+    /// and the histogram was inactive.
+    ///
+    /// The default is `true`
+    pub fn reset_after_inactivity(&mut self, reset: bool) {
+        self.reset_after_inactivity = reset;
+    }
+
     pub fn set_description<T: Into<String>>(&mut self, description: T) {
         self.description = Some(description.into())
     }
 
     fn put_values_into_snapshot(&self, into: &mut Snapshot) {
+        if let Some(d) = self.max_inactivity_duration {
+            if self.last_update.elapsed() > d {
+                into.items
+                    .push(("_inactive".to_string(), ItemKind::Boolean(true)));
+                into.items
+                    .push(("_active".to_string(), ItemKind::Boolean(false)));
+                return;
+            } else {
+                into.items
+                    .push(("_inactive".to_string(), ItemKind::Boolean(false)));
+                into.items
+                    .push(("_active".to_string(), ItemKind::Boolean(true)));
+            }
+        };
+
         if self.last_tick.get().elapsed() >= Duration::from_secs(5) {
             self.inner_meter.tick();
             self.last_tick.set(Instant::now());
@@ -147,6 +182,15 @@ impl PutsSnapshot for Meter {
 
 impl Updates for Meter {
     fn update(&mut self, with: &Update) {
+        if let Some(d) = self.max_inactivity_duration {
+            if self.reset_after_inactivity && self.last_update.elapsed() > d {
+                self.inner_meter = StdMeter::default();
+                self.last_tick.set(Instant::now());
+            }
+        }
+
+        self.last_update = Instant::now();
+
         if self.last_tick.get().elapsed() >= Duration::from_secs(5) {
             self.inner_meter.tick();
             self.last_tick.set(Instant::now());

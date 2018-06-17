@@ -16,6 +16,7 @@ pub struct Histogram {
     inner_histogram: ExponentialDecayHistogram,
     last_update: Instant,
     max_inactivity_duration: Option<Duration>,
+    reset_after_inactivity: bool,
 }
 
 impl Histogram {
@@ -28,6 +29,7 @@ impl Histogram {
             inner_histogram,
             last_update: Instant::now(),
             max_inactivity_duration: None,
+            reset_after_inactivity: true,
         }
     }
 
@@ -51,6 +53,14 @@ impl Histogram {
     /// inactive until no more snapshots are taken
     pub fn set_inactivity_limit(&mut self, limit: Duration) {
         self.max_inactivity_duration = Some(limit);
+    }
+
+    /// Reset the histogram if inactivity tracking was enabled
+    /// and the histogram was inactive.
+    ///
+    /// The default is `true`
+    pub fn reset_after_inactivity(&mut self, reset: bool) {
+        self.reset_after_inactivity = reset;
     }
 
     fn put_values_into_snapshot(&self, into: &mut Snapshot) {
@@ -110,6 +120,14 @@ impl PutsSnapshot for Histogram {
 
 impl Updates for Histogram {
     fn update(&mut self, with: &Update) {
+        if let Some(d) = self.max_inactivity_duration {
+            if self.reset_after_inactivity && self.last_update.elapsed() > d {
+                self.inner_histogram = ExponentialDecayHistogram::new()
+            }
+        };
+
+        self.last_update = Instant::now();
+
         match *with {
             Update::ObservationWithValue(v, t) => if t > self.last_update {
                 self.inner_histogram.update_at(t, v as i64);
