@@ -71,20 +71,26 @@ impl Histogram {
 
         let snapshot = self.inner_histogram.snapshot();
 
-        let quantiles = vec![
-            (50u16, snapshot.value(0.5)),
-            (75u16, snapshot.value(0.75)),
-            (99u16, snapshot.value(0.99)),
-            (999u16, snapshot.value(0.999)),
-        ];
+        let histo_snapshot = if snapshot.count() > 0 {
+            let quantiles = vec![
+                (50u16, snapshot.value(0.5)),
+                (75u16, snapshot.value(0.75)),
+                (95u16, snapshot.value(0.95)),
+                (98u16, snapshot.value(0.98)),
+                (99u16, snapshot.value(0.99)),
+                (999u16, snapshot.value(0.999)),
+            ];
 
-        let histo_snapshot = HistogramSnapshot {
-            min: snapshot.min(),
-            max: snapshot.max(),
-            mean: snapshot.mean(),
-            stddev: snapshot.stddev(),
-            count: snapshot.count(),
-            quantiles: quantiles,
+            HistogramSnapshot {
+                min: Some(snapshot.min()),
+                max: Some(snapshot.max()),
+                mean: Some(snapshot.mean()),
+                stddev: Some(snapshot.stddev()),
+                count: snapshot.count(),
+                quantiles: quantiles,
+            }
+        } else {
+            HistogramSnapshot::default()
         };
 
         histo_snapshot.put_snapshot(into);
@@ -128,29 +134,53 @@ impl Descriptive for Histogram {
 }
 
 struct HistogramSnapshot {
-    pub max: i64,
-    pub min: i64,
-    pub mean: f64,
-    pub stddev: f64,
+    pub max: Option<i64>,
+    pub min: Option<i64>,
+    pub mean: Option<f64>,
+    pub stddev: Option<f64>,
     pub count: u64,
     pub quantiles: Vec<(u16, i64)>,
 }
 
+impl Default for HistogramSnapshot {
+    fn default() -> HistogramSnapshot {
+        HistogramSnapshot {
+            max: None,
+            min: None,
+            mean: None,
+            stddev: None,
+            count: 0,
+            quantiles: Vec::new(),
+        }
+    }
+}
+
 impl HistogramSnapshot {
     pub fn put_snapshot(&self, into: &mut Snapshot) {
-        into.items.push(("max".to_string(), self.max.into()));
-        into.items.push(("min".to_string(), self.min.into()));
-        into.items.push(("mean".to_string(), self.mean.into()));
-        into.items.push(("stddev".to_string(), self.stddev.into()));
         into.items.push(("count".to_string(), self.count.into()));
 
-        let mut quantiles = Snapshot::default();
-
-        for &(ref q, ref v) in &self.quantiles {
-            quantiles.items.push((format!("p{}", q), ItemKind::Int(*v)));
+        if let Some(x) = self.max {
+            into.items.push(("max".to_string(), x.into()));
+        }
+        if let Some(x) = self.min {
+            into.items.push(("min".to_string(), x.into()));
+        }
+        if let Some(x) = self.mean {
+            into.items.push(("mean".to_string(), x.into()));
+        }
+        if let Some(x) = self.stddev {
+            into.items.push(("stddev".to_string(), x.into()));
         }
 
-        into.items
-            .push(("quantiles".to_string(), ItemKind::Snapshot(quantiles)));
+        if !self.quantiles.is_empty() {
+            let mut quantiles = Snapshot::default();
+
+            for &(ref q, ref v) in &self.quantiles {
+                quantiles.items.push((format!("p{}", q), ItemKind::Int(*v)));
+            }
+
+            into.items
+                .push(("quantiles".to_string(), ItemKind::Snapshot(quantiles)));
+        }
     }
 }
