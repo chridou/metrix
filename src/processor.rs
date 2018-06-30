@@ -2,12 +2,12 @@
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
 
-use cockpit::{Cockpit, HandlesObservations};
+use cockpit::Cockpit;
 use instruments::Panel;
 use snapshot::{ItemKind, Snapshot};
 use util;
 use Descriptive;
-use {Observation, PutsSnapshot, TelemetryTransmitter};
+use {HandlesObservations, Observation, PutsSnapshot, TelemetryTransmitter};
 
 /// Implementors can group everything that can process
 /// `TelemetryMessage`s.

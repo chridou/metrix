@@ -87,6 +87,33 @@ impl<T> From<Observation<T>> for LabelAndUpdate<T> {
     }
 }
 
+/// A label with the associated `Update`
+///
+/// This is basically a split `Observation`
+pub struct BorrowedLabelAndUpdate<'a, T: 'a>(pub &'a T, pub Update);
+
+impl<'a, T> From<&'a Observation<T>> for BorrowedLabelAndUpdate<'a, T> {
+    fn from(obs: &'a Observation<T>) -> BorrowedLabelAndUpdate<'a, T> {
+        match obs {
+            Observation::Observed {
+                label,
+                count,
+                timestamp,
+                ..
+            } => BorrowedLabelAndUpdate(label, Update::Observations(*count, *timestamp)),
+            Observation::ObservedOne {
+                label, timestamp, ..
+            } => BorrowedLabelAndUpdate(label, Update::Observation(*timestamp)),
+            Observation::ObservedOneValue {
+                label,
+                value,
+                timestamp,
+                ..
+            } => BorrowedLabelAndUpdate(label, Update::ObservationWithValue(*value, *timestamp)),
+        }
+    }
+}
+
 /// Implementors of `Updates`
 /// can handle `Update`s.
 ///

@@ -3,19 +3,15 @@ use std::time::{Duration, Instant};
 
 use metrics::metrics::{Meter as MMeter, StdMeter};
 
+use instruments::meter::{MeterRate, MeterSnapshot};
 use instruments::{Instrument, Update, Updates};
 
 use snapshot::{ItemKind, Snapshot};
 use util;
 use {Descriptive, PutsSnapshot};
 
-/// For measuring rates, e.g. request/s
-///
-/// This meter count occurences. An occurrence with values is
-/// counted as 1 occurence.
-///
-/// To get rates on values use `instruments::other_instruments::ValeMeter`
-pub struct Meter {
+/// A meter that is ticked by values instead of observations
+pub struct ValueMeter {
     name: String,
     title: Option<String>,
     description: Option<String>,
@@ -27,9 +23,9 @@ pub struct Meter {
     fifteen_minute_rate_enabled: bool,
 }
 
-impl Meter {
-    pub fn new_with_defaults<T: Into<String>>(name: T) -> Meter {
-        Meter {
+impl ValueMeter {
+    pub fn new_with_defaults<T: Into<String>>(name: T) -> ValueMeter {
+        ValueMeter {
             name: name.into(),
             title: None,
             description: None,
@@ -68,7 +64,7 @@ impl Meter {
     /// Enable tracking of one minute rates.
     ///
     /// Default: enabled
-    pub fn enable_one_minute_rate(&mut self, enabled: bool) {
+    pub fn set_one_minute_rate_enabled(&mut self, enabled: bool) {
         self.one_minute_rate_enabled = enabled;
     }
 
@@ -134,9 +130,9 @@ impl Meter {
     }
 }
 
-impl Instrument for Meter {}
+impl Instrument for ValueMeter {}
 
-impl PutsSnapshot for Meter {
+impl PutsSnapshot for ValueMeter {
     fn put_snapshot(&self, into: &mut Snapshot, descriptive: bool) {
         util::put_postfixed_descriptives(self, &self.name, into, descriptive);
         let mut new_level = Snapshot::default();
@@ -145,77 +141,25 @@ impl PutsSnapshot for Meter {
     }
 }
 
-impl Updates for Meter {
+impl Updates for ValueMeter {
     fn update(&mut self, with: &Update) {
-        if self.last_tick.get().elapsed() >= Duration::from_secs(5) {
-            self.inner_meter.tick();
-            self.last_tick.set(Instant::now());
-        }
-
         match *with {
-            Update::ObservationWithValue(_, _) => self.inner_meter.mark(1),
-            Update::Observations(n, _) => {
-                if n <= ::std::i64::MAX as u64 && n != 0 {
-                    self.inner_meter.mark(n as i64)
+            Update::ObservationWithValue(v, _) => {
+                if v <= ::std::i64::MAX as u64 && v != 0 {
+                    self.inner_meter.mark(v as i64)
                 }
             }
-            Update::Observation(_) => self.inner_meter.mark(1),
+            _ => (),
         }
     }
 }
 
-impl Descriptive for Meter {
+impl Descriptive for ValueMeter {
     fn title(&self) -> Option<&str> {
         self.title.as_ref().map(|n| &**n)
     }
 
     fn description(&self) -> Option<&str> {
         self.description.as_ref().map(|n| &**n)
-    }
-}
-
-pub(crate) struct MeterSnapshot {
-    pub count: u64,
-    pub one_minute: Option<MeterRate>,
-    pub five_minutes: Option<MeterRate>,
-    pub fifteen_minutes: Option<MeterRate>,
-}
-
-impl MeterSnapshot {
-    pub fn put_snapshot(&self, into: &mut Snapshot) {
-        into.items.push(("count".to_string(), self.count.into()));
-
-        if let Some(ref one_minute_data) = self.one_minute {
-            let mut one_minute = Snapshot::default();
-            one_minute_data.put_snapshot(&mut one_minute);
-            into.items
-                .push(("one_minute".to_string(), ItemKind::Snapshot(one_minute)));
-        }
-
-        if let Some(ref five_minute_data) = self.five_minutes {
-            let mut five_minutes = Snapshot::default();
-            five_minute_data.put_snapshot(&mut five_minutes);
-            into.items
-                .push(("five_minutes".to_string(), ItemKind::Snapshot(five_minutes)));
-        }
-
-        if let Some(ref fifteen_minute_data) = self.fifteen_minutes {
-            let mut fifteen_minutes = Snapshot::default();
-            fifteen_minute_data.put_snapshot(&mut fifteen_minutes);
-            into.items.push((
-                "fifteen_minutes".to_string(),
-                ItemKind::Snapshot(fifteen_minutes),
-            ));
-        }
-    }
-}
-
-pub(crate) struct MeterRate {
-    pub rate: f64,
-}
-
-impl MeterRate {
-    fn put_snapshot(&self, into: &mut Snapshot) {
-        into.items.push(("rate".to_string(), self.rate.into()));
     }
 }

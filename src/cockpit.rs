@@ -4,16 +4,7 @@ use std::time::{Duration, Instant};
 use instruments::*;
 use snapshot::{ItemKind, Snapshot};
 use util;
-use {Observation, PutsSnapshot};
-
-/// Something that can react on `Observation`s where
-/// the `Label` is the type of the label.
-///
-/// You can use this to implement your own metrics.
-pub trait HandlesObservations: PutsSnapshot + Send + 'static {
-    type Label: Send + 'static;
-    fn handle_observation(&mut self, observation: &Observation<Self::Label>);
-}
+use {HandlesObservations, Observation, PutsSnapshot};
 
 /// A cockpit groups panels.
 ///

@@ -136,7 +136,7 @@ use std::sync::mpsc;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
-use cockpit::{Cockpit, HandlesObservations};
+use cockpit::Cockpit;
 use instruments::{Panel, ValueScaling};
 use processor::TelemetryMessage;
 
@@ -211,6 +211,15 @@ impl<L> Observation<L> {
             Observation::ObservedOneValue { timestamp, .. } => timestamp,
         }
     }
+}
+
+/// Something that can react on `Observation`s where
+/// the `Label` is the type of the label.
+///
+/// You can use this to implement your own metrics.
+pub trait HandlesObservations: PutsSnapshot + Send + 'static {
+    type Label: Send + 'static;
+    fn handle_observation(&mut self, observation: &Observation<Self::Label>);
 }
 
 /// Transmits telemetry data to the backend.
