@@ -57,7 +57,7 @@ impl ValueMeter {
     /// Rates below this value will be shown as zero.
     ///
     /// Default is 0.001
-    pub fn set_lower_cuttoff(&mut self, cutoff: f64) {
+    pub fn set_lower_cutoff(&mut self, cutoff: f64) {
         self.lower_cutoff = cutoff
     }
 
@@ -82,7 +82,7 @@ impl ValueMeter {
         self.fifteen_minute_rate_enabled = enabled;
     }
 
-    fn put_values_into_snapshot(&self, into: &mut Snapshot) {
+    pub(crate) fn get_snapshot(&self) -> MeterSnapshot {
         if self.last_tick.get().elapsed() >= Duration::from_secs(5) {
             self.inner_meter.tick();
             self.last_tick.set(Instant::now());
@@ -91,6 +91,9 @@ impl ValueMeter {
         let snapshot = self.inner_meter.snapshot();
 
         let meter_snapshot = MeterSnapshot {
+            name: &self.name,
+            title: self.title.as_ref().map(|x| &**x),
+            description: self.description.as_ref().map(|x| &**x),
             count: snapshot.count as u64,
             one_minute: if self.one_minute_rate_enabled {
                 Some(MeterRate {
@@ -99,6 +102,7 @@ impl ValueMeter {
                     } else {
                         snapshot.rates[0]
                     },
+                    share: None,
                 })
             } else {
                 None
@@ -110,6 +114,7 @@ impl ValueMeter {
                     } else {
                         snapshot.rates[1]
                     },
+                    share: None,
                 })
             } else {
                 None
@@ -121,12 +126,14 @@ impl ValueMeter {
                     } else {
                         snapshot.rates[2]
                     },
+                    share: None,
                 })
             } else {
                 None
             },
         };
-        meter_snapshot.put_snapshot(into);
+
+        meter_snapshot
     }
 }
 
@@ -134,10 +141,9 @@ impl Instrument for ValueMeter {}
 
 impl PutsSnapshot for ValueMeter {
     fn put_snapshot(&self, into: &mut Snapshot, descriptive: bool) {
-        util::put_postfixed_descriptives(self, &self.name, into, descriptive);
-        let mut new_level = Snapshot::default();
-        self.put_values_into_snapshot(&mut new_level);
-        into.push(self.name.clone(), ItemKind::Snapshot(new_level));
+        let meter_snapshot = self.get_snapshot();
+
+        meter_snapshot.put_snapshot(into, descriptive);
     }
 }
 

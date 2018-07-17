@@ -61,14 +61,14 @@ impl Meter {
     /// Rates below this value will be shown as zero.
     ///
     /// Default is 0.001
-    pub fn set_lower_cuttoff(&mut self, cutoff: f64) {
+    pub fn set_lower_cutoff(&mut self, cutoff: f64) {
         self.lower_cutoff = cutoff
     }
 
     /// Enable tracking of one minute rates.
     ///
     /// Default: enabled
-    pub fn enable_one_minute_rate(&mut self, enabled: bool) {
+    pub fn set_enable_one_minute_rate_enabled(&mut self, enabled: bool) {
         self.one_minute_rate_enabled = enabled;
     }
 
@@ -86,7 +86,7 @@ impl Meter {
         self.fifteen_minute_rate_enabled = enabled;
     }
 
-    fn put_values_into_snapshot(&self, into: &mut Snapshot) {
+    pub(crate) fn get_snapshot(&self) -> MeterSnapshot {
         if self.last_tick.get().elapsed() >= Duration::from_secs(5) {
             self.inner_meter.tick();
             self.last_tick.set(Instant::now());
@@ -95,6 +95,9 @@ impl Meter {
         let snapshot = self.inner_meter.snapshot();
 
         let meter_snapshot = MeterSnapshot {
+            name: &self.name,
+            title: self.title.as_ref().map(|x| &**x),
+            description: self.description.as_ref().map(|x| &**x),
             count: snapshot.count as u64,
             one_minute: if self.one_minute_rate_enabled {
                 Some(MeterRate {
@@ -103,6 +106,7 @@ impl Meter {
                     } else {
                         snapshot.rates[0]
                     },
+                    share: None,
                 })
             } else {
                 None
@@ -114,6 +118,7 @@ impl Meter {
                     } else {
                         snapshot.rates[1]
                     },
+                    share: None,
                 })
             } else {
                 None
@@ -125,12 +130,14 @@ impl Meter {
                     } else {
                         snapshot.rates[2]
                     },
+                    share: None,
                 })
             } else {
                 None
             },
         };
-        meter_snapshot.put_snapshot(into);
+
+        meter_snapshot
     }
 }
 
@@ -138,10 +145,9 @@ impl Instrument for Meter {}
 
 impl PutsSnapshot for Meter {
     fn put_snapshot(&self, into: &mut Snapshot, descriptive: bool) {
-        util::put_postfixed_descriptives(self, &self.name, into, descriptive);
-        let mut new_level = Snapshot::default();
-        self.put_values_into_snapshot(&mut new_level);
-        into.push(self.name.clone(), ItemKind::Snapshot(new_level));
+        let meter_snapshot = self.get_snapshot();
+
+        meter_snapshot.put_snapshot(into, descriptive);
     }
 }
 
@@ -174,48 +180,74 @@ impl Descriptive for Meter {
     }
 }
 
-pub(crate) struct MeterSnapshot {
+pub(crate) struct MeterSnapshot<'a> {
+    pub name: &'a str,
+    pub title: Option<&'a str>,
+    pub description: Option<&'a str>,
     pub count: u64,
     pub one_minute: Option<MeterRate>,
     pub five_minutes: Option<MeterRate>,
     pub fifteen_minutes: Option<MeterRate>,
 }
 
-impl MeterSnapshot {
-    pub fn put_snapshot(&self, into: &mut Snapshot) {
-        into.items.push(("count".to_string(), self.count.into()));
+impl<'a> MeterSnapshot<'a> {
+    pub fn put_snapshot(&self, into_container: &mut Snapshot, descriptive: bool) {
+        util::put_postfixed_descriptives(self, &self.name, into_container, descriptive);
+        let mut new_level = Snapshot::default();
+
+        new_level
+            .items
+            .push(("count".to_string(), self.count.into()));
 
         if let Some(ref one_minute_data) = self.one_minute {
             let mut one_minute = Snapshot::default();
             one_minute_data.put_snapshot(&mut one_minute);
-            into.items
+            new_level
+                .items
                 .push(("one_minute".to_string(), ItemKind::Snapshot(one_minute)));
         }
 
         if let Some(ref five_minute_data) = self.five_minutes {
             let mut five_minutes = Snapshot::default();
             five_minute_data.put_snapshot(&mut five_minutes);
-            into.items
+            new_level
+                .items
                 .push(("five_minutes".to_string(), ItemKind::Snapshot(five_minutes)));
         }
 
         if let Some(ref fifteen_minute_data) = self.fifteen_minutes {
             let mut fifteen_minutes = Snapshot::default();
             fifteen_minute_data.put_snapshot(&mut fifteen_minutes);
-            into.items.push((
+            new_level.items.push((
                 "fifteen_minutes".to_string(),
                 ItemKind::Snapshot(fifteen_minutes),
             ));
         }
+
+        into_container.push(self.name.clone(), ItemKind::Snapshot(new_level));
+    }
+}
+
+impl<'a> Descriptive for MeterSnapshot<'a> {
+    fn title(&self) -> Option<&str> {
+        self.title
+    }
+
+    fn description(&self) -> Option<&str> {
+        self.description
     }
 }
 
 pub(crate) struct MeterRate {
     pub rate: f64,
+    pub share: Option<f64>,
 }
 
 impl MeterRate {
     fn put_snapshot(&self, into: &mut Snapshot) {
         into.items.push(("rate".to_string(), self.rate.into()));
+        if let Some(share) = self.share {
+            into.items.push(("share".to_string(), share.into()));
+        }
     }
 }
