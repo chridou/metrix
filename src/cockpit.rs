@@ -20,7 +20,7 @@ use {HandlesObservations, Observation, PutsSnapshot};
 ///
 /// ```
 /// use std::time::Instant;
-/// use metrix::Observation;
+/// use metrix::{Observation, HandlesObservations};
 /// use metrix::instruments::*;
 /// use metrix::cockpit::*;
 ///
