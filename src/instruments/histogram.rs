@@ -51,6 +51,8 @@ impl Histogram {
 
     /// Sets the maximum amount of time this histogram may be
     /// inactive until no more snapshots are taken
+    ///
+    /// Default is no inactivity tracking.
     pub fn set_inactivity_limit(&mut self, limit: Duration) {
         self.max_inactivity_duration = Some(limit);
     }
@@ -58,7 +60,8 @@ impl Histogram {
     /// Reset the histogram if inactivity tracking was enabled
     /// and the histogram was inactive.
     ///
-    /// The default is `true`
+    /// The default is `true`. Only has an effect if a `max_inactivity_duration`
+    /// is set.
     pub fn reset_after_inactivity(&mut self, reset: bool) {
         self.reset_after_inactivity = reset;
     }

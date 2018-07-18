@@ -112,6 +112,13 @@
 //! hierarchy all processors registered with the driver will only
 //! be driven by that driver.
 //!
+//! ## Recent changes:
+//!
+//! * 0.8.0
+//!     * Meters only have 1 munite rate enabled by default
+//!     * Histograms can track inactivity and reset themselves
+//!     * Breaking changes: Moved some traits into other packages
+//!
 //! ## Contributing
 //!
 //! Contributing is welcome. Criticism is also welcome!
@@ -123,7 +130,6 @@
 //!
 //! Copyright (c) 2018 Christian Douven
 //!
-
 extern crate exponential_decay_histogram;
 extern crate json;
 #[cfg(feature = "log")]
