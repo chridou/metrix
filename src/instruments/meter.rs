@@ -111,7 +111,7 @@ impl Meter {
             } else {
                 None
             },
-            five_minutes: if self.one_minute_rate_enabled {
+            five_minutes: if self.five_minute_rate_enabled {
                 Some(MeterRate {
                     rate: if snapshot.rates[1] < self.lower_cutoff {
                         0.0
@@ -123,7 +123,7 @@ impl Meter {
             } else {
                 None
             },
-            fifteen_minutes: if self.one_minute_rate_enabled {
+            fifteen_minutes: if self.fifteen_minute_rate_enabled {
                 Some(MeterRate {
                     rate: if snapshot.rates[2] < self.lower_cutoff {
                         0.0

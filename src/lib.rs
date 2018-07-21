@@ -114,8 +114,10 @@
 //!
 //! ## Recent changes:
 //!
+//! * 0.8.1
+//!     * Fixed bug always reporting all meter rate if 1 munite was enabled
 //! * 0.8.0
-//!     * Meters only have 1 munite rate enabled by default
+//!     * Meters only have 1 minute rate enabled by default
 //!     * Histograms can track inactivity and reset themselves
 //!     * Breaking changes: Moved some traits into other packages
 //!
