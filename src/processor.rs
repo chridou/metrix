@@ -1,6 +1,7 @@
 //! Transmitting observations and grouping metrics.
-use std::sync::mpsc;
 use std::time::{Duration, Instant};
+
+use crossbeam_channel::{self as channel, Receiver};
 
 use cockpit::Cockpit;
 use instruments::Panel;
@@ -94,7 +95,7 @@ pub struct TelemetryProcessor<L> {
     description: Option<String>,
     cockpits: Vec<Cockpit<L>>,
     handlers: Vec<Box<HandlesObservations<Label = L>>>,
-    receiver: mpsc::Receiver<TelemetryMessage<L>>,
+    receiver: Receiver<TelemetryMessage<L>>,
     snapshooters: Vec<Box<PutsSnapshot>>,
     last_activity_at: Instant,
     max_inactivity_duration: Option<Duration>,
@@ -109,7 +110,7 @@ where
     ///
     /// The `name` will cause a grouping in the `Snapshot`.
     pub fn new_pair<T: Into<String>>(name: T) -> (TelemetryTransmitter<L>, TelemetryProcessor<L>) {
-        let (tx, rx) = mpsc::channel();
+        let (tx, rx) = channel::unbounded();
 
         let transmitter = TelemetryTransmitter { sender: tx };
 
@@ -136,7 +137,7 @@ where
     ///
     /// No grouping will occur unless the name is set.
     pub fn new_pair_without_name() -> (TelemetryTransmitter<L>, TelemetryProcessor<L>) {
-        let (tx, rx) = mpsc::channel();
+        let (tx, rx) = channel::unbounded();
 
         let transmitter = TelemetryTransmitter { sender: tx };
 
@@ -246,7 +247,7 @@ where
         let mut dropped = 0;
         while num_received < max {
             match self.receiver.try_recv() {
-                Ok(TelemetryMessage::Observation(obs)) => {
+                Some(TelemetryMessage::Observation(obs)) => {
                     if obs.timestamp() <= drop_deadline {
                         dropped += 1;
                     } else {
@@ -259,15 +260,15 @@ where
                         processed += 1;
                     }
                 }
-                Ok(TelemetryMessage::AddCockpit(c)) => {
+                Some(TelemetryMessage::AddCockpit(c)) => {
                     self.add_cockpit(c);
                     processed += 1;
                 }
-                Ok(TelemetryMessage::AddHandler(h)) => {
+                Some(TelemetryMessage::AddHandler(h)) => {
                     self.add_handler(h);
                     processed += 1;
                 }
-                Ok(TelemetryMessage::AddPanel {
+                Some(TelemetryMessage::AddPanel {
                     cockpit_name,
                     panel,
                 }) => {
@@ -279,8 +280,7 @@ where
                     }
                     processed += 1;
                 }
-                Err(mpsc::TryRecvError::Empty) => break,
-                Err(mpsc::TryRecvError::Disconnected) => break,
+                None => break,
             };
             num_received += 1;
         }

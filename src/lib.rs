@@ -114,6 +114,8 @@
 //!
 //! ## Recent changes:
 //!
+//! * 0.8.3
+//!     * Use crossbeam channels
 //! * 0.8.1
 //!     * Fixed bug always reporting all meter rate if 1 munite was enabled
 //! * 0.8.0
@@ -137,6 +139,7 @@ extern crate json;
 #[cfg(feature = "log")]
 #[macro_use]
 extern crate log;
+extern crate crossbeam_channel;
 extern crate metrics;
 
 use snapshot::Snapshot;
@@ -338,7 +341,7 @@ pub trait TransmitsTelemetryData<L> {
 /// See `synced()` method.
 #[derive(Clone)]
 pub struct TelemetryTransmitter<L> {
-    sender: mpsc::Sender<TelemetryMessage<L>>,
+    sender: crossbeam_channel::Sender<TelemetryMessage<L>>,
 }
 
 impl<L> TelemetryTransmitter<L>
@@ -355,37 +358,25 @@ where
 
 impl<L> TransmitsTelemetryData<L> for TelemetryTransmitter<L> {
     fn transmit(&self, observation: Observation<L>) -> &Self {
-        if let Err(_err) = self.sender.send(TelemetryMessage::Observation(observation)) {
-            // maybe log...
-        }
-
+        self.sender.send(TelemetryMessage::Observation(observation));
         self
     }
 
     fn add_handler(&self, handler: Box<HandlesObservations<Label = L>>) -> &Self {
-        if let Err(_err) = self.sender.send(TelemetryMessage::AddHandler(handler)) {
-            // maybe log...
-        }
-
+        self.sender.send(TelemetryMessage::AddHandler(handler));
         self
     }
 
     fn add_cockpit(&self, cockpit: Cockpit<L>) -> &Self {
-        if let Err(_err) = self.sender.send(TelemetryMessage::AddCockpit(cockpit)) {
-            // maybe log...
-        }
-
+        self.sender.send(TelemetryMessage::AddCockpit(cockpit));
         self
     }
 
     fn add_panel_to_cockpit(&self, cockpit_name: String, panel: Panel<L>) -> &Self {
-        if let Err(_err) = self.sender.send(TelemetryMessage::AddPanel {
+        self.sender.send(TelemetryMessage::AddPanel {
             cockpit_name,
             panel,
-        }) {
-            // maybe log...
-        }
-
+        });
         self
     }
 }
@@ -399,7 +390,7 @@ impl<L> TransmitsTelemetryData<L> for TelemetryTransmitter<L> {
 /// it can be shared between threads.
 #[derive(Clone)]
 pub struct TelemetryTransmitterSync<L> {
-    sender: Arc<Mutex<mpsc::Sender<TelemetryMessage<L>>>>,
+    sender: Arc<Mutex<crossbeam_channel::Sender<TelemetryMessage<L>>>>,
 }
 
 impl<L> TelemetryTransmitterSync<L>
@@ -410,52 +401,37 @@ where
 
 impl<L> TransmitsTelemetryData<L> for TelemetryTransmitterSync<L> {
     fn transmit(&self, observation: Observation<L>) -> &Self {
-        if let Err(_err) = self.sender
+        self.sender
             .lock()
             .unwrap()
-            .send(TelemetryMessage::Observation(observation))
-        {
-            // maybe log...
-        }
-
+            .send(TelemetryMessage::Observation(observation));
         self
     }
 
     fn add_handler(&self, handler: Box<HandlesObservations<Label = L>>) -> &Self {
-        if let Err(_err) = self.sender
+        self.sender
             .lock()
             .unwrap()
-            .send(TelemetryMessage::AddHandler(handler))
-        {
-            // maybe log...
-        }
-
+            .send(TelemetryMessage::AddHandler(handler));
         self
     }
 
     fn add_cockpit(&self, cockpit: Cockpit<L>) -> &Self {
-        if let Err(_err) = self.sender
+        self.sender
             .lock()
             .unwrap()
-            .send(TelemetryMessage::AddCockpit(cockpit))
-        {
-            // maybe log...
-        }
-
+            .send(TelemetryMessage::AddCockpit(cockpit));
         self
     }
 
     fn add_panel_to_cockpit(&self, cockpit_name: String, panel: Panel<L>) -> &Self {
-        if let Err(_err) = self.sender
+        self.sender
             .lock()
             .unwrap()
             .send(TelemetryMessage::AddPanel {
                 cockpit_name,
                 panel,
-            }) {
-            // maybe log...
-        }
-
+            });
         self
     }
 }

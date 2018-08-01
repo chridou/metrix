@@ -108,6 +108,8 @@ be driven by that driver.
 
 ## Recent changes:
 
+* 0.8.3
+    * Use crossbeam channels
 * 0.8.1
     * Fixed bug always reporting all meter rate if 1 munite was enabled
 * 0.8.0
