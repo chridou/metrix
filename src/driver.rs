@@ -1,8 +1,13 @@
 //! The thing that makes it happen... You need it!
+use std::fmt;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::thread;
 use std::time::{Duration, Instant};
+
+use crossbeam_channel::{self, Receiver as CrossbeamReceiver, Sender as CrossbeamSender};
+use futures::future::Future;
+use futures::sync::oneshot;
 
 use instruments::switches::*;
 use instruments::*;
@@ -10,6 +15,87 @@ use processor::{AggregatesProcessors, ProcessesTelemetryMessages, ProcessingOutc
 use snapshot::{ItemKind, Snapshot};
 use util;
 use {Descriptive, PutsSnapshot};
+
+/// A Builder for a `TelemetryDriver`
+pub struct DriverBuilder {
+    /// An optional name that will also group the metrics under the name
+    ///
+    /// Default is `None`
+    pub name: Option<String>,
+    /// A title to be added when a `Snapshot` with descriptions is created
+    ///
+    /// Default is `None`
+    pub title: Option<String>,
+    /// A description to be added when a `Snapshot` with descriptions is created
+    ///
+    /// Default is `None`
+    pub description: Option<String>,
+    /// `max_observation_age` is the maximum age of an `Observation`
+    /// to be taken into account. This is determined by the `timestamp`
+    /// field of an `Observation`. `Observations` that are too old are simply
+    /// dropped. The default is **60 seconds**.
+    pub max_observation_age: Option<Duration>,
+    /// If true metrics for the `TelemetryDriver` will be added to the
+    /// generated `Snapshot`
+    ///
+    /// Default is `true`
+    pub with_driver_metrics: bool,
+}
+
+impl DriverBuilder {
+    pub fn new<T: Into<String>>(name: T) -> DriverBuilder {
+        let mut me = Self::default();
+        me.name = Some(name.into());
+        me
+    }
+
+    pub fn set_name<T: Into<String>>(mut self, name: T) -> Self {
+        self.name = Some(name.into());
+        self
+    }
+
+    pub fn set_title<T: Into<String>>(mut self, title: T) -> Self {
+        self.title = Some(title.into());
+        self
+    }
+
+    pub fn set_description<T: Into<String>>(mut self, description: T) -> Self {
+        self.description = Some(description.into());
+        self
+    }
+
+    pub fn set_max_observation_age(mut self, max_observation_age: Duration) -> Self {
+        self.max_observation_age = Some(max_observation_age);
+        self
+    }
+
+    pub fn set_driver_metrics(mut self, enabled: bool) -> Self {
+        self.with_driver_metrics = enabled;
+        self
+    }
+
+    pub fn build(self) -> TelemetryDriver {
+        TelemetryDriver::new(
+            self.name,
+            self.title,
+            self.description,
+            self.max_observation_age,
+            self.with_driver_metrics,
+        )
+    }
+}
+
+impl Default for DriverBuilder {
+    fn default() -> Self {
+        Self {
+            name: None,
+            title: None,
+            description: None,
+            max_observation_age: Some(Duration::from_secs(60)),
+            with_driver_metrics: true,
+        }
+    }
+}
 
 /// Triggers registered `ProcessesTelemetryMessages` to
 /// poll for messages.
@@ -29,7 +115,7 @@ use {Descriptive, PutsSnapshot};
 /// The metrics will be added to all snapshots
 /// under a field named `_metrix` which contains the
 /// following fields:
-///  
+///
 /// * `collections_per_second`: The number of observation collection runs
 /// done per second
 ///
@@ -56,18 +142,14 @@ use {Descriptive, PutsSnapshot};
 ///
 /// * `dropped_observations_alarm`: Will be `true` if observations have been
 /// dropped. Will by default stay `true` for 60 seconds once triggered.
-///  
+///
 /// * `inactivity_alarm`: Will be `true` if no observations have been made for
 /// a certain amount of time. The default is 60 seconds.
 #[derive(Clone)]
 pub struct TelemetryDriver {
-    name: Option<String>,
-    title: Option<String>,
-    description: Option<String>,
-    processors: Arc<Mutex<Vec<Box<ProcessesTelemetryMessages>>>>,
-    snapshooters: Arc<Mutex<Vec<Box<PutsSnapshot>>>>,
+    descriptives: Descriptives,
     drop_guard: Arc<DropGuard>,
-    driver_metrics: Option<DriverMetrics>,
+    sender: CrossbeamSender<DriverMessage>,
 }
 
 struct DropGuard {
@@ -87,28 +169,10 @@ impl TelemetryDriver {
     /// to be taken into account. This is determined by the `timestamp`
     /// field of an `Observation`. `Observations` that are too old are simply
     /// dropped. The default is **60 seconds**.
-    pub fn new<T: Into<String>>(
-        name: Option<T>,
-        max_observation_age: Option<Duration>,
-    ) -> TelemetryDriver {
-        TelemetryDriver::create(name, max_observation_age, false)
-    }
-
-    /// Creates a new `TelemetryDriver` which has its own metrics.
-    ///
-    /// `max_observation_age` is the maximum age of an `Observation`
-    /// to be taken into account. This is determined by the `timestamp`
-    /// field of an `Observation`. `Observations` that are too old are simply
-    /// dropped. The default is **60 seconds**.
-    pub fn with_default_metrics<T: Into<String>>(
-        name: Option<T>,
-        max_observation_age: Option<Duration>,
-    ) -> TelemetryDriver {
-        TelemetryDriver::create(name, max_observation_age, true)
-    }
-
-    fn create<T: Into<String>>(
-        name: Option<T>,
+    pub fn new(
+        name: Option<String>,
+        title: Option<String>,
+        description: Option<String>,
         max_observation_age: Option<Duration>,
         with_driver_metrics: bool,
     ) -> TelemetryDriver {
@@ -116,76 +180,84 @@ impl TelemetryDriver {
 
         let driver_metrics = if with_driver_metrics {
             Some(DriverMetrics {
-                instruments: Arc::new(Mutex::new(DriverInstruments::default())),
+                instruments: DriverInstruments::default(),
             })
         } else {
             None
         };
 
+        let (sender, receiver) = crossbeam_channel::unbounded();
+
+        let mut descriptives = Descriptives::default();
+        descriptives.name = name;
+        descriptives.title = title;
+        descriptives.description = description;
+
         let driver = TelemetryDriver {
-            name: name.map(Into::into),
-            title: None,
-            description: None,
+            descriptives: descriptives.clone(),
             drop_guard: Arc::new(DropGuard {
                 is_running: is_running.clone(),
             }),
-            processors: Arc::new(Mutex::new(Vec::new())),
-            snapshooters: Arc::new(Mutex::new(Vec::new())),
-            driver_metrics: driver_metrics.clone(),
+            sender,
         };
 
         start_telemetry_loop(
-            driver.processors.clone(),
+            descriptives,
             is_running,
             max_observation_age.unwrap_or(Duration::from_secs(60)),
             driver_metrics,
+            receiver,
         );
 
         driver
     }
 
     pub fn name(&self) -> Option<&str> {
-        self.name.as_ref().map(|n| &**n)
+        self.descriptives.name.as_ref().map(|n| &**n)
     }
 
-    pub fn set_name<T: Into<String>>(&mut self, name: T) {
-        self.name = Some(name.into())
-    }
-
-    pub fn set_title<T: Into<String>>(&mut self, title: T) {
-        self.title = Some(title.into())
-    }
-
-    pub fn set_description<T: Into<String>>(&mut self, description: T) {
-        self.description = Some(description.into())
-    }
-
-    pub fn snapshot(&self, descriptive: bool) -> Snapshot {
-        let mut outer = Snapshot::default();
-        self.put_snapshot(&mut outer, descriptive);
-        outer
-    }
-
-    fn put_values_into_snapshot(&self, into: &mut Snapshot, descriptive: bool) {
-        let started = Instant::now();
-
-        util::put_default_descriptives(self, into, descriptive);
-        self.processors
-            .lock()
-            .unwrap()
-            .iter()
-            .for_each(|p| p.put_snapshot(into, descriptive));
-
-        self.snapshooters
-            .lock()
-            .unwrap()
-            .iter()
-            .for_each(|s| s.put_snapshot(into, descriptive));
-
-        if let Some(ref driver_metrics) = self.driver_metrics {
-            driver_metrics.update_post_snapshot(started);
-            driver_metrics.put_snapshot(into, descriptive);
+    pub fn snapshot(&self, descriptive: bool) -> Result<Snapshot, GetSnapshotError> {
+        let snapshot = Snapshot::default();
+        let (tx, rx) = crossbeam_channel::unbounded();
+        let _ = self
+            .sender
+            .send(DriverMessage::GetSnapshotSync(snapshot, tx, descriptive));
+        if let Some(snapshot) = rx.recv() {
+            Ok(snapshot)
+        } else {
+            Err(GetSnapshotError)
         }
+    }
+
+    pub fn snapshot_async(
+        &self,
+        descriptive: bool,
+    ) -> impl Future<Item = Snapshot, Error = GetSnapshotError> + Send + 'static {
+        let snapshot = Snapshot::default();
+        let (tx, rx) = oneshot::channel();
+        let _ = self
+            .sender
+            .send(DriverMessage::GetSnapshotAsync(snapshot, tx, descriptive));
+        rx.map_err(|_| GetSnapshotError)
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct GetSnapshotError;
+
+impl ::std::error::Error for GetSnapshotError {
+    fn description(&self) -> &str {
+        "Could not create a snapshot"
+    }
+
+    fn cause(&self) -> Option<&::std::error::Error> {
+        None
+    }
+}
+
+impl fmt::Display for GetSnapshotError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", ::std::error::Error::description(self))
     }
 }
 
@@ -198,77 +270,119 @@ impl ProcessesTelemetryMessages for TelemetryDriver {
 
 impl PutsSnapshot for TelemetryDriver {
     fn put_snapshot(&self, into: &mut Snapshot, descriptive: bool) {
-        if let Some(ref name) = self.name {
-            let mut new_level = Snapshot::default();
-            self.put_values_into_snapshot(&mut new_level, descriptive);
-            into.items
-                .push((name.clone(), ItemKind::Snapshot(new_level)));
-        } else {
-            self.put_values_into_snapshot(into, descriptive);
+        if let Ok(snapshot) = self.snapshot(descriptive) {
+            snapshot
+                .items
+                .into_iter()
+                .for_each(|(k, v)| into.push(k, v));
         }
     }
 }
 
 impl Default for TelemetryDriver {
     fn default() -> TelemetryDriver {
-        TelemetryDriver::new::<String>(None, Some(Duration::from_secs(60)))
+        TelemetryDriver::new(None, None, None, Some(Duration::from_secs(60)), true)
     }
 }
 
 impl AggregatesProcessors for TelemetryDriver {
     fn add_processor<P: ProcessesTelemetryMessages>(&mut self, processor: P) {
-        self.processors.lock().unwrap().push(Box::new(processor));
+        let _ = self
+            .sender
+            .send(DriverMessage::AddProcessor(Box::new(processor)));
     }
 
     fn add_snapshooter<S: PutsSnapshot>(&mut self, snapshooter: S) {
-        self.snapshooters
-            .lock()
-            .unwrap()
-            .push(Box::new(snapshooter));
+        let _ = self
+            .sender
+            .send(DriverMessage::AddSnapshooter(Box::new(snapshooter)));
     }
 }
 
 impl Descriptive for TelemetryDriver {
     fn title(&self) -> Option<&str> {
-        self.title.as_ref().map(|n| &**n)
+        self.descriptives.title.as_ref().map(|n| &**n)
     }
 
     fn description(&self) -> Option<&str> {
-        self.description.as_ref().map(|n| &**n)
+        self.descriptives.description.as_ref().map(|n| &**n)
     }
 }
 
 fn start_telemetry_loop(
-    processors: Arc<Mutex<Vec<Box<ProcessesTelemetryMessages>>>>,
+    descriptives: Descriptives,
     is_running: Arc<AtomicBool>,
     max_observation_age: Duration,
     driver_metrics: Option<DriverMetrics>,
+    receiver: CrossbeamReceiver<DriverMessage>,
 ) {
     thread::spawn(move || {
         telemetry_loop(
-            &processors,
+            descriptives,
             &is_running,
             max_observation_age,
             driver_metrics,
+            receiver,
         )
     });
 }
 
+enum DriverMessage {
+    AddProcessor(Box<dyn ProcessesTelemetryMessages>),
+    AddSnapshooter(Box<dyn PutsSnapshot>),
+    GetSnapshotSync(Snapshot, CrossbeamSender<Snapshot>, bool),
+    GetSnapshotAsync(Snapshot, oneshot::Sender<Snapshot>, bool),
+}
+
 fn telemetry_loop(
-    processors: &Mutex<Vec<Box<ProcessesTelemetryMessages>>>,
+    descriptives: Descriptives,
     is_running: &AtomicBool,
     max_observation_age: Duration,
     mut driver_metrics: Option<DriverMetrics>,
+    receiver: CrossbeamReceiver<DriverMessage>,
 ) {
     let mut last_outcome_logged = Instant::now() - Duration::from_secs(60);
     let mut dropped_since_last_logged = 0usize;
+
+    let mut processors: Vec<Box<dyn ProcessesTelemetryMessages>> = Vec::new();
+    let mut snapshooters: Vec<Box<dyn PutsSnapshot>> = Vec::new();
+
     loop {
         if !is_running.load(Ordering::Relaxed) {
             break;
         }
 
+        if let Some(message) = receiver.try_recv() {
+            match message {
+                DriverMessage::AddProcessor(processor) => processors.push(processor),
+                DriverMessage::AddSnapshooter(snapshooter) => snapshooters.push(snapshooter),
+                DriverMessage::GetSnapshotSync(mut snapshot, back_channel, descriptive) => {
+                    put_values_into_snapshot(
+                        &mut snapshot,
+                        &processors,
+                        &snapshooters,
+                        driver_metrics.as_mut(),
+                        &descriptives,
+                        descriptive,
+                    );
+                    let _ = back_channel.send(snapshot);
+                }
+                DriverMessage::GetSnapshotAsync(mut snapshot, back_channel, descriptive) => {
+                    put_values_into_snapshot(
+                        &mut snapshot,
+                        &processors,
+                        &snapshooters,
+                        driver_metrics.as_mut(),
+                        &descriptives,
+                        descriptive,
+                    );
+                    let _ = back_channel.send(snapshot);
+                }
+            }
+        }
+
         let started = Instant::now();
-        let outcome = do_a_run(processors, 1_000, max_observation_age);
+        let outcome = do_a_run(&mut processors, 1_000, max_observation_age);
 
         dropped_since_last_logged += outcome.dropped;
 
@@ -295,12 +409,10 @@ fn telemetry_loop(
 }
 
 fn do_a_run(
-    processors: &Mutex<Vec<Box<ProcessesTelemetryMessages>>>,
+    processors: &mut [Box<dyn ProcessesTelemetryMessages>],
     max: usize,
     max_observation_age: Duration,
 ) -> ProcessingOutcome {
-    let mut processors = processors.lock().unwrap();
-
     let mut outcome = ProcessingOutcome::default();
 
     for processor in processors.iter_mut() {
@@ -309,6 +421,93 @@ fn do_a_run(
     }
 
     outcome
+}
+
+fn put_values_into_snapshot(
+    into: &mut Snapshot,
+    processors: &[Box<dyn ProcessesTelemetryMessages>],
+    snapshooters: &[Box<dyn PutsSnapshot>],
+    driver_metrics: Option<&mut DriverMetrics>,
+    descriptives: &Descriptives,
+    descriptive: bool,
+) {
+    let started = Instant::now();
+
+    if let Some(ref name) = descriptives.name {
+        let mut new_level = Snapshot::default();
+        add_snapshot_values(
+            &mut new_level,
+            &processors,
+            &snapshooters,
+            driver_metrics,
+            &descriptives,
+            descriptive,
+            started,
+        );
+        into.items
+            .push((name.clone(), ItemKind::Snapshot(new_level)));
+    } else {
+        add_snapshot_values(
+            into,
+            &processors,
+            &snapshooters,
+            driver_metrics,
+            &descriptives,
+            descriptive,
+            started,
+        );
+    }
+}
+
+fn add_snapshot_values(
+    into: &mut Snapshot,
+    processors: &[Box<dyn ProcessesTelemetryMessages>],
+    snapshooters: &[Box<dyn PutsSnapshot>],
+    driver_metrics: Option<&mut DriverMetrics>,
+    descriptives: &Descriptives,
+    descriptive: bool,
+    started: Instant,
+) {
+    util::put_default_descriptives(descriptives, into, descriptive);
+    processors
+        .iter()
+        .for_each(|p| p.put_snapshot(into, descriptive));
+
+    snapshooters
+        .iter()
+        .for_each(|s| s.put_snapshot(into, descriptive));
+
+    if let Some(driver_metrics) = driver_metrics {
+        driver_metrics.update_post_snapshot(started);
+        driver_metrics.put_snapshot(into, descriptive);
+    }
+}
+
+#[derive(Clone)]
+struct Descriptives {
+    pub name: Option<String>,
+    pub title: Option<String>,
+    pub description: Option<String>,
+}
+
+impl Default for Descriptives {
+    fn default() -> Self {
+        Self {
+            name: None,
+            title: None,
+            description: None,
+        }
+    }
+}
+
+impl Descriptive for Descriptives {
+    fn title(&self) -> Option<&str> {
+        self.title.as_ref().map(|n| &**n)
+    }
+
+    fn description(&self) -> Option<&str> {
+        self.description.as_ref().map(|n| &**n)
+    }
 }
 
 #[cfg(feature = "log")]
@@ -321,31 +520,26 @@ fn log_outcome(dropped: usize) {
 #[inline]
 fn log_outcome(_dropped: usize) {}
 
-#[derive(Clone)]
 struct DriverMetrics {
-    instruments: Arc<Mutex<DriverInstruments>>,
+    instruments: DriverInstruments,
 }
 
 impl DriverMetrics {
-    pub fn update_post_collection(&self, outcome: &ProcessingOutcome, collection_started: Instant) {
+    pub fn update_post_collection(
+        &mut self,
+        outcome: &ProcessingOutcome,
+        collection_started: Instant,
+    ) {
         self.instruments
-            .lock()
-            .unwrap()
             .update_post_collection(outcome, collection_started);
     }
 
-    pub fn update_post_snapshot(&self, snapshot_started: Instant) {
-        self.instruments
-            .lock()
-            .unwrap()
-            .update_post_snapshot(snapshot_started);
+    pub fn update_post_snapshot(&mut self, snapshot_started: Instant) {
+        self.instruments.update_post_snapshot(snapshot_started);
     }
 
-    pub fn put_snapshot(&self, into: &mut Snapshot, descriptive: bool) {
-        self.instruments
-            .lock()
-            .unwrap()
-            .put_snapshot(into, descriptive);
+    pub fn put_snapshot(&mut self, into: &mut Snapshot, descriptive: bool) {
+        self.instruments.put_snapshot(into, descriptive);
     }
 }
 

@@ -144,7 +144,8 @@ fn create_bar_metrics() -> (TelemetryTransmitterSync<BarLabel>, ProcessorMount) 
 }
 
 fn main() {
-    let mut driver = TelemetryDriver::with_default_metrics(Some("demo"), None);
+    let builder = DriverBuilder::new("demo");
+    let mut driver = builder.build();
 
     let (foo_transmitter, foo_processor) = create_foo_metrics();
     let (bar_transmitter, bar_processor) = create_bar_metrics();
@@ -175,7 +176,7 @@ fn main() {
     };
 
     // Poll a snapshot for the counter
-    let _ = driver.snapshot(true);
+    let _ = driver.snapshot(true).unwrap();
 
     let handle2 = {
         let foo_transmitter = foo_transmitter.clone();
@@ -190,7 +191,7 @@ fn main() {
     };
 
     // Poll a snapshot for the counter
-    let _ = driver.snapshot(true);
+    let _ = driver.snapshot(true).unwrap();
 
     let handle3 = {
         let bar_transmitter = bar_transmitter.clone();
@@ -223,7 +224,7 @@ fn main() {
 
     println!("\n\n\n=======================\n\n");
 
-    let snapshot = driver.snapshot(true);
+    let snapshot = driver.snapshot(true).unwrap();
 
     let mut config = JsonConfig::default();
     config.pretty = Some(4);

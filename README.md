@@ -108,6 +108,11 @@ be driven by that driver.
 
 ## Recent changes:
 
+* 0.9.0
+    * `TelemetryDriver` has a builder
+    * `TelemetryDriver` is immutable
+    * Snapshots are calculated in the background thread
+    * Snapshots can be queried with as a `Future`
 * 0.8.3
     * Use crossbeam channels
 * 0.8.1

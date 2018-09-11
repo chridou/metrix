@@ -114,6 +114,11 @@
 //!
 //! ## Recent changes:
 //!
+//! * 0.9.0
+//!     * `TelemetryDriver` has a builder
+//!     * `TelemetryDriver` is immutable
+//!     * Snapshots are calculated in the background thread
+//!     * Snapshots can be queried with as a `Future`
 //! * 0.8.3
 //!     * Use crossbeam channels
 //! * 0.8.1
@@ -140,10 +145,10 @@ extern crate json;
 #[macro_use]
 extern crate log;
 extern crate crossbeam_channel;
+extern crate futures;
 extern crate metrics;
 
 use snapshot::Snapshot;
-use std::sync::mpsc;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
@@ -393,11 +398,7 @@ pub struct TelemetryTransmitterSync<L> {
     sender: Arc<Mutex<crossbeam_channel::Sender<TelemetryMessage<L>>>>,
 }
 
-impl<L> TelemetryTransmitterSync<L>
-where
-    L: Send + 'static,
-{
-}
+impl<L> TelemetryTransmitterSync<L> where L: Send + 'static {}
 
 impl<L> TransmitsTelemetryData<L> for TelemetryTransmitterSync<L> {
     fn transmit(&self, observation: Observation<L>) -> &Self {
