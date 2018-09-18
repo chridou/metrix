@@ -114,6 +114,8 @@
 //!
 //! ## Recent changes:
 //!
+//! * 0.9.1
+//!     * `TelemetryDriver` now supports a processing strategy
 //! * 0.9.0
 //!     * `TelemetryDriver` has a builder
 //!     * `TelemetryDriver` is immutable
@@ -229,6 +231,19 @@ impl<L> Observation<L> {
     }
 }
 
+pub trait ObservationLike {
+    fn timestamp(&self) -> Instant;
+}
+
+impl<L> ObservationLike for Observation<L> {
+    fn timestamp(&self) -> Instant {
+        match *self {
+            Observation::Observed { timestamp, .. } => timestamp,
+            Observation::ObservedOne { timestamp, .. } => timestamp,
+            Observation::ObservedOneValue { timestamp, .. } => timestamp,
+        }
+    }
+}
 /// Something that can react on `Observation`s where
 /// the `Label` is the type of the label.
 ///

@@ -146,6 +146,8 @@ fn create_bar_metrics() -> (TelemetryTransmitterSync<BarLabel>, ProcessorMount) 
 fn main() {
     let builder = DriverBuilder::new("demo");
     let mut driver = builder.build();
+    //driver.change_processing_stragtegy(ProcessingStrategy::DropAll);
+    //driver.pause();
 
     let (foo_transmitter, foo_processor) = create_foo_metrics();
     let (bar_transmitter, bar_processor) = create_bar_metrics();
@@ -207,14 +209,16 @@ fn main() {
     handle2.join().unwrap();
     handle3.join().unwrap();
 
+    //driver.resume();
+
     println!(
-        "Sending observations took {:?}. Sleeping 5 secs to collect remaining data. \
+        "Sending observations took {:?}. Sleeping 1 secs to collect remaining data. \
          Depending on your machine you might see that not all metrics have a count \
          of 5 million obseravtions.",
         start.elapsed()
     );
 
-    thread::sleep(Duration::from_secs(5));
+    thread::sleep(Duration::from_secs(1));
 
     println!("\n\n\n=======================\n\n");
 

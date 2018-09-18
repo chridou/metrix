@@ -11,7 +11,9 @@ use futures::sync::oneshot;
 
 use instruments::switches::*;
 use instruments::*;
-use processor::{AggregatesProcessors, ProcessesTelemetryMessages, ProcessingOutcome};
+use processor::{
+    AggregatesProcessors, ProcessesTelemetryMessages, ProcessingOutcome, ProcessingStrategy,
+};
 use snapshot::{ItemKind, Snapshot};
 use util;
 use {Descriptive, PutsSnapshot};
@@ -30,11 +32,9 @@ pub struct DriverBuilder {
     ///
     /// Default is `None`
     pub description: Option<String>,
-    /// `max_observation_age` is the maximum age of an `Observation`
-    /// to be taken into account. This is determined by the `timestamp`
-    /// field of an `Observation`. `Observations` that are too old are simply
+    /// Sets the `ProcessingStrategy`
     /// dropped. The default is **60 seconds**.
-    pub max_observation_age: Option<Duration>,
+    pub processing_strategy: ProcessingStrategy,
     /// If true metrics for the `TelemetryDriver` will be added to the
     /// generated `Snapshot`
     ///
@@ -64,8 +64,8 @@ impl DriverBuilder {
         self
     }
 
-    pub fn set_max_observation_age(mut self, max_observation_age: Duration) -> Self {
-        self.max_observation_age = Some(max_observation_age);
+    pub fn set_processing_strategy(mut self, processing_strategy: ProcessingStrategy) -> Self {
+        self.processing_strategy = processing_strategy;
         self
     }
 
@@ -79,7 +79,7 @@ impl DriverBuilder {
             self.name,
             self.title,
             self.description,
-            self.max_observation_age,
+            self.processing_strategy,
             self.with_driver_metrics,
         )
     }
@@ -91,7 +91,7 @@ impl Default for DriverBuilder {
             name: None,
             title: None,
             description: None,
-            max_observation_age: Some(Duration::from_secs(60)),
+            processing_strategy: ProcessingStrategy::default(),
             with_driver_metrics: true,
         }
     }
@@ -173,7 +173,7 @@ impl TelemetryDriver {
         name: Option<String>,
         title: Option<String>,
         description: Option<String>,
-        max_observation_age: Option<Duration>,
+        processing_strategy: ProcessingStrategy,
         with_driver_metrics: bool,
     ) -> TelemetryDriver {
         let is_running = Arc::new(AtomicBool::new(true));
@@ -204,7 +204,7 @@ impl TelemetryDriver {
         start_telemetry_loop(
             descriptives,
             is_running,
-            max_observation_age.unwrap_or(Duration::from_secs(60)),
+            processing_strategy,
             driver_metrics,
             receiver,
         );
@@ -212,8 +212,26 @@ impl TelemetryDriver {
         driver
     }
 
+    /// Gets the name of this driver
     pub fn name(&self) -> Option<&str> {
         self.descriptives.name.as_ref().map(|n| &**n)
+    }
+
+    /// Changes the `ProcessingStrategy`
+    pub fn change_processing_stragtegy(&self, strategy: ProcessingStrategy) {
+        let _ = self
+            .sender
+            .send(DriverMessage::SetProcessingStrategy(strategy));
+    }
+
+    /// Pauses processing of observations.
+    pub fn pause(&self) {
+        let _ = self.sender.send(DriverMessage::Pause);
+    }
+
+    /// Resumes processing of observations
+    pub fn resume(&self) {
+        let _ = self.sender.send(DriverMessage::Resume);
     }
 
     pub fn snapshot(&self, descriptive: bool) -> Result<Snapshot, GetSnapshotError> {
@@ -263,7 +281,7 @@ impl fmt::Display for GetSnapshotError {
 
 impl ProcessesTelemetryMessages for TelemetryDriver {
     /// Receive and handle pending operations
-    fn process(&mut self, _max: usize, _drop_deadline: Instant) -> ProcessingOutcome {
+    fn process(&mut self, _max: usize, _strategy: ProcessingStrategy) -> ProcessingOutcome {
         ProcessingOutcome::default()
     }
 }
@@ -281,7 +299,7 @@ impl PutsSnapshot for TelemetryDriver {
 
 impl Default for TelemetryDriver {
     fn default() -> TelemetryDriver {
-        TelemetryDriver::new(None, None, None, Some(Duration::from_secs(60)), true)
+        TelemetryDriver::new(None, None, None, ProcessingStrategy::default(), true)
     }
 }
 
@@ -312,7 +330,7 @@ impl Descriptive for TelemetryDriver {
 fn start_telemetry_loop(
     descriptives: Descriptives,
     is_running: Arc<AtomicBool>,
-    max_observation_age: Duration,
+    processing_strategy: ProcessingStrategy,
     driver_metrics: Option<DriverMetrics>,
     receiver: CrossbeamReceiver<DriverMessage>,
 ) {
@@ -320,7 +338,7 @@ fn start_telemetry_loop(
         telemetry_loop(
             descriptives,
             &is_running,
-            max_observation_age,
+            processing_strategy,
             driver_metrics,
             receiver,
         )
@@ -332,12 +350,15 @@ enum DriverMessage {
     AddSnapshooter(Box<dyn PutsSnapshot>),
     GetSnapshotSync(Snapshot, CrossbeamSender<Snapshot>, bool),
     GetSnapshotAsync(Snapshot, oneshot::Sender<Snapshot>, bool),
+    SetProcessingStrategy(ProcessingStrategy),
+    Pause,
+    Resume,
 }
 
 fn telemetry_loop(
     descriptives: Descriptives,
     is_running: &AtomicBool,
-    max_observation_age: Duration,
+    processing_strategy: ProcessingStrategy,
     mut driver_metrics: Option<DriverMetrics>,
     receiver: CrossbeamReceiver<DriverMessage>,
 ) {
@@ -346,6 +367,10 @@ fn telemetry_loop(
 
     let mut processors: Vec<Box<dyn ProcessesTelemetryMessages>> = Vec::new();
     let mut snapshooters: Vec<Box<dyn PutsSnapshot>> = Vec::new();
+
+    let mut processing_stragtegy = processing_strategy;
+
+    let mut paused = false;
 
     loop {
         if !is_running.load(Ordering::Relaxed) {
@@ -378,11 +403,30 @@ fn telemetry_loop(
                     );
                     let _ = back_channel.send(snapshot);
                 }
+                DriverMessage::SetProcessingStrategy(strategy) => {
+                    log_info(&format!("Processing strategy changed to {:?}", strategy));
+                    processing_stragtegy = strategy
+                }
+                DriverMessage::Pause => {
+                    log_info("pausing");
+                    paused = true
+                }
+                DriverMessage::Resume => {
+                    paused = {
+                        log_info("resuming");
+                        false
+                    }
+                }
             }
         }
 
+        if paused {
+            thread::sleep(Duration::from_millis(50));
+            continue;
+        }
+
         let started = Instant::now();
-        let outcome = do_a_run(&mut processors, 1_000, max_observation_age);
+        let outcome = do_a_run(&mut processors, 1_000, processing_stragtegy);
 
         dropped_since_last_logged += outcome.dropped;
 
@@ -402,8 +446,8 @@ fn telemetry_loop(
 
         let finished = Instant::now();
         let elapsed = finished - started;
-        if elapsed < Duration::from_millis(5) {
-            thread::sleep(Duration::from_millis(5) - elapsed)
+        if elapsed < Duration::from_millis(10) {
+            thread::sleep(Duration::from_millis(10) - elapsed)
         }
     }
 }
@@ -411,13 +455,12 @@ fn telemetry_loop(
 fn do_a_run(
     processors: &mut [Box<dyn ProcessesTelemetryMessages>],
     max: usize,
-    max_observation_age: Duration,
+    strategy: ProcessingStrategy,
 ) -> ProcessingOutcome {
     let mut outcome = ProcessingOutcome::default();
 
     for processor in processors.iter_mut() {
-        let drop_deadline = Instant::now() - max_observation_age;
-        outcome.combine_with(&processor.process(max, drop_deadline));
+        outcome.combine_with(&processor.process(max, strategy));
     }
 
     outcome
@@ -519,6 +562,16 @@ fn log_outcome(dropped: usize) {
 #[cfg(not(feature = "log"))]
 #[inline]
 fn log_outcome(_dropped: usize) {}
+
+#[cfg(feature = "log")]
+#[inline]
+fn log_info(message: &str) {
+    info!("{}", message);
+}
+
+#[cfg(not(feature = "log"))]
+#[inline]
+fn log_info(_message: &str) {}
 
 struct DriverMetrics {
     instruments: DriverInstruments,

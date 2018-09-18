@@ -8,7 +8,7 @@ use instruments::Panel;
 use snapshot::{ItemKind, Snapshot};
 use util;
 use Descriptive;
-use {HandlesObservations, Observation, PutsSnapshot, TelemetryTransmitter};
+use {HandlesObservations, Observation, ObservationLike, PutsSnapshot, TelemetryTransmitter};
 
 /// Implementors can group everything that can process
 /// `TelemetryMessage`s.
@@ -70,6 +70,55 @@ impl Default for ProcessingOutcome {
     }
 }
 
+/// A strategy for processing observations
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum ProcessingStrategy {
+    /// Process all observations
+    ProcessAll,
+    /// Drop all observations
+    DropAll,
+    /// Process only observations that are not older
+    /// than the given `Durations` by the time
+    /// messages are processed.
+    DropOlderThan(Duration),
+}
+
+impl ProcessingStrategy {
+    pub(crate) fn decider(&self) -> ProcessingDecider {
+        match *self {
+            ProcessingStrategy::ProcessAll => ProcessingDecider::ProcessAll,
+            ProcessingStrategy::DropAll => ProcessingDecider::DropAll,
+            ProcessingStrategy::DropOlderThan(max_age) => {
+                ProcessingDecider::DropBeforeDeadline(Instant::now() - max_age)
+            }
+        }
+    }
+}
+
+impl Default for ProcessingStrategy {
+    fn default() -> Self {
+        ProcessingStrategy::DropOlderThan(Duration::from_secs(60))
+    }
+}
+
+pub enum ProcessingDecider {
+    ProcessAll,
+    DropAll,
+    DropBeforeDeadline(Instant),
+}
+
+impl ProcessingDecider {
+    pub fn should_be_processed<T: ObservationLike>(&self, observation: &T) -> bool {
+        match self {
+            ProcessingDecider::ProcessAll => true,
+            ProcessingDecider::DropAll => false,
+            ProcessingDecider::DropBeforeDeadline(drop_deadline) => {
+                observation.timestamp() > *drop_deadline
+            }
+        }
+    }
+}
+
 /// Can process `TelemetryMessage`.
 ///
 /// This is the counterpart of `TransmitsTelemetryData`.
@@ -78,7 +127,7 @@ impl Default for ProcessingOutcome {
 /// trait also requires the capability to write `Snapshot`s.
 pub trait ProcessesTelemetryMessages: PutsSnapshot + Send + 'static {
     /// Receive and handle pending operations
-    fn process(&mut self, max: usize, drop_deadline: Instant) -> ProcessingOutcome;
+    fn process(&mut self, max: usize, strategy: ProcessingStrategy) -> ProcessingOutcome;
 }
 
 /// The counterpart of the `TelemetryTransmitter`. It receives the
@@ -241,16 +290,15 @@ impl<L> ProcessesTelemetryMessages for TelemetryProcessor<L>
 where
     L: Clone + Eq + Send + 'static,
 {
-    fn process(&mut self, max: usize, drop_deadline: Instant) -> ProcessingOutcome {
+    fn process(&mut self, max: usize, strategy: ProcessingStrategy) -> ProcessingOutcome {
         let mut num_received = 0;
         let mut processed = 0;
         let mut dropped = 0;
+        let decider = strategy.decider();
         while num_received < max {
             match self.receiver.try_recv() {
                 Some(TelemetryMessage::Observation(obs)) => {
-                    if obs.timestamp() <= drop_deadline {
-                        dropped += 1;
-                    } else {
+                    if decider.should_be_processed(&obs) {
                         self.cockpits
                             .iter_mut()
                             .for_each(|c| c.handle_observation(&obs));
@@ -258,6 +306,8 @@ where
                             .iter_mut()
                             .for_each(|h| h.handle_observation(&obs));
                         processed += 1;
+                    } else {
+                        dropped += 1;
                     }
                 }
                 Some(TelemetryMessage::AddCockpit(c)) => {
@@ -272,7 +322,8 @@ where
                     cockpit_name,
                     panel,
                 }) => {
-                    if let Some(ref mut cockpit) = self.cockpits
+                    if let Some(ref mut cockpit) = self
+                        .cockpits
                         .iter_mut()
                         .find(|c| c.name() == Some(&cockpit_name))
                     {
@@ -423,11 +474,11 @@ impl AggregatesProcessors for ProcessorMount {
 }
 
 impl ProcessesTelemetryMessages for ProcessorMount {
-    fn process(&mut self, max: usize, drop_deadline: Instant) -> ProcessingOutcome {
+    fn process(&mut self, max: usize, strategy: ProcessingStrategy) -> ProcessingOutcome {
         let mut outcome = ProcessingOutcome::default();
 
         for processor in self.processors.iter_mut() {
-            outcome.combine_with(&processor.process(max, drop_deadline));
+            outcome.combine_with(&processor.process(max, strategy));
         }
 
         if outcome.something_happened() {
