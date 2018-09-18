@@ -152,7 +152,7 @@ impl PutsSnapshot for Meter {
 }
 
 impl Updates for Meter {
-    fn update(&mut self, with: &Update) {
+    fn update(&mut self, with: &Update) -> usize {
         if self.last_tick.get().elapsed() >= Duration::from_secs(5) {
             self.inner_meter.tick();
             self.last_tick.set(Instant::now());
@@ -167,6 +167,8 @@ impl Updates for Meter {
             }
             Update::Observation(_) => self.inner_meter.mark(1),
         }
+
+        1
     }
 }
 

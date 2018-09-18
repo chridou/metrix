@@ -122,7 +122,7 @@ impl PutsSnapshot for Histogram {
 }
 
 impl Updates for Histogram {
-    fn update(&mut self, with: &Update) {
+    fn update(&mut self, with: &Update) -> usize {
         if let Some(d) = self.max_inactivity_duration {
             if self.reset_after_inactivity && self.last_update.elapsed() > d {
                 self.inner_histogram = ExponentialDecayHistogram::new()
@@ -132,14 +132,17 @@ impl Updates for Histogram {
         self.last_update = Instant::now();
 
         match *with {
-            Update::ObservationWithValue(v, t) => if t > self.last_update {
-                self.inner_histogram.update_at(t, v as i64);
-                self.last_update = t
-            } else {
-                self.inner_histogram.update(v as i64);
-                self.last_update = Instant::now();
-            },
-            _ => (),
+            Update::ObservationWithValue(v, t) => {
+                if t > self.last_update {
+                    self.inner_histogram.update_at(t, v as i64);
+                    self.last_update = t
+                } else {
+                    self.inner_histogram.update(v as i64);
+                    self.last_update = Instant::now();
+                }
+                1
+            }
+            _ => 0,
         }
     }
 }

@@ -124,7 +124,9 @@ pub trait Updates {
     /// Not all `Update`s might modify the internal state.
     /// Only those that are appropriate and meaningful for
     /// the implementor.
-    fn update(&mut self, with: &Update);
+    ///
+    /// Returns the number of instruments updated
+    fn update(&mut self, with: &Update) -> usize;
 }
 
 /// Requirement for an instrument
@@ -344,17 +346,31 @@ where
 }
 
 impl<L> Updates for Panel<L> {
-    fn update(&mut self, with: &Update) {
+    fn update(&mut self, with: &Update) -> usize {
+        let mut instruments_updated = 0;
+
         let with = if let Some(scaling) = self.value_scaling {
             with.clone().scale(scaling)
         } else {
             with.clone()
         };
-        self.counter.iter_mut().for_each(|x| x.update(&with));
-        self.gauge.iter_mut().for_each(|x| x.update(&with));
-        self.meter.iter_mut().for_each(|x| x.update(&with));
-        self.histogram.iter_mut().for_each(|x| x.update(&with));
-        self.instruments.iter_mut().for_each(|x| x.update(&with));
+        self.counter
+            .iter_mut()
+            .for_each(|x| instruments_updated += x.update(&with));
+        self.gauge
+            .iter_mut()
+            .for_each(|x| instruments_updated += x.update(&with));
+        self.meter
+            .iter_mut()
+            .for_each(|x| instruments_updated += x.update(&with));
+        self.histogram
+            .iter_mut()
+            .for_each(|x| instruments_updated += x.update(&with));
+        self.instruments
+            .iter_mut()
+            .for_each(|x| instruments_updated += x.update(&with));
+
+        instruments_updated
     }
 }
 

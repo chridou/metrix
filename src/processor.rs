@@ -47,6 +47,7 @@ pub(crate) enum TelemetryMessage<L> {
 pub struct ProcessingOutcome {
     pub processed: usize,
     pub dropped: usize,
+    pub instruments_updated: usize,
 }
 
 impl ProcessingOutcome {
@@ -54,6 +55,7 @@ impl ProcessingOutcome {
     pub fn combine_with(&mut self, other: &ProcessingOutcome) {
         self.processed += other.processed;
         self.dropped += other.dropped;
+        self.instruments_updated += other.instruments_updated;
     }
 
     pub fn something_happened(&self) -> bool {
@@ -66,6 +68,7 @@ impl Default for ProcessingOutcome {
         ProcessingOutcome {
             processed: 0,
             dropped: 0,
+            instruments_updated: 0,
         }
     }
 }
@@ -293,6 +296,7 @@ where
     fn process(&mut self, max: usize, strategy: ProcessingStrategy) -> ProcessingOutcome {
         let mut num_received = 0;
         let mut processed = 0;
+        let mut instruments_updated = 0;
         let mut dropped = 0;
         let decider = strategy.decider();
         while num_received < max {
@@ -301,10 +305,10 @@ where
                     if decider.should_be_processed(&obs) {
                         self.cockpits
                             .iter_mut()
-                            .for_each(|c| c.handle_observation(&obs));
+                            .for_each(|c| instruments_updated += c.handle_observation(&obs));
                         self.handlers
                             .iter_mut()
-                            .for_each(|h| h.handle_observation(&obs));
+                            .for_each(|h| instruments_updated += h.handle_observation(&obs));
                         processed += 1;
                     } else {
                         dropped += 1;
@@ -336,7 +340,11 @@ where
             num_received += 1;
         }
 
-        let outcome = ProcessingOutcome { processed, dropped };
+        let outcome = ProcessingOutcome {
+            processed,
+            dropped,
+            instruments_updated,
+        };
 
         if outcome.something_happened() {
             self.last_activity_at = Instant::now();

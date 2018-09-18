@@ -122,8 +122,9 @@ impl PutsSnapshot for StaircaseTimer {
 }
 
 impl Updates for StaircaseTimer {
-    fn update(&mut self, _: &Update) {
-        self.stay_on_until = Some(Instant::now() + self.switch_off_after)
+    fn update(&mut self, _: &Update) -> usize {
+        self.stay_on_until = Some(Instant::now() + self.switch_off_after);
+        1
     }
 }
 

@@ -29,7 +29,8 @@ impl Snapshot {
             return None;
         }
 
-        if let Some(item) = self.items
+        if let Some(item) = self
+            .items
             .iter()
             .find(|&&(ref name, _)| name == path[0])
             .map(|x| &x.1)

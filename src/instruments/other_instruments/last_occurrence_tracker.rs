@@ -106,8 +106,9 @@ impl PutsSnapshot for LastOccurrenceTracker {
 }
 
 impl Updates for LastOccurrenceTracker {
-    fn update(&mut self, _: &Update) {
-        self.happened_last = Some(Instant::now())
+    fn update(&mut self, _: &Update) -> usize {
+        self.happened_last = Some(Instant::now());
+        1
     }
 }
 

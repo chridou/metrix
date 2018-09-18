@@ -603,6 +603,7 @@ struct DriverInstruments {
     observations_processed_per_collection: Histogram,
     observations_dropped_per_second: Meter,
     observations_dropped_per_collection: Histogram,
+    instruments_updated_per_second: Meter,
     snapshots_per_second: Meter,
     snapshots_times_us: Histogram,
     dropped_observations_alarm: StaircaseTimer,
@@ -625,6 +626,9 @@ impl Default for DriverInstruments {
             ),
             observations_dropped_per_collection: Histogram::new_with_defaults(
                 "observations_dropped_per_collection",
+            ),
+            instruments_updated_per_second: Meter::new_with_defaults(
+                "instruments_updated_per_second",
             ),
             snapshots_per_second: Meter::new_with_defaults("snapshots_per_second"),
             snapshots_times_us: Histogram::new_with_defaults("snapshots_times_us"),
@@ -664,6 +668,13 @@ impl DriverInstruments {
             self.dropped_observations_alarm
                 .update(&Update::Observation(now));
         }
+        if outcome.instruments_updated > 0 {
+            self.instruments_updated_per_second
+                .update(&Update::Observations(
+                    outcome.instruments_updated as u64,
+                    now,
+                ));
+        }
         self.inactivity_alarm.update(&Update::Observation(now));
     }
 
@@ -690,6 +701,8 @@ impl DriverInstruments {
         self.observations_dropped_per_second
             .put_snapshot(&mut container, descriptive);
         self.observations_dropped_per_collection
+            .put_snapshot(&mut container, descriptive);
+        self.instruments_updated_per_second
             .put_snapshot(&mut container, descriptive);
         self.snapshots_per_second
             .put_snapshot(&mut container, descriptive);

@@ -114,6 +114,8 @@
 //!
 //! ## Recent changes:
 //!
+//! * 0.9.2
+//!     * measure number of instrumets updated per second
 //! * 0.9.1
 //!     * `TelemetryDriver` now supports a processing strategy
 //! * 0.9.0
@@ -250,7 +252,7 @@ impl<L> ObservationLike for Observation<L> {
 /// You can use this to implement your own metrics.
 pub trait HandlesObservations: PutsSnapshot + Send + 'static {
     type Label: Send + 'static;
-    fn handle_observation(&mut self, observation: &Observation<Self::Label>);
+    fn handle_observation(&mut self, observation: &Observation<Self::Label>) -> usize;
 }
 
 /// Transmits telemetry data to the backend.

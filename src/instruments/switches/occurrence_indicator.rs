@@ -108,8 +108,9 @@ impl PutsSnapshot for OccurrenceIndicator {
 }
 
 impl Updates for OccurrenceIndicator {
-    fn update(&mut self, _: &Update) {
-        self.happened_last = Instant::now()
+    fn update(&mut self, _: &Update) -> usize {
+        self.happened_last = Instant::now();
+        1
     }
 }
 

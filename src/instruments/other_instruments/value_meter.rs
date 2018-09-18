@@ -148,14 +148,15 @@ impl PutsSnapshot for ValueMeter {
 }
 
 impl Updates for ValueMeter {
-    fn update(&mut self, with: &Update) {
+    fn update(&mut self, with: &Update) -> usize {
         match *with {
             Update::ObservationWithValue(v, _) => {
                 if v <= ::std::i64::MAX as u64 && v != 0 {
                     self.inner_meter.mark(v as i64)
                 }
+                1
             }
-            _ => (),
+            _ => 0,
         }
     }
 }

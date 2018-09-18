@@ -133,13 +133,17 @@ where
 {
     type Label = L;
 
-    fn handle_observation(&mut self, observation: &Observation<Self::Label>) {
+    fn handle_observation(&mut self, observation: &Observation<Self::Label>) -> usize {
         let BorrowedLabelAndUpdate(incoming_label, update) = observation.into();
+
+        let mut instruments_updated = 0;
 
         self.meters
             .iter_mut()
             .filter(|(label, _)| incoming_label == label)
-            .for_each(|(_, meter)| meter.update(&update));
+            .for_each(|(_, meter)| instruments_updated += meter.update(&update));
+
+        instruments_updated
     }
 }
 

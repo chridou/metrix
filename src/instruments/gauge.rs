@@ -87,10 +87,13 @@ impl PutsSnapshot for Gauge {
 }
 
 impl Updates for Gauge {
-    fn update(&mut self, with: &Update) {
+    fn update(&mut self, with: &Update) -> usize {
         match *with {
-            Update::ObservationWithValue(v, _) => self.set(v),
-            _ => (),
+            Update::ObservationWithValue(v, _) => {
+                self.set(v);
+                1
+            }
+            _ => 0,
         }
     }
 }

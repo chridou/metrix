@@ -93,11 +93,20 @@ impl PutsSnapshot for Counter {
 }
 
 impl Updates for Counter {
-    fn update(&mut self, with: &Update) {
+    fn update(&mut self, with: &Update) -> usize {
         match *with {
-            Update::Observation(_) => self.inc(),
-            Update::Observations(n, _) => self.inc_by(n),
-            Update::ObservationWithValue(_, _) => self.inc(),
+            Update::Observation(_) => {
+                self.inc();
+                1
+            }
+            Update::Observations(n, _) => {
+                self.inc_by(n);
+                1
+            }
+            Update::ObservationWithValue(_, _) => {
+                self.inc();
+                1
+            }
         }
     }
 }

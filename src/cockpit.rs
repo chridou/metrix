@@ -316,7 +316,7 @@ where
 {
     type Label = L;
 
-    fn handle_observation(&mut self, observation: &Observation<Self::Label>) {
+    fn handle_observation(&mut self, observation: &Observation<Self::Label>) -> usize {
         self.last_activity_at = Instant::now();
 
         let observation = if let Some(scaling) = self.value_scaling {
@@ -325,16 +325,20 @@ where
             observation.clone()
         };
 
+        let mut instruments_updated = 0;
+
         self.handlers
             .iter_mut()
-            .for_each(|h| h.handle_observation(&observation));
+            .for_each(|h| instruments_updated += h.handle_observation(&observation));
 
         let LabelAndUpdate(label, update) = observation.into();
 
         self.panels
             .iter_mut()
             .filter(|p| p.label() == &label)
-            .for_each(|p| p.update(&update));
+            .for_each(|p| instruments_updated += p.update(&update));
+
+        instruments_updated
     }
 }
 

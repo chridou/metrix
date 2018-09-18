@@ -53,7 +53,8 @@ pub fn put_descriptives<T>(
     T: Descriptive,
 {
     if let Some(title) = what.title() {
-        let title_not_already_there = into.items
+        let title_not_already_there = into
+            .items
             .iter()
             .find(|&&(ref n, _)| n == title_field_label)
             .is_none();
@@ -66,7 +67,8 @@ pub fn put_descriptives<T>(
     }
 
     if let Some(description) = what.description() {
-        let description_not_already_there = into.items
+        let description_not_already_there = into
+            .items
             .iter()
             .find(|&&(ref n, _)| n == description_field_label)
             .is_none();
