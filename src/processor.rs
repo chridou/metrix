@@ -301,7 +301,7 @@ where
         let decider = strategy.decider();
         while num_received < max {
             match self.receiver.try_recv() {
-                Some(TelemetryMessage::Observation(obs)) => {
+                Ok(TelemetryMessage::Observation(obs)) => {
                     if decider.should_be_processed(&obs) {
                         self.cockpits
                             .iter_mut()
@@ -314,15 +314,15 @@ where
                         dropped += 1;
                     }
                 }
-                Some(TelemetryMessage::AddCockpit(c)) => {
+                Ok(TelemetryMessage::AddCockpit(c)) => {
                     self.add_cockpit(c);
                     processed += 1;
                 }
-                Some(TelemetryMessage::AddHandler(h)) => {
+                Ok(TelemetryMessage::AddHandler(h)) => {
                     self.add_handler(h);
                     processed += 1;
                 }
-                Some(TelemetryMessage::AddPanel {
+                Ok(TelemetryMessage::AddPanel {
                     cockpit_name,
                     panel,
                 }) => {
@@ -335,7 +335,10 @@ where
                     }
                     processed += 1;
                 }
-                None => break,
+                Err(err) => {
+                    util::log_error(format!("Failed to process messages: {}", err));
+                    break;
+                },
             };
             num_received += 1;
         }

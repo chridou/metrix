@@ -109,6 +109,8 @@ be driven by that driver.
 ## Recent changes:
 
 * 0.9.2
+    * updated crossbeam
+* 0.9.2
     * measure number of instrumets updated per second
 * 0.9.1
     * `TelemetryDriver` now supports a processing strategy

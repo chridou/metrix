@@ -1,3 +1,5 @@
+use std::fmt;
+
 use snapshot::{ItemKind, Snapshot};
 use Descriptive;
 
@@ -80,3 +82,23 @@ pub fn put_descriptives<T>(
         }
     }
 }
+
+#[cfg(feature = "log")]
+#[inline]
+pub fn log_error<T: fmt::Display>(message: T) {
+    info!("{}", message);
+}
+
+#[cfg(not(feature = "log"))]
+#[inline]
+pub fn log_error<T: fmt::Display>(_message: T) {}
+
+#[cfg(feature = "log")]
+#[inline]
+pub fn log_info<T: fmt::Display>(message: T) {
+    info!("{}", message);
+}
+
+#[cfg(not(feature = "log"))]
+#[inline]
+pub fn log_info<T: fmt::Display>(_message: T) {}

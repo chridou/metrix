@@ -115,6 +115,8 @@
 //! ## Recent changes:
 //!
 //! * 0.9.2
+//!     * updated crossbeam
+//! * 0.9.2
 //!     * measure number of instrumets updated per second
 //! * 0.9.1
 //!     * `TelemetryDriver` now supports a processing strategy
@@ -380,25 +382,33 @@ where
 
 impl<L> TransmitsTelemetryData<L> for TelemetryTransmitter<L> {
     fn transmit(&self, observation: Observation<L>) -> &Self {
-        self.sender.send(TelemetryMessage::Observation(observation));
+        if let Err(err) = self.sender.send(TelemetryMessage::Observation(observation)){
+            util::log_error(format!("Failed to transmit observation: {}", err));
+        };
         self
     }
 
     fn add_handler(&self, handler: Box<HandlesObservations<Label = L>>) -> &Self {
-        self.sender.send(TelemetryMessage::AddHandler(handler));
+        if let Err(err) = self.sender.send(TelemetryMessage::AddHandler(handler)){
+            util::log_error(format!("Failed to add handler: {}", err));
+        };
         self
     }
 
     fn add_cockpit(&self, cockpit: Cockpit<L>) -> &Self {
-        self.sender.send(TelemetryMessage::AddCockpit(cockpit));
+        if let Err(err) = self.sender.send(TelemetryMessage::AddCockpit(cockpit)){
+            util::log_error(format!("Failed to add cockpit: {}", err));
+        };
         self
     }
 
     fn add_panel_to_cockpit(&self, cockpit_name: String, panel: Panel<L>) -> &Self {
-        self.sender.send(TelemetryMessage::AddPanel {
+        if let Err(err) = self.sender.send(TelemetryMessage::AddPanel {
             cockpit_name,
             panel,
-        });
+        }){
+            util::log_error(format!("Failed to add panel to cockpit: {}", err));
+        };
         self
     }
 }
@@ -419,37 +429,45 @@ impl<L> TelemetryTransmitterSync<L> where L: Send + 'static {}
 
 impl<L> TransmitsTelemetryData<L> for TelemetryTransmitterSync<L> {
     fn transmit(&self, observation: Observation<L>) -> &Self {
-        self.sender
+        if let Err(err) = self.sender
             .lock()
             .unwrap()
-            .send(TelemetryMessage::Observation(observation));
+            .send(TelemetryMessage::Observation(observation)){
+            util::log_error(format!("Failed to transmit observation: {}", err));
+        };
         self
     }
 
     fn add_handler(&self, handler: Box<HandlesObservations<Label = L>>) -> &Self {
-        self.sender
+        if let Err(err) =self.sender
             .lock()
             .unwrap()
-            .send(TelemetryMessage::AddHandler(handler));
+            .send(TelemetryMessage::AddHandler(handler)){
+            util::log_error(format!("Failed to add handler: {}", err));
+        };
         self
     }
 
     fn add_cockpit(&self, cockpit: Cockpit<L>) -> &Self {
-        self.sender
+        if let Err(err) =self.sender
             .lock()
             .unwrap()
-            .send(TelemetryMessage::AddCockpit(cockpit));
+            .send(TelemetryMessage::AddCockpit(cockpit)){
+            util::log_error(format!("Failed to add cockpit: {}", err));
+        };
         self
     }
 
     fn add_panel_to_cockpit(&self, cockpit_name: String, panel: Panel<L>) -> &Self {
-        self.sender
+        if let Err(err) =self.sender
             .lock()
             .unwrap()
             .send(TelemetryMessage::AddPanel {
                 cockpit_name,
                 panel,
-            });
+            }){
+            util::log_error(format!("Failed to add panel to cockpit: {}", err));
+        };
         self
     }
 }

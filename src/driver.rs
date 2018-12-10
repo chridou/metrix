@@ -240,11 +240,7 @@ impl TelemetryDriver {
         let _ = self
             .sender
             .send(DriverMessage::GetSnapshotSync(snapshot, tx, descriptive));
-        if let Some(snapshot) = rx.recv() {
-            Ok(snapshot)
-        } else {
-            Err(GetSnapshotError)
-        }
+        rx.recv().map_err(|err| GetSnapshotError)
     }
 
     pub fn snapshot_async(
@@ -377,7 +373,8 @@ fn telemetry_loop(
             break;
         }
 
-        if let Some(message) = receiver.try_recv() {
+        match receiver.try_recv() {
+            Ok(message) =>
             match message {
                 DriverMessage::AddProcessor(processor) => processors.push(processor),
                 DriverMessage::AddSnapshooter(snapshooter) => snapshooters.push(snapshooter),
@@ -404,19 +401,22 @@ fn telemetry_loop(
                     let _ = back_channel.send(snapshot);
                 }
                 DriverMessage::SetProcessingStrategy(strategy) => {
-                    log_info(&format!("Processing strategy changed to {:?}", strategy));
+                    util::log_info(&format!("Processing strategy changed to {:?}", strategy));
                     processing_stragtegy = strategy
                 }
                 DriverMessage::Pause => {
-                    log_info("pausing");
+                    util::log_info("pausing");
                     paused = true
                 }
                 DriverMessage::Resume => {
                     paused = {
-                        log_info("resuming");
+                        util::log_info("resuming");
                         false
                     }
                 }
+            },
+            Err(err) => {
+                util::log_error(format!("Failed to receive message: {}", err));
             }
         }
 
@@ -563,15 +563,6 @@ fn log_outcome(dropped: usize) {
 #[inline]
 fn log_outcome(_dropped: usize) {}
 
-#[cfg(feature = "log")]
-#[inline]
-fn log_info(message: &str) {
-    info!("{}", message);
-}
-
-#[cfg(not(feature = "log"))]
-#[inline]
-fn log_info(_message: &str) {}
 
 struct DriverMetrics {
     instruments: DriverInstruments,
