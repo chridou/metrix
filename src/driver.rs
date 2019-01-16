@@ -330,15 +330,18 @@ fn start_telemetry_loop(
     driver_metrics: Option<DriverMetrics>,
     receiver: CrossbeamReceiver<DriverMessage>,
 ) {
-    thread::spawn(move || {
-        telemetry_loop(
-            descriptives,
-            &is_running,
-            processing_strategy,
-            driver_metrics,
-            receiver,
-        )
-    });
+    let builder = thread::Builder::new().name("metrix".to_string());
+    builder
+        .spawn(move || {
+            telemetry_loop(
+                descriptives,
+                &is_running,
+                processing_strategy,
+                driver_metrics,
+                receiver,
+            )
+        })
+        .unwrap();
 }
 
 enum DriverMessage {
@@ -374,8 +377,7 @@ fn telemetry_loop(
         }
 
         match receiver.try_recv() {
-            Ok(message) =>
-            match message {
+            Ok(message) => match message {
                 DriverMessage::AddProcessor(processor) => processors.push(processor),
                 DriverMessage::AddSnapshooter(snapshooter) => snapshooters.push(snapshooter),
                 DriverMessage::GetSnapshotSync(mut snapshot, back_channel, descriptive) => {
@@ -562,7 +564,6 @@ fn log_outcome(dropped: usize) {
 #[cfg(not(feature = "log"))]
 #[inline]
 fn log_outcome(_dropped: usize) {}
-
 
 struct DriverMetrics {
     instruments: DriverInstruments,
