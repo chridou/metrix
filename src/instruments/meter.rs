@@ -226,7 +226,7 @@ impl<'a> MeterSnapshot<'a> {
             ));
         }
 
-        into_container.push(self.name.clone(), ItemKind::Snapshot(new_level));
+        into_container.push(self.name, ItemKind::Snapshot(new_level));
     }
 }
 

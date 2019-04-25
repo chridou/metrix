@@ -1,19 +1,5 @@
 //! # metrix
 //!
-//! [![crates.io](https://img.shields.io/crates/v/metrix.svg)]
-//! (https://crates.io/crates/metrix)
-//! [![docs.rs](https://docs.rs/metrix/badge.svg)]
-//! (https://docs.rs/metrix)
-//! [![downloads](https://img.shields.io/crates/d/metrix.svg)]
-//! (https://crates.io/crates/metrix)
-//! [![Build Status](https://travis-ci.org/chridou/metrix.svg?branch=master)]
-//! (https://travis-ci.org/chridou/metrix)
-//! [![license-mit](http://img.shields.io/badge/license-MIT-blue.svg)]
-//! (https://github.com/chridou/metrix/blob/master/LICENSE-MIT)
-//! [![license-apache](http://img.shields.io/badge/license-APACHE-blue.svg)]
-//! (https://github.com/chridou/metrix/blob/master/LICENSE-APACHE)
-//!
-//!
 //! Metrics for monitoring applications and alerting.
 //!
 //! ## Goal
@@ -112,27 +98,6 @@
 //! hierarchy all processors registered with the driver will only
 //! be driven by that driver.
 //!
-//! ## Recent changes:
-//!
-//! * 0.9.2
-//!     * updated crossbeam
-//! * 0.9.2
-//!     * measure number of instrumets updated per second
-//! * 0.9.1
-//!     * `TelemetryDriver` now supports a processing strategy
-//! * 0.9.0
-//!     * `TelemetryDriver` has a builder
-//!     * `TelemetryDriver` is immutable
-//!     * Snapshots are calculated in the background thread
-//!     * Snapshots can be queried with as a `Future`
-//! * 0.8.3
-//!     * Use crossbeam channels
-//! * 0.8.1
-//!     * Fixed bug always reporting all meter rate if 1 munite was enabled
-//! * 0.8.0
-//!     * Meters only have 1 minute rate enabled by default
-//!     * Histograms can track inactivity and reset themselves
-//!     * Breaking changes: Moved some traits into other packages
 //!
 //! ## Contributing
 //!
@@ -382,21 +347,21 @@ where
 
 impl<L> TransmitsTelemetryData<L> for TelemetryTransmitter<L> {
     fn transmit(&self, observation: Observation<L>) -> &Self {
-        if let Err(err) = self.sender.send(TelemetryMessage::Observation(observation)){
+        if let Err(err) = self.sender.send(TelemetryMessage::Observation(observation)) {
             util::log_error(format!("Failed to transmit observation: {}", err));
         };
         self
     }
 
     fn add_handler(&self, handler: Box<HandlesObservations<Label = L>>) -> &Self {
-        if let Err(err) = self.sender.send(TelemetryMessage::AddHandler(handler)){
+        if let Err(err) = self.sender.send(TelemetryMessage::AddHandler(handler)) {
             util::log_error(format!("Failed to add handler: {}", err));
         };
         self
     }
 
     fn add_cockpit(&self, cockpit: Cockpit<L>) -> &Self {
-        if let Err(err) = self.sender.send(TelemetryMessage::AddCockpit(cockpit)){
+        if let Err(err) = self.sender.send(TelemetryMessage::AddCockpit(cockpit)) {
             util::log_error(format!("Failed to add cockpit: {}", err));
         };
         self
@@ -406,7 +371,7 @@ impl<L> TransmitsTelemetryData<L> for TelemetryTransmitter<L> {
         if let Err(err) = self.sender.send(TelemetryMessage::AddPanel {
             cockpit_name,
             panel,
-        }){
+        }) {
             util::log_error(format!("Failed to add panel to cockpit: {}", err));
         };
         self
@@ -429,43 +394,51 @@ impl<L> TelemetryTransmitterSync<L> where L: Send + 'static {}
 
 impl<L> TransmitsTelemetryData<L> for TelemetryTransmitterSync<L> {
     fn transmit(&self, observation: Observation<L>) -> &Self {
-        if let Err(err) = self.sender
+        if let Err(err) = self
+            .sender
             .lock()
             .unwrap()
-            .send(TelemetryMessage::Observation(observation)){
+            .send(TelemetryMessage::Observation(observation))
+        {
             util::log_error(format!("Failed to transmit observation: {}", err));
         };
         self
     }
 
     fn add_handler(&self, handler: Box<HandlesObservations<Label = L>>) -> &Self {
-        if let Err(err) =self.sender
+        if let Err(err) = self
+            .sender
             .lock()
             .unwrap()
-            .send(TelemetryMessage::AddHandler(handler)){
+            .send(TelemetryMessage::AddHandler(handler))
+        {
             util::log_error(format!("Failed to add handler: {}", err));
         };
         self
     }
 
     fn add_cockpit(&self, cockpit: Cockpit<L>) -> &Self {
-        if let Err(err) =self.sender
+        if let Err(err) = self
+            .sender
             .lock()
             .unwrap()
-            .send(TelemetryMessage::AddCockpit(cockpit)){
+            .send(TelemetryMessage::AddCockpit(cockpit))
+        {
             util::log_error(format!("Failed to add cockpit: {}", err));
         };
         self
     }
 
     fn add_panel_to_cockpit(&self, cockpit_name: String, panel: Panel<L>) -> &Self {
-        if let Err(err) =self.sender
+        if let Err(err) = self
+            .sender
             .lock()
             .unwrap()
             .send(TelemetryMessage::AddPanel {
                 cockpit_name,
                 panel,
-            }){
+            })
+        {
             util::log_error(format!("Failed to add panel to cockpit: {}", err));
         };
         self

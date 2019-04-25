@@ -338,7 +338,7 @@ where
                 Err(err) => {
                     util::log_error(format!("Failed to process messages: {}", err));
                     break;
-                },
+                }
             };
             num_received += 1;
         }

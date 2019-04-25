@@ -1,5 +1,6 @@
-use instruments::{Instrument, Update, Updates};
+use std::time::{Duration, Instant};
 
+use instruments::{Instrument, Update, Updates};
 use snapshot::Snapshot;
 use util;
 use {Descriptive, PutsSnapshot};
@@ -27,7 +28,9 @@ pub struct Gauge {
     name: String,
     title: Option<String>,
     description: Option<String>,
-    value: Option<u64>,
+    value: Option<(u64, u64)>,
+    peak_keep_alive: Option<Duration>,
+    last_peak_at: Instant,
 }
 
 impl Gauge {
@@ -37,15 +40,44 @@ impl Gauge {
             title: None,
             description: None,
             value: None,
+            peak_keep_alive: None,
+            last_peak_at: Instant::now(),
         }
     }
 
     pub fn set(&mut self, v: u64) {
-        self.value = Some(v);
+        let new_value = if let Some((_, peak)) = self.value.take() {
+            if let Some(peak_dur) = self.peak_keep_alive {
+                let now = Instant::now();
+                if v > peak {
+                    self.last_peak_at = now;
+                    Some((v, v))
+                } else if self.last_peak_at > now - peak_dur {
+                    Some((v, peak))
+                } else {
+                    Some((v, v))
+                }
+            } else {
+                Some((v, v))
+            }
+        } else {
+            self.last_peak_at = Instant::now();
+            Some((v, v))
+        };
+        self.value = new_value;
     }
 
     pub fn get(&self) -> Option<u64> {
-        self.value
+        self.value.as_ref().map(|v| v.0)
+    }
+
+    /// If set to `Some(Duration)` a peak value will
+    /// be diplayed for the given duration unless there
+    /// is a new peak. The field has the name `[gauge_name]_peak`.
+    ///
+    /// If set to None the peak values will not be shown.
+    pub fn set_peak_keep_alive(&mut self, d: Duration) {
+        self.peak_keep_alive = Some(d)
     }
 
     /// Gets the name of this `Gauge`
@@ -80,8 +112,16 @@ impl Instrument for Gauge {}
 impl PutsSnapshot for Gauge {
     fn put_snapshot(&self, into: &mut Snapshot, descriptive: bool) {
         util::put_postfixed_descriptives(self, &self.name, into, descriptive);
-        if let Some(v) = self.value {
-            into.items.push((self.name.clone(), v.into()));
+        if let Some((value, peak)) = self.value {
+            into.items.push((self.name.clone(), value.into()));
+            if let Some(peak_dur) = self.peak_keep_alive {
+                let peak_name = format!("{}_peak", self.name);
+                if self.last_peak_at > Instant::now() - peak_dur {
+                    into.items.push((peak_name, peak.into()));
+                } else {
+                    into.items.push((peak_name, value.into()));
+                }
+            }
         }
     }
 }

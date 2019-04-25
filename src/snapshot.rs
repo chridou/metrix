@@ -223,15 +223,17 @@ impl ItemKind {
     fn to_json_value(&self, config: &JsonConfig) -> JsonValue {
         match *self {
             ItemKind::Text(ref v) => v.clone().into(),
-            ItemKind::Boolean(v) => if config.make_booleans_ints {
-                if v {
-                    1.into()
+            ItemKind::Boolean(v) => {
+                if config.make_booleans_ints {
+                    if v {
+                        1.into()
+                    } else {
+                        0.into()
+                    }
                 } else {
-                    0.into()
+                    v.into()
                 }
-            } else {
-                v.into()
-            },
+            }
             ItemKind::Float(v) => v.into(),
             ItemKind::UInt(v) => v.into(),
             ItemKind::Int(v) => v.into(),
