@@ -28,9 +28,8 @@ pub struct Gauge {
     name: String,
     title: Option<String>,
     description: Option<String>,
-    value: Option<(u64, u64)>,
-    peak_keep_alive: Option<Duration>,
-    last_peak_at: Instant,
+    value: Option<State>,
+    memorize_extrema: Option<Duration>,
 }
 
 impl Gauge {
@@ -40,44 +39,54 @@ impl Gauge {
             title: None,
             description: None,
             value: None,
-            peak_keep_alive: None,
-            last_peak_at: Instant::now(),
+            memorize_extrema: None,
         }
     }
 
     pub fn set(&mut self, v: u64) {
-        let new_value = if let Some((_, peak)) = self.value.take() {
-            if let Some(peak_dur) = self.peak_keep_alive {
+        if let Some(mut state) = self.value.take() {
+            if let Some(ext_dur) = self.memorize_extrema {
                 let now = Instant::now();
-                if v > peak {
-                    self.last_peak_at = now;
-                    Some((v, v))
-                } else if self.last_peak_at > now - peak_dur {
-                    Some((v, peak))
-                } else {
-                    Some((v, v))
+                if v > state.peak {
+                    state.last_peak_at = now;
+                    state.peak = v;
+                } else if state.last_peak_at < now - ext_dur {
+                    state.peak = v;
                 }
-            } else {
-                Some((v, v))
+
+                if v < state.bottom {
+                    state.last_bottom_at = now;
+                    state.bottom = v;
+                } else if state.last_bottom_at < now - ext_dur {
+                    state.bottom = v;
+                }
             }
+            state.current = v;
         } else {
-            self.last_peak_at = Instant::now();
-            Some((v, v))
-        };
-        self.value = new_value;
+            let now = Instant::now();
+            self.value = Some(State {
+                current: v,
+                peak: v,
+                bottom: v,
+                last_peak_at: now,
+                last_bottom_at: now,
+            });
+        }
     }
 
     pub fn get(&self) -> Option<u64> {
-        self.value.as_ref().map(|v| v.0)
+        self.value.as_ref().map(|v| v.current)
     }
 
-    /// If set to `Some(Duration)` a peak value will
+    /// If set to `Some(Duration)` a peak and bottom values will
     /// be diplayed for the given duration unless there
-    /// is a new peak. The field has the name `[gauge_name]_peak`.
+    /// is a new peak or bottom which will reset the timer.
+    /// The fields has the names `[gauge_name]_peak` and
+    /// `[gauge_name]_bottom`
     ///
-    /// If set to None the peak values will not be shown.
-    pub fn set_peak_keep_alive(&mut self, d: Duration) {
-        self.peak_keep_alive = Some(d)
+    /// If set to None the peak and bottom values will not be shown.
+    pub fn set_memorize_extrema(&mut self, d: Duration) {
+        self.memorize_extrema = Some(d)
     }
 
     /// Gets the name of this `Gauge`
@@ -112,14 +121,20 @@ impl Instrument for Gauge {}
 impl PutsSnapshot for Gauge {
     fn put_snapshot(&self, into: &mut Snapshot, descriptive: bool) {
         util::put_postfixed_descriptives(self, &self.name, into, descriptive);
-        if let Some((value, peak)) = self.value {
-            into.items.push((self.name.clone(), value.into()));
-            if let Some(peak_dur) = self.peak_keep_alive {
+        if let Some(ref state) = self.value {
+            into.items.push((self.name.clone(), state.current.into()));
+            if let Some(ext_dur) = self.memorize_extrema {
                 let peak_name = format!("{}_peak", self.name);
-                if self.last_peak_at > Instant::now() - peak_dur {
-                    into.items.push((peak_name, peak.into()));
+                if state.last_peak_at > Instant::now() - ext_dur {
+                    into.items.push((peak_name, state.peak.into()));
                 } else {
-                    into.items.push((peak_name, value.into()));
+                    into.items.push((peak_name, state.current.into()));
+                }
+                let bottom_name = format!("{}_bottom", self.name);
+                if state.last_bottom_at > Instant::now() - ext_dur {
+                    into.items.push((bottom_name, state.bottom.into()));
+                } else {
+                    into.items.push((bottom_name, state.current.into()));
                 }
             }
         }
@@ -146,4 +161,12 @@ impl Descriptive for Gauge {
     fn description(&self) -> Option<&str> {
         self.description.as_ref().map(|n| &**n)
     }
+}
+
+struct State {
+    current: u64,
+    peak: u64,
+    bottom: u64,
+    last_peak_at: Instant,
+    last_bottom_at: Instant,
 }

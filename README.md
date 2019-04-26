@@ -107,6 +107,8 @@ hierarchy all processors registered with the driver will only
 be driven by that driver.
 
 ## Recent changes:
+* 0.9.6
+    Added peak and bottom tracking to `Gauge`
 * 0.9.5
     Added peak tracking to `Gauge`
 * 0.9.2
