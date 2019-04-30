@@ -107,6 +107,8 @@ hierarchy all processors registered with the driver will only
 be driven by that driver.
 
 ## Recent changes:
+* 0.9.7 use `<=` and `>=` for detecting peaks and bottoms
+    Added peak and bottom tracking to `Gauge`
 * 0.9.6
     Added peak and bottom tracking to `Gauge`
 * 0.9.5

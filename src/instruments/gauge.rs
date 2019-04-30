@@ -47,14 +47,14 @@ impl Gauge {
         if let Some(mut state) = self.value.take() {
             if let Some(ext_dur) = self.memorize_extrema {
                 let now = Instant::now();
-                if v > state.peak {
+                if v >= state.peak {
                     state.last_peak_at = now;
                     state.peak = v;
                 } else if state.last_peak_at < now - ext_dur {
                     state.peak = v;
                 }
 
-                if v < state.bottom {
+                if v <= state.bottom {
                     state.last_bottom_at = now;
                     state.bottom = v;
                 } else if state.last_bottom_at < now - ext_dur {
