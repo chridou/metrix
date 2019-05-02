@@ -62,6 +62,7 @@ impl Gauge {
                 }
             }
             state.current = v;
+            self.value = Some(state);
         } else {
             let now = Instant::now();
             self.value = Some(State {
