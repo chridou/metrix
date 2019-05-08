@@ -1,6 +1,6 @@
 //! Instruments that track values and/or derive values
 //! from observations.
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use self::switches::*;
 use snapshot::{ItemKind, Snapshot};
@@ -183,13 +183,15 @@ pub struct Panel<L> {
     instruments: Vec<Box<Instrument>>,
     snapshooters: Vec<Box<PutsSnapshot>>,
     value_scaling: Option<ValueScaling>,
+    last_update: Instant,
+    max_inactivity_duration: Option<Duration>,
 }
 
 impl<L> Panel<L> {
     /// Create a new `Panel` without a name.
     pub fn new(label: L) -> Panel<L> {
         Panel {
-            label: label,
+            label,
             name: None,
             title: None,
             description: None,
@@ -200,6 +202,8 @@ impl<L> Panel<L> {
             value_scaling: None,
             instruments: Vec::new(),
             snapshooters: Vec::new(),
+            last_update: Instant::now(),
+            max_inactivity_duration: None,
         }
     }
 
@@ -298,12 +302,34 @@ impl<L> Panel<L> {
         self.description = Some(description.into())
     }
 
+    /// Sets the maximum amount of time this panel may be
+    /// inactive until no more snapshots are taken
+    ///
+    /// Default is no inactivity tracking.
+    pub fn set_inactivity_limit(&mut self, limit: Duration) {
+        self.max_inactivity_duration = Some(limit);
+    }
+
     pub fn label(&self) -> &L {
         &self.label
     }
 
     fn put_values_into_snapshot(&self, into: &mut Snapshot, descriptive: bool) {
         util::put_default_descriptives(self, into, descriptive);
+        if let Some(d) = self.max_inactivity_duration {
+            if self.last_update.elapsed() > d {
+                into.items
+                    .push(("_inactive".to_string(), ItemKind::Boolean(true)));
+                into.items
+                    .push(("_active".to_string(), ItemKind::Boolean(false)));
+                return;
+            } else {
+                into.items
+                    .push(("_inactive".to_string(), ItemKind::Boolean(false)));
+                into.items
+                    .push(("_active".to_string(), ItemKind::Boolean(true)));
+            }
+        };
         self.counter
             .as_ref()
             .iter()
@@ -369,6 +395,10 @@ impl<L> Updates for Panel<L> {
         self.instruments
             .iter_mut()
             .for_each(|x| instruments_updated += x.update(&with));
+
+        if instruments_updated != 0 {
+            self.last_update = Instant::now();
+        }
 
         instruments_updated
     }

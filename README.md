@@ -107,6 +107,8 @@ hierarchy all processors registered with the driver will only
 be driven by that driver.
 
 ## Recent changes:
+* 0.9.9
+    * Inactivity tracking for panels
 * 0.9.8
     * Fixed set values for gauges
 * 0.9.7 use `<=` and `>=` for detecting peaks and bottoms

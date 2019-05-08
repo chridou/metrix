@@ -100,7 +100,7 @@ impl Histogram {
                 mean: Some(snapshot.mean()),
                 stddev: Some(snapshot.stddev()),
                 count: snapshot.count(),
-                quantiles: quantiles,
+                quantiles,
             }
         } else {
             HistogramSnapshot::default()
