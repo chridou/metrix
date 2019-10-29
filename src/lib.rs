@@ -222,6 +222,11 @@ pub trait HandlesObservations: PutsSnapshot + Send + 'static {
     fn handle_observation(&mut self, observation: &Observation<Self::Label>) -> usize;
 }
 
+/// Const for setting boolean values. `true` is `1`.
+pub const TRUE: u64 = 1;
+/// Const for setting boolean values. `false` is `0`.
+pub const FALSE: u64 = 0;
+
 /// Transmits telemetry data to the backend.
 ///
 /// Implementors should tranfer `Observations` to
