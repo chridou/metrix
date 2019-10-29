@@ -12,11 +12,11 @@ pub struct Flag {
     name: String,
     title: Option<String>,
     description: Option<String>,
-    state: bool,
+    state: Option<bool>,
 }
 
 impl Flag {
-    pub fn new_with_defaults<T: Into<String>>(name: T, initial_state: bool) -> Self {
+    pub fn new_with_defaults<T: Into<String>>(name: T, initial_state: Option<bool>) -> Self {
         Self {
             name: name.into(),
             title: None,
@@ -52,7 +52,7 @@ impl Flag {
     }
 
     /// Returns the current state
-    pub fn state(&self) -> bool {
+    pub fn state(&self) -> Option<bool> {
         self.state
     }
 }
@@ -63,7 +63,9 @@ impl PutsSnapshot for Flag {
     fn put_snapshot(&self, into: &mut Snapshot, descriptive: bool) {
         util::put_postfixed_descriptives(self, &self.name, into, descriptive);
 
-        into.items.push((self.name.clone(), self.state.into()));
+        if let Some(state) = self.state {
+            into.items.push((self.name.clone(), state.into()));
+        }
     }
 }
 
@@ -72,9 +74,9 @@ impl Updates for Flag {
         match *with {
             Update::ObservationWithValue(value, _) => {
                 if value == 0 {
-                    self.state = false
+                    self.state = Some(false)
                 } else {
-                    self.state = true
+                    self.state = Some(true)
                 }
                 1
             }
