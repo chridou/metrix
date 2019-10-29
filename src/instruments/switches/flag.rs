@@ -13,6 +13,7 @@ pub struct Flag {
     title: Option<String>,
     description: Option<String>,
     state: Option<bool>,
+    inverted_prefix: Option<String>,
 }
 
 impl Flag {
@@ -22,6 +23,7 @@ impl Flag {
             title: None,
             description: None,
             state: initial_state,
+            inverted_prefix: None,
         }
     }
 
@@ -51,6 +53,11 @@ impl Flag {
         self.description = Some(description.into())
     }
 
+    /// Show the inverted value. Name will be prefixed with `prefix`.
+    pub fn show_inverted<T: Into<String>>(&mut self, prefix: T) {
+        self.inverted_prefix = Some(prefix.into())
+    }
+
     /// Returns the current state
     pub fn state(&self) -> Option<bool> {
         self.state
@@ -65,6 +72,10 @@ impl PutsSnapshot for Flag {
 
         if let Some(state) = self.state {
             into.items.push((self.name.clone(), state.into()));
+            if let Some(inverted_prefix) = &self.inverted_prefix {
+                into.items
+                    .push((format!("{}{}", inverted_prefix, self.name), (!state).into()));
+            }
         }
     }
 }
