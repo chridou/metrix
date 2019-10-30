@@ -107,7 +107,9 @@ hierarchy all processors registered with the driver will only
 be driven by that driver.
 
 ## Recent changes:
-* 0.9.11
+* 0.9.13
+    * All instruments that display booleans can show there inverted state
+* 0.9.12
     * Flag can show its inverted value
 * 0.9.11
     * Value of Flag can be `None`
