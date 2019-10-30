@@ -6,14 +6,14 @@ use {Descriptive, PutsSnapshot};
 /// A `Flag` which can have the states `true` or `false`
 ///
 /// The `Flag` reacts on observations with values. A value
-/// of `0` sets the `Flag` to `false`, all other values set the
-/// `Flag` to `true`.
+/// of `0` sets the `Flag` to `false`, '1' will set the
+/// `Flag` to `true`. For all other values the behaviour is undefined.
 pub struct Flag {
     name: String,
     title: Option<String>,
     description: Option<String>,
     state: Option<bool>,
-    inverted_prefix: Option<String>,
+    show_inverted: Option<(String, bool)>,
 }
 
 impl Flag {
@@ -23,7 +23,7 @@ impl Flag {
             title: None,
             description: None,
             state: initial_state,
-            inverted_prefix: None,
+            show_inverted: None,
         }
     }
 
@@ -54,8 +54,19 @@ impl Flag {
     }
 
     /// Show the inverted value. Name will be prefixed with `prefix`.
+    #[deprecated(since = "0.9.12", note = "use 'show_inverted_prefixed'")]
     pub fn show_inverted<T: Into<String>>(&mut self, prefix: T) {
-        self.inverted_prefix = Some(prefix.into())
+        self.show_inverted_prefixed(prefix)
+    }
+
+    /// Show the inverted value. Name will be prefixed with `prefix`.
+    pub fn show_inverted_prefixed<T: Into<String>>(&mut self, prefix: T) {
+        self.show_inverted = Some((prefix.into(), true))
+    }
+
+    /// Show the inverted value. Name will be postfixed with `postfix`.
+    pub fn show_inverted_postfix<T: Into<String>>(&mut self, postfix: T) {
+        self.show_inverted = Some((postfix.into(), false));
     }
 
     /// Returns the current state
@@ -72,9 +83,13 @@ impl PutsSnapshot for Flag {
 
         if let Some(state) = self.state {
             into.items.push((self.name.clone(), state.into()));
-            if let Some(inverted_prefix) = &self.inverted_prefix {
-                into.items
-                    .push((format!("{}{}", inverted_prefix, self.name), (!state).into()));
+            if let Some((inverted_tag, prefixed)) = &self.show_inverted {
+                let label = if *prefixed {
+                    format!("{}{}", inverted_tag, self.name)
+                } else {
+                    format!("{}{}", self.name, inverted_tag)
+                };
+                into.items.push((label, (!state).into()));
             }
         }
     }

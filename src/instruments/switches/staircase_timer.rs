@@ -24,6 +24,7 @@ pub struct StaircaseTimer {
     switch_off_after: Duration,
     invert: bool,
     stay_on_until: Option<Instant>,
+    show_inverted: Option<(String, bool)>,
 }
 
 impl StaircaseTimer {
@@ -35,6 +36,7 @@ impl StaircaseTimer {
             switch_off_after: Duration::from_secs(60),
             invert: false,
             stay_on_until: None,
+            show_inverted: None,
         }
     }
 
@@ -95,6 +97,16 @@ impl StaircaseTimer {
         self.switch_off_after
     }
 
+    /// Show the inverted value. Name will be prefixed with `prefix`.
+    pub fn show_inverted_prefixed<T: Into<String>>(&mut self, prefix: T) {
+        self.show_inverted = Some((prefix.into(), true))
+    }
+
+    /// Show the inverted value. Name will be postfixed with `postfix`.
+    pub fn show_inverted_postfix<T: Into<String>>(&mut self, postfix: T) {
+        self.show_inverted = Some((postfix.into(), false));
+    }
+
     /// Returns the current state
     pub fn state(&self) -> bool {
         let value = if let Some(stay_on_until) = self.stay_on_until {
@@ -118,6 +130,14 @@ impl PutsSnapshot for StaircaseTimer {
         util::put_postfixed_descriptives(self, &self.name, into, descriptive);
 
         into.items.push((self.name.clone(), self.state().into()));
+        if let Some((inverted_tag, prefixed)) = &self.show_inverted {
+            let label = if *prefixed {
+                format!("{}{}", inverted_tag, self.name)
+            } else {
+                format!("{}{}", self.name, inverted_tag)
+            };
+            into.items.push((label, (!self.state()).into()));
+        }
     }
 }
 
