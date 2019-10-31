@@ -101,7 +101,7 @@ impl StaircaseTimer {
 
     /// Show the inverted value. Name will be adjusted with `name_alternation`.
     pub fn show_inverted(&mut self, name_alternation: NameAlternation) {
-        self.show_inverted = Some(name_alternation.into())
+        self.show_inverted = Some(name_alternation)
     }
 
     /// Show the inverted value. Name will be prefixed with `prefix`.

@@ -11,7 +11,7 @@ use super::NameAlternation;
 /// within a given time.
 ///
 /// Can be used for alerting, e.g. if something
-/// bad was observed within a given timeframe.
+/// bad was observed within a given time frame.
 pub struct OccurrenceIndicator {
     name: String,
     title: Option<String>,
@@ -91,7 +91,7 @@ impl OccurrenceIndicator {
 
     /// Show the inverted value. Name will be adjusted with `name_alternation`.
     pub fn show_inverted(&mut self, name_alternation: NameAlternation) {
-        self.show_inverted = Some(name_alternation.into())
+        self.show_inverted = Some(name_alternation)
     }
 
     /// Show the inverted value. Name will be prefixed with `prefix`.

@@ -96,7 +96,7 @@ impl NonOccurrenceIndicator {
 
     /// Show the inverted value. Name will be adjusted with `name_alternation`.
     pub fn show_inverted(&mut self, name_alternation: NameAlternation) {
-        self.show_inverted = Some(name_alternation.into())
+        self.show_inverted = Some(name_alternation)
     }
 
     /// Show the inverted value. Name will be prefixed with `prefix`.
@@ -116,7 +116,8 @@ impl NonOccurrenceIndicator {
 
     /// Returns the current state
     pub fn state(&self) -> bool {
-        let current_state = self.happened_last < Instant::now() - self.if_not_happened_within;
+        let must_have_happened_after = Instant::now() - self.if_not_happened_within;
+        let current_state = self.happened_last > must_have_happened_after;
 
         if self.invert {
             !current_state

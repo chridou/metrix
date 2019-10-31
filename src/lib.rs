@@ -34,7 +34,7 @@
 //!
 //! ### Observations
 //!
-//! An abservation is made somewhere within your application. When an
+//! An observation is made somewhere within your application. When an
 //! observation is sent to the backend it must have a label attached. This label
 //! is then matched against the label of a panel to determine whether an
 //! observation is handled for updating or not.
@@ -60,7 +60,7 @@
 //! ### Cockpit
 //!
 //! A cockpit aggregates multiple `Panel`s. A cockpit can be used to monitor
-//! different tasks/parts of a component or worklflow. A cockpit
+//! different tasks/parts of a component or workflow. A cockpit
 //! is bound to a label type.
 //!
 //! An example can be that you have service component that calls an external
