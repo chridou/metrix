@@ -5,6 +5,8 @@ use snapshot::Snapshot;
 use util;
 use {Descriptive, PutsSnapshot};
 
+use super::NameAlternation;
+
 /// Changes the state based on the occurrence of an observation
 /// within a given time.
 ///
@@ -17,7 +19,7 @@ pub struct OccurrenceIndicator {
     if_happened_within: Duration,
     happened_last: Instant,
     invert: bool,
-    show_inverted: Option<(String, bool)>,
+    show_inverted: Option<NameAlternation>,
 }
 
 impl OccurrenceIndicator {
@@ -87,16 +89,25 @@ impl OccurrenceIndicator {
         self.if_happened_within
     }
 
+    /// Show the inverted value. Name will be adjusted with `name_alternation`.
+    pub fn show_inverted(&mut self, name_alternation: NameAlternation) {
+        self.show_inverted = Some(name_alternation.into())
+    }
+
     /// Show the inverted value. Name will be prefixed with `prefix`.
     pub fn show_inverted_prefixed<T: Into<String>>(&mut self, prefix: T) {
-        self.show_inverted = Some((prefix.into(), true))
+        self.show_inverted(NameAlternation::Prefix(prefix.into()))
     }
 
     /// Show the inverted value. Name will be postfixed with `postfix`.
-    pub fn show_inverted_postfix<T: Into<String>>(&mut self, postfix: T) {
-        self.show_inverted = Some((postfix.into(), false));
+    pub fn show_inverted_postfixed<T: Into<String>>(&mut self, postfix: T) {
+        self.show_inverted(NameAlternation::Postfix(postfix.into()))
     }
 
+    /// Show the inverted value. Name will be renamed with `new_name`.
+    pub fn show_inverted_renamed<T: Into<String>>(&mut self, new_name: T) {
+        self.show_inverted(NameAlternation::Rename(new_name.into()))
+    }
     /// Returns the current state
     pub fn state(&self) -> bool {
         let current_state = self.happened_last + self.if_happened_within >= Instant::now();
@@ -116,13 +127,9 @@ impl PutsSnapshot for OccurrenceIndicator {
         util::put_postfixed_descriptives(self, &self.name, into, descriptive);
 
         into.items.push((self.name.clone(), self.state().into()));
-        if let Some((inverted_tag, prefixed)) = &self.show_inverted {
-            let label = if *prefixed {
-                format!("{}{}", inverted_tag, self.name)
-            } else {
-                format!("{}{}", self.name, inverted_tag)
-            };
-            into.items.push((label, (!self.state()).into()));
+        if let Some(alternation) = &self.show_inverted {
+            let label = alternation.adjust_name(&self.name);
+            into.items.push((label.into(), (!self.state()).into()));
         }
     }
 }
