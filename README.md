@@ -107,6 +107,8 @@ hierarchy all processors registered with the driver will only
 be driven by that driver.
 
 ## Recent changes:
+* 0.9.16
+    * Added an instrument `IncDecGauge` whic can only be increased or decreased
 * 0.9.15
     * Fix bug in NonOccurence tracker which had a logic error
 * 0.9.14

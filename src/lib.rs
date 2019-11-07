@@ -227,9 +227,14 @@ pub const TRUE: u64 = 1;
 /// Const for setting boolean values. `false` is `0`.
 pub const FALSE: u64 = 0;
 
+/// Const for incrementing on instruments with support. `INCR` is `1`.
+pub const INCR: u64 = 1;
+/// Const for decrementing on instruments with support. `DECR` is `0`.
+pub const DECR: u64 = 0;
+
 /// Transmits telemetry data to the backend.
 ///
-/// Implementors should tranfer `Observations` to
+/// Implementors should transfer `Observations` to
 /// a backend and manipulate the instruments there to not
 /// to interfere to much with the actual task being measured/observed
 pub trait TransmitsTelemetryData<L> {
