@@ -3,7 +3,7 @@ use std::time::{Duration, Instant};
 use instruments::{Instrument, Update, Updates};
 use snapshot::Snapshot;
 use util;
-use {Descriptive, PutsSnapshot};
+use {Descriptive, PutsSnapshot, DECR, INCR};
 
 /// Simply returns the value that has been observed last.
 ///
@@ -45,6 +45,13 @@ impl Gauge {
 
     pub fn set(&mut self, v: u64) {
         if let Some(mut state) = self.value.take() {
+            let v = if v == INCR {
+                state.current + 1
+            } else if v == DECR {
+                state.current - 1
+            } else {
+                v as i64
+            };
             if let Some(ext_dur) = self.memorize_extrema {
                 let now = Instant::now();
                 if v >= state.peak {
@@ -64,6 +71,13 @@ impl Gauge {
             state.current = v;
             self.value = Some(state);
         } else {
+            let v = if v == INCR {
+                1
+            } else if v == DECR {
+                -1
+            } else {
+                v as i64
+            };
             let now = Instant::now();
             self.value = Some(State {
                 current: v,
@@ -75,12 +89,12 @@ impl Gauge {
         }
     }
 
-    pub fn get(&self) -> Option<u64> {
+    pub fn get(&self) -> Option<i64> {
         self.value.as_ref().map(|v| v.current)
     }
 
     /// If set to `Some(Duration)` a peak and bottom values will
-    /// be diplayed for the given duration unless there
+    /// be displayed for the given duration unless there
     /// is a new peak or bottom which will reset the timer.
     /// The fields has the names `[gauge_name]_peak` and
     /// `[gauge_name]_bottom`
@@ -165,9 +179,9 @@ impl Descriptive for Gauge {
 }
 
 struct State {
-    current: u64,
-    peak: u64,
-    bottom: u64,
+    current: i64,
+    peak: i64,
+    bottom: i64,
     last_peak_at: Instant,
     last_bottom_at: Instant,
 }

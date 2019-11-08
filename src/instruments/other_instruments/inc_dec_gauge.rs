@@ -5,6 +5,7 @@ use snapshot::Snapshot;
 use util;
 use {Descriptive, PutsSnapshot, DECR, INCR};
 
+#[deprecated(since = "0.9.17", note = "Use Gauge. It also supports INC/DEC")]
 pub struct IncDecGauge {
     name: String,
     title: Option<String>,

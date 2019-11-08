@@ -227,10 +227,10 @@ pub const TRUE: u64 = 1;
 /// Const for setting boolean values. `false` is `0`.
 pub const FALSE: u64 = 0;
 
-/// Const for incrementing on instruments with support. `INCR` is `1`.
-pub const INCR: u64 = 1;
-/// Const for decrementing on instruments with support. `DECR` is `0`.
-pub const DECR: u64 = 0;
+/// Const for incrementing on instruments with support. `INCR` is `std::u64::MAX`.
+pub const INCR: u64 = std::u64::MAX;
+/// Const for decrementing on instruments with support. `DECR` is `std::u64::MAX -1`.
+pub const DECR: u64 = std::u64::MAX - 1;
 
 /// Transmits telemetry data to the backend.
 ///
