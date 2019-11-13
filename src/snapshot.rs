@@ -1,4 +1,6 @@
 //! Pulling data from the backend for monitoring
+use std::fmt;
+
 use json::{stringify, stringify_pretty, JsonValue};
 
 /// A `Snapshot` which contains measured values
@@ -21,12 +23,12 @@ impl Snapshot {
 
     /// Find an item on a path with a given a separator.
     ///
-    /// Same as `find` but with a configurable seperator.
-    pub fn find_with_separator(&self, path: &str, separator: char) -> Option<&ItemKind> {
+    /// Same as `find` but with a configurable separator.
+    pub fn find_with_separator(&self, path: &str, separator: char) -> FindItem {
         let path: Vec<&str> = path.split(separator).filter(|x| !x.is_empty()).collect();
 
         if path.is_empty() {
-            return None;
+            return FindItem::NotFound;
         }
 
         if let Some(item) = self
@@ -37,7 +39,7 @@ impl Snapshot {
         {
             find_item(item, &path[1..])
         } else {
-            None
+            FindItem::NotFound
         }
     }
 
@@ -57,6 +59,7 @@ impl Snapshot {
     ///
     /// ```
     /// use metrix::snapshot::*;
+    /// use metrix::snapshot::FindItem::*;
     ///
     /// // a -> 23
     /// // b -> c -> 42
@@ -72,22 +75,22 @@ impl Snapshot {
     ///     ],
     /// };
     ///
-    /// assert_eq!(snapshot.find("a"), Some(&ItemKind::UInt(23)));
-    /// assert_eq!(snapshot.find("a/x"), Some(&ItemKind::UInt(23)));
-    /// assert_eq!(snapshot.find("/a/x"), Some(&ItemKind::UInt(23)));
+    /// assert_eq!(snapshot.find("a"), Found(&ItemKind::UInt(23)));
+    /// assert_eq!(snapshot.find("a/x"), Found(&ItemKind::UInt(23)));
+    /// assert_eq!(snapshot.find("/a/x"), Found(&ItemKind::UInt(23)));
     ///
-    /// assert_eq!(snapshot.find("b"), Some(&inner));
+    /// assert_eq!(snapshot.find("b"), Found(&inner));
     ///
-    /// assert_eq!(snapshot.find("b/c"), Some(&ItemKind::UInt(42)));
-    /// assert_eq!(snapshot.find("/b//c"), Some(&ItemKind::UInt(42)));
+    /// assert_eq!(snapshot.find("b/c"), Found(&ItemKind::UInt(42)));
+    /// assert_eq!(snapshot.find("/b//c"), Found(&ItemKind::UInt(42)));
     ///
-    /// assert_eq!(snapshot.find("b/c/x"), Some(&ItemKind::UInt(42)));
+    /// assert_eq!(snapshot.find("b/c/x"), Found(&ItemKind::UInt(42)));
     ///
-    /// assert_eq!(snapshot.find(""), None);
+    /// assert_eq!(snapshot.find(""), NotFound);
     ///
-    /// assert_eq!(snapshot.find("/"), None);
+    /// assert_eq!(snapshot.find("/"), NotFound);
     /// ```
-    pub fn find(&self, path: &str) -> Option<&ItemKind> {
+    pub fn find(&self, path: &str) -> FindItem {
         self.find_with_separator(path, '/')
     }
 
@@ -138,6 +141,7 @@ impl Snapshot {
 ///
 /// ```
 /// use metrix::snapshot::*;
+/// use metrix::snapshot::FindItem::*;
 ///
 /// // a -> 23
 /// // b -> c -> 42
@@ -153,36 +157,36 @@ impl Snapshot {
 ///     ],
 /// });
 ///
-/// assert_eq!(find_item(&snapshot, &["a"]), Some(&ItemKind::UInt(23)));
-/// assert_eq!(find_item(&snapshot, &["a", "x"]), Some(&ItemKind::UInt(23)));
+/// assert_eq!(find_item(&snapshot, &["a"]), Found(&ItemKind::UInt(23)));
+/// assert_eq!(find_item(&snapshot, &["a", "x"]), Found(&ItemKind::UInt(23)));
 /// assert_eq!(
 ///     find_item(&snapshot, &["", "a", "x"]),
-///     Some(&ItemKind::UInt(23))
+///     Found(&ItemKind::UInt(23))
 /// );
 ///
-/// assert_eq!(find_item(&snapshot, &["b"]), Some(&inner));
+/// assert_eq!(find_item(&snapshot, &["b"]), Found(&inner));
 ///
-/// assert_eq!(find_item(&snapshot, &["b", "c"]), Some(&ItemKind::UInt(42)));
+/// assert_eq!(find_item(&snapshot, &["b", "c"]), Found(&ItemKind::UInt(42)));
 /// assert_eq!(
 ///     find_item(&snapshot, &["", "b", "", "c"]),
-///     Some(&ItemKind::UInt(42))
+///     Found(&ItemKind::UInt(42))
 /// );
 ///
 /// assert_eq!(
 ///     find_item(&snapshot, &["b", "c", "x"]),
-///     Some(&ItemKind::UInt(42))
+///     Found(&ItemKind::UInt(42))
 /// );
 ///
-/// assert_eq!(find_item::<String>(&snapshot, &[]), Some(&snapshot));
+/// assert_eq!(find_item::<String>(&snapshot, &[]), Found(&snapshot));
 ///
-/// assert_eq!(find_item(&snapshot, &[""]), Some(&snapshot));
+/// assert_eq!(find_item(&snapshot, &[""]), Found(&snapshot));
 /// ```
-pub fn find_item<'a, T>(item: &'a ItemKind, path: &[T]) -> Option<&'a ItemKind>
+pub fn find_item<'a, T>(item: &'a ItemKind, path: &[T]) -> FindItem<'a>
 where
     T: AsRef<str>,
 {
     if path.is_empty() {
-        return Some(item);
+        return FindItem::Found(item);
     };
 
     if path[0].as_ref().is_empty() {
@@ -199,10 +203,36 @@ where
             {
                 find_item(item, &path[1..])
             } else {
-                None
+                FindItem::NotFound
             }
         }
-        ref other => Some(other),
+        ref other => FindItem::Found(other),
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum FindItem<'a> {
+    Found(&'a ItemKind),
+    NotFound,
+}
+
+impl<'a> FindItem<'a> {
+    pub fn opt(&self) -> Option<&ItemKind> {
+        use self::FindItem::*;
+        match self {
+            Found(ref v) => Some(v),
+            NotFound => None,
+        }
+    }
+}
+
+impl<'a> fmt::Display for FindItem<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        use self::FindItem::*;
+        match self {
+            Found(ref v) => write!(f, "{}", v),
+            NotFound => write!(f, "<item not found>"),
+        }
     }
 }
 
@@ -217,6 +247,20 @@ pub enum ItemKind {
     UInt(u64),
     Int(i64),
     Snapshot(Snapshot),
+}
+
+impl fmt::Display for ItemKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        use self::ItemKind::*;
+        match self {
+            Text(ref v) => write!(f, "{}", v),
+            Boolean(v) => write!(f, "{}", v),
+            Float(v) => write!(f, "{}", v),
+            UInt(v) => write!(f, "{}", v),
+            Int(v) => write!(f, "{}", v),
+            Snapshot(ref snapshot) => write!(f, "Snapshot({} items)", snapshot.items.len()),
+        }
+    }
 }
 
 impl ItemKind {
