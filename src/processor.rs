@@ -1,7 +1,7 @@
 //! Transmitting observations and grouping metrics.
 use std::time::{Duration, Instant};
 
-use crossbeam_channel::{self as channel, Receiver};
+use crossbeam_channel::{self as channel, Receiver, TryRecvError};
 
 use cockpit::Cockpit;
 use instruments::Panel;
@@ -335,8 +335,11 @@ where
                     }
                     processed += 1;
                 }
-                Err(err) => {
-                    util::log_error(format!("Failed to process messages: {}", err));
+                Err(TryRecvError::Empty) => {}
+                Err(TryRecvError::Disconnected) => {
+                    util::log_warning(
+                        "Processor failed to receive message. Channel disconnected. Exiting",
+                    );
                     break;
                 }
             };

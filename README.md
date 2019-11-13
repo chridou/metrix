@@ -107,8 +107,10 @@ hierarchy all processors registered with the driver will only
 be driven by that driver.
 
 ## Recent changes:
-* 0.9.21
+* 0.9.22
     * Exit the processor if all drivers are gone
+* 0.9.21
+    * Exit the driver if all drivers are gone
 * 0.9.20
     * Do not log an error if the channel is empty
 * 0.9.18

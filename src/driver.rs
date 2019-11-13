@@ -421,7 +421,9 @@ fn telemetry_loop(
             },
             Err(TryRecvError::Empty) => {}
             Err(TryRecvError::Disconnected) => {
-                util::log_warning("Failed to receive message. Channel disconnected. Exiting");
+                util::log_warning(
+                    "Driver failed to receive message. Channel disconnected. Exiting",
+                );
                 break;
             }
         }
