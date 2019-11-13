@@ -5,7 +5,9 @@ use std::sync::Arc;
 use std::thread;
 use std::time::{Duration, Instant};
 
-use crossbeam_channel::{self, Receiver as CrossbeamReceiver, Sender as CrossbeamSender};
+use crossbeam_channel::{
+    self, Receiver as CrossbeamReceiver, Sender as CrossbeamSender, TryRecvError,
+};
 use futures::future::Future;
 use futures::sync::oneshot;
 
@@ -417,8 +419,9 @@ fn telemetry_loop(
                     }
                 }
             },
-            Err(err) => {
-                util::log_error(format!("Failed to receive message: {}", err));
+            Err(TryRecvError::Empty) => {}
+            Err(TryRecvError::Disconnected) => {
+                util::log_error(format!("Failed to receive message. Channel disconnected"));
             }
         }
 
