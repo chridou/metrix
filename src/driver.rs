@@ -421,7 +421,8 @@ fn telemetry_loop(
             },
             Err(TryRecvError::Empty) => {}
             Err(TryRecvError::Disconnected) => {
-                util::log_error(format!("Failed to receive message. Channel disconnected"));
+                util::log_warning("Failed to receive message. Channel disconnected. Exiting");
+                break;
             }
         }
 
@@ -455,6 +456,8 @@ fn telemetry_loop(
             thread::sleep(Duration::from_millis(10) - elapsed)
         }
     }
+
+    util::log_info("Metrix driver stopped");
 }
 
 fn do_a_run(

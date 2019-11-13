@@ -95,6 +95,16 @@ pub fn log_error<T: fmt::Display>(_message: T) {}
 
 #[cfg(feature = "log")]
 #[inline]
+pub fn log_warning<T: fmt::Display>(message: T) {
+    warn!("{}", message);
+}
+
+#[cfg(not(feature = "log"))]
+#[inline]
+pub fn log_warning<T: fmt::Display>(_message: T) {}
+
+#[cfg(feature = "log")]
+#[inline]
 pub fn log_info<T: fmt::Display>(message: T) {
     info!("{}", message);
 }
