@@ -1,5 +1,6 @@
 //! Pulling data from the backend for monitoring
 use std::fmt;
+use std::time::Duration;
 
 use json::{stringify, stringify_pretty, JsonValue};
 
@@ -224,6 +225,50 @@ impl<'a> FindItem<'a> {
             NotFound => None,
         }
     }
+
+    pub fn to_duration_nanoseconds(&self) -> FindDurationItem {
+        match self {
+            FindItem::Found(ref v) => match v {
+                ItemKind::UInt(v) => FindDurationItem::Duration(Duration::from_nanos(*v)),
+                ItemKind::Int(v) => FindDurationItem::Duration(Duration::from_nanos(*v as u64)),
+                _ => FindDurationItem::NotADuration,
+            },
+            FindItem::NotFound => FindDurationItem::NotFound,
+        }
+    }
+
+    pub fn to_duration_microseconds(&self) -> FindDurationItem {
+        match self {
+            FindItem::Found(ref v) => match v {
+                ItemKind::UInt(v) => FindDurationItem::Duration(Duration::from_micros(*v)),
+                ItemKind::Int(v) => FindDurationItem::Duration(Duration::from_micros(*v as u64)),
+                _ => FindDurationItem::NotADuration,
+            },
+            FindItem::NotFound => FindDurationItem::NotFound,
+        }
+    }
+
+    pub fn to_duration_milliseconds(&self) -> FindDurationItem {
+        match self {
+            FindItem::Found(ref v) => match v {
+                ItemKind::UInt(v) => FindDurationItem::Duration(Duration::from_millis(*v)),
+                ItemKind::Int(v) => FindDurationItem::Duration(Duration::from_millis(*v as u64)),
+                _ => FindDurationItem::NotADuration,
+            },
+            FindItem::NotFound => FindDurationItem::NotFound,
+        }
+    }
+
+    pub fn to_duration_seconds(&self) -> FindDurationItem {
+        match self {
+            FindItem::Found(ref v) => match v {
+                ItemKind::UInt(v) => FindDurationItem::Duration(Duration::from_secs(*v)),
+                ItemKind::Int(v) => FindDurationItem::Duration(Duration::from_secs(*v as u64)),
+                _ => FindDurationItem::NotADuration,
+            },
+            FindItem::NotFound => FindDurationItem::NotFound,
+        }
+    }
 }
 
 impl<'a> fmt::Display for FindItem<'a> {
@@ -232,6 +277,33 @@ impl<'a> fmt::Display for FindItem<'a> {
         match self {
             Found(ref v) => write!(f, "{}", v),
             NotFound => write!(f, "<item not found>"),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FindDurationItem {
+    NotFound,
+    NotADuration,
+    Duration(Duration),
+}
+
+impl FindDurationItem {
+    pub fn opt(self) -> Option<Duration> {
+        match self {
+            FindDurationItem::Duration(d) => Some(d),
+            _ => None,
+        }
+    }
+}
+
+impl fmt::Display for FindDurationItem {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        use self::FindDurationItem::*;
+        match self {
+            Duration(d) => write!(f, "{:?}", d),
+            NotFound => write!(f, "<item not found>"),
+            NotADuration => write!(f, "<item not a duration>"),
         }
     }
 }
@@ -247,20 +319,6 @@ pub enum ItemKind {
     UInt(u64),
     Int(i64),
     Snapshot(Snapshot),
-}
-
-impl fmt::Display for ItemKind {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use self::ItemKind::*;
-        match self {
-            Text(ref v) => write!(f, "{}", v),
-            Boolean(v) => write!(f, "{}", v),
-            Float(v) => write!(f, "{}", v),
-            UInt(v) => write!(f, "{}", v),
-            Int(v) => write!(f, "{}", v),
-            Snapshot(ref snapshot) => write!(f, "Snapshot({} items)", snapshot.items.len()),
-        }
-    }
 }
 
 impl ItemKind {
@@ -282,6 +340,20 @@ impl ItemKind {
             ItemKind::UInt(v) => v.into(),
             ItemKind::Int(v) => v.into(),
             ItemKind::Snapshot(ref snapshot) => snapshot.to_json_value(config),
+        }
+    }
+}
+
+impl fmt::Display for ItemKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        use self::ItemKind::*;
+        match self {
+            Text(ref v) => write!(f, "{}", v),
+            Boolean(v) => write!(f, "{}", v),
+            Float(v) => write!(f, "{}", v),
+            UInt(v) => write!(f, "{}", v),
+            Int(v) => write!(f, "{}", v),
+            Snapshot(ref snapshot) => write!(f, "Snapshot({} items)", snapshot.items.len()),
         }
     }
 }
