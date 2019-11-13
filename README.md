@@ -107,6 +107,8 @@ hierarchy all processors registered with the driver will only
 be driven by that driver.
 
 ## Recent changes:
+* 0.9.20
+    * Do not log an error if the channel is empty
 * 0.9.18
     * Improved find item to implement display on `ItemKind`
 * 0.9.17
