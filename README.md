@@ -107,6 +107,8 @@ hierarchy all processors registered with the driver will only
 be driven by that driver.
 
 ## Recent changes:
+* 0.9.23
+    * `FoundItem` should also have a find method
 * 0.9.22
     * Exit the processor if all drivers are gone
 * 0.9.21

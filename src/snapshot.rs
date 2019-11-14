@@ -226,6 +226,19 @@ impl<'a> FindItem<'a> {
         }
     }
 
+    pub fn find_with_separator(&self, path: &str, separator: char) -> FindItem {
+        match self {
+            FindItem::Found(ItemKind::Snapshot(snapshot)) => {
+                snapshot.find_with_separator(path, separator)
+            }
+            _ => FindItem::NotFound,
+        }
+    }
+
+    pub fn find(&self, path: &str) -> FindItem {
+        self.find_with_separator(path, '/')
+    }
+
     pub fn to_duration_nanoseconds(&self) -> FindDurationItem {
         match self {
             FindItem::Found(ref v) => match v {
