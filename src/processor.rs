@@ -151,6 +151,7 @@ pub struct TelemetryProcessor<L> {
     snapshooters: Vec<Box<PutsSnapshot>>,
     last_activity_at: Instant,
     max_inactivity_duration: Option<Duration>,
+    is_disconnected: bool,
 }
 
 impl<L> TelemetryProcessor<L>
@@ -179,6 +180,7 @@ where
             receiver: rx,
             last_activity_at,
             max_inactivity_duration,
+            is_disconnected: false,
         };
 
         (transmitter, receiver)
@@ -206,6 +208,7 @@ where
             receiver: rx,
             last_activity_at,
             max_inactivity_duration,
+            is_disconnected: false,
         };
 
         (transmitter, receiver)
@@ -294,6 +297,10 @@ where
     L: Clone + Eq + Send + 'static,
 {
     fn process(&mut self, max: usize, strategy: ProcessingStrategy) -> ProcessingOutcome {
+        if self.is_disconnected {
+            return ProcessingOutcome::default();
+        }
+
         let mut num_received = 0;
         let mut processed = 0;
         let mut instruments_updated = 0;
@@ -337,9 +344,16 @@ where
                 }
                 Err(TryRecvError::Empty) => {}
                 Err(TryRecvError::Disconnected) => {
-                    util::log_warning(
-                        "Processor failed to receive message. Channel disconnected. Exiting",
-                    );
+                    let name = self
+                        .name
+                        .as_ref()
+                        .map(|n| &**n)
+                        .unwrap_or_else(|| "<no name>");
+                    util::log_warning(format!(
+                        "Processor '{}' failed to receive message. Channel disconnected. Exiting",
+                        name
+                    ));
+                    self.is_disconnected = true;
                     break;
                 }
             };
