@@ -3,16 +3,15 @@ use std::time::{Duration, Instant};
 
 use metrics::metrics::{Meter as MMeter, StdMeter};
 
-use instruments::{Instrument, Update, Updates};
-
-use snapshot::{ItemKind, Snapshot};
-use util;
-use {Descriptive, PutsSnapshot};
+use crate::instruments::{Instrument, Update, Updates};
+use crate::snapshot::{ItemKind, Snapshot};
+use crate::util;
+use crate::{Descriptive, PutsSnapshot};
 
 /// For measuring rates, e.g. request/s
 ///
-/// This meter count occurences. An occurrence with values is
-/// counted as 1 occurence.
+/// This meter count occurrences. An occurrence with values is
+/// counted as 1 occurrence.
 ///
 /// To get rates on values use `instruments::other_instruments::ValeMeter`
 pub struct Meter {

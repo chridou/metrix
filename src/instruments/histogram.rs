@@ -2,11 +2,10 @@ use std::time::{Duration, Instant};
 
 use exponential_decay_histogram::ExponentialDecayHistogram;
 
-use instruments::{Instrument, Update, Updates};
-use snapshot::{ItemKind, Snapshot};
-use {Descriptive, PutsSnapshot};
-
-use util;
+use crate::instruments::{Instrument, Update, Updates};
+use crate::snapshot::{ItemKind, Snapshot};
+use crate::util;
+use crate::{Descriptive, PutsSnapshot};
 
 /// For tracking values. E.g. request latencies
 pub struct Histogram {

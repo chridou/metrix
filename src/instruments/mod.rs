@@ -3,10 +3,10 @@
 use std::time::{Duration, Instant};
 
 use self::switches::*;
-use snapshot::{ItemKind, Snapshot};
-use util;
-use Observation;
-use {Descriptive, PutsSnapshot};
+use crate::snapshot::{ItemKind, Snapshot};
+use crate::util;
+use crate::Observation;
+use crate::{Descriptive, PutsSnapshot};
 
 pub use self::counter::Counter;
 pub use self::gauge::Gauge;
@@ -180,8 +180,8 @@ pub struct Panel<L> {
     gauge: Option<Gauge>,
     meter: Option<Meter>,
     histogram: Option<Histogram>,
-    instruments: Vec<Box<Instrument>>,
-    snapshooters: Vec<Box<PutsSnapshot>>,
+    instruments: Vec<Box<dyn Instrument>>,
+    snapshooters: Vec<Box<dyn PutsSnapshot>>,
     value_scaling: Option<ValueScaling>,
     last_update: Instant,
     max_inactivity_duration: Option<Duration>,

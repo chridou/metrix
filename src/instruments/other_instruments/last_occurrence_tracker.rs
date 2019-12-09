@@ -1,11 +1,11 @@
 use std::time::Instant;
 
-use instruments::{Instrument, Update, Updates};
-use snapshot::Snapshot;
-use util;
-use {Descriptive, PutsSnapshot};
+use crate::instruments::{Instrument, Update, Updates};
+use crate::snapshot::Snapshot;
+use crate::util;
+use crate::{Descriptive, PutsSnapshot};
 
-/// Tracks how many seconds elapsed since the last occurence
+/// Tracks how many seconds elapsed since the last occurrence
 pub struct LastOccurrenceTracker {
     name: String,
     title: Option<String>,
@@ -27,26 +27,26 @@ impl LastOccurrenceTracker {
         }
     }
 
-    /// Gets the name of this `OccurenceTracker`
+    /// Gets the name of this `LastOccurrenceTracker`
     pub fn name(&self) -> &str {
         &self.name
     }
 
-    /// Set the name if this `OccurenceTracker`.
+    /// Set the name if this `LastOccurrenceTracker`.
     ///
     /// The name is a path segment within a `Snapshot`
     pub fn set_name<T: Into<String>>(&mut self, name: T) {
         self.name = name.into();
     }
 
-    /// Sets the `title` of this `OccurenceTracker`.
+    /// Sets the `title` of this `LastOccurrenceTracker`.
     ///
     /// A title can be part of a descriptive `Snapshot`
     pub fn set_title<T: Into<String>>(&mut self, title: T) {
         self.title = Some(title.into())
     }
 
-    /// Sets the `description` of this `OccurenceTracker`.
+    /// Sets the `description` of this `LastOccurrenceTracker`.
     ///
     /// A description can be part of a descriptive `Snapshot`
     pub fn set_description<T: Into<String>>(&mut self, description: T) {
@@ -72,7 +72,7 @@ impl LastOccurrenceTracker {
     /// be returned will instead be `0`.
     ///
     /// Hint: This instrument will return `None` unless there
-    /// was at least one Occurence recorded.
+    /// was at least one occurrence recorded.
     pub fn set_make_none_zero(&mut self, make_zero: bool) {
         self.make_none_zero = make_zero
     }

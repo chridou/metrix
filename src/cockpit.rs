@@ -1,10 +1,10 @@
 //! Cockpits are used to monitor different aspects of a component
 use std::time::{Duration, Instant};
 
-use instruments::*;
-use snapshot::{ItemKind, Snapshot};
-use util;
-use {HandlesObservations, Observation, PutsSnapshot};
+use crate::instruments::*;
+use crate::snapshot::{ItemKind, Snapshot};
+use crate::util;
+use crate::{HandlesObservations, Observation, PutsSnapshot};
 
 /// A cockpit groups panels.
 ///
@@ -104,8 +104,8 @@ pub struct Cockpit<L> {
     description: Option<String>,
     panels: Vec<Panel<L>>,
     value_scaling: Option<ValueScaling>,
-    handlers: Vec<Box<HandlesObservations<Label = L>>>,
-    snapshooters: Vec<Box<PutsSnapshot>>,
+    handlers: Vec<Box<dyn HandlesObservations<Label = L>>>,
+    snapshooters: Vec<Box<dyn PutsSnapshot>>,
     last_activity_at: Instant,
     max_inactivity_duration: Option<Duration>,
 }
@@ -226,7 +226,7 @@ where
     }
 
     /// Returns all the handlers.
-    pub fn handlers(&self) -> Vec<&HandlesObservations<Label = L>> {
+    pub fn handlers(&self) -> Vec<&dyn HandlesObservations<Label = L>> {
         self.handlers.iter().map(|h| &**h).collect()
     }
 
@@ -239,7 +239,7 @@ where
     }
 
     /// Returns all snapshooters.
-    pub fn snapshooters(&self) -> Vec<&PutsSnapshot> {
+    pub fn snapshooters(&self) -> Vec<&dyn PutsSnapshot> {
         self.snapshooters.iter().map(|p| &**p).collect()
     }
 
@@ -342,7 +342,7 @@ where
     }
 }
 
-impl<L> ::Descriptive for Cockpit<L> {
+impl<L> crate::Descriptive for Cockpit<L> {
     fn title(&self) -> Option<&str> {
         self.title.as_ref().map(|n| &**n)
     }

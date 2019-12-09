@@ -11,14 +11,14 @@ use crossbeam_channel::{
 use futures::future::Future;
 use futures::sync::oneshot;
 
-use instruments::switches::*;
-use instruments::*;
-use processor::{
+use crate::instruments::switches::*;
+use crate::instruments::*;
+use crate::processor::{
     AggregatesProcessors, ProcessesTelemetryMessages, ProcessingOutcome, ProcessingStrategy,
 };
-use snapshot::{ItemKind, Snapshot};
-use util;
-use {Descriptive, PutsSnapshot};
+use crate::snapshot::{ItemKind, Snapshot};
+use crate::util;
+use crate::{Descriptive, PutsSnapshot};
 
 /// A Builder for a `TelemetryDriver`
 pub struct DriverBuilder {
@@ -242,7 +242,7 @@ impl TelemetryDriver {
         let _ = self
             .sender
             .send(DriverMessage::GetSnapshotSync(snapshot, tx, descriptive));
-        rx.recv().map_err(|err| GetSnapshotError)
+        rx.recv().map_err(|_err| GetSnapshotError)
     }
 
     pub fn snapshot_async(
@@ -266,7 +266,7 @@ impl ::std::error::Error for GetSnapshotError {
         "Could not create a snapshot"
     }
 
-    fn cause(&self) -> Option<&::std::error::Error> {
+    fn cause(&self) -> Option<&dyn ::std::error::Error> {
         None
     }
 }

@@ -3,12 +3,14 @@ use std::time::{Duration, Instant};
 
 use crossbeam_channel::{self as channel, Receiver, TryRecvError};
 
-use cockpit::Cockpit;
-use instruments::Panel;
-use snapshot::{ItemKind, Snapshot};
-use util;
-use Descriptive;
-use {HandlesObservations, Observation, ObservationLike, PutsSnapshot, TelemetryTransmitter};
+use crate::cockpit::Cockpit;
+use crate::instruments::Panel;
+use crate::snapshot::{ItemKind, Snapshot};
+use crate::util;
+use crate::Descriptive;
+use crate::{
+    HandlesObservations, Observation, ObservationLike, PutsSnapshot, TelemetryTransmitter,
+};
 
 /// Implementors can group everything that can process
 /// `TelemetryMessage`s.
@@ -28,8 +30,8 @@ pub(crate) enum TelemetryMessage<L> {
     Observation(Observation<L>),
     /// A `Cockpit` should be added
     AddCockpit(Cockpit<L>),
-    /// An arbritrary `HandlesObservations` should be added
-    AddHandler(Box<HandlesObservations<Label = L>>),
+    /// An arbitrary `HandlesObservations` should be added
+    AddHandler(Box<dyn HandlesObservations<Label = L>>),
     /// Adds a panel to a cockpit with the given name
     ///
     /// This means the cockpit must have a name set.
@@ -146,9 +148,9 @@ pub struct TelemetryProcessor<L> {
     title: Option<String>,
     description: Option<String>,
     cockpits: Vec<Cockpit<L>>,
-    handlers: Vec<Box<HandlesObservations<Label = L>>>,
+    handlers: Vec<Box<dyn HandlesObservations<Label = L>>>,
     receiver: Receiver<TelemetryMessage<L>>,
-    snapshooters: Vec<Box<PutsSnapshot>>,
+    snapshooters: Vec<Box<dyn PutsSnapshot>>,
     last_activity_at: Instant,
     max_inactivity_duration: Option<Duration>,
     is_disconnected: bool,
@@ -225,12 +227,12 @@ where
     }
 
     /// Add a (custom) handler for `Observation`s.
-    pub fn add_handler(&mut self, handler: Box<HandlesObservations<Label = L>>) {
+    pub fn add_handler(&mut self, handler: Box<dyn HandlesObservations<Label = L>>) {
         self.handlers.push(handler);
     }
 
     /// Returns all the handlers
-    pub fn handlers(&self) -> Vec<&HandlesObservations<Label = L>> {
+    pub fn handlers(&self) -> Vec<&dyn HandlesObservations<Label = L>> {
         self.handlers.iter().map(|h| &**h).collect()
     }
 
@@ -241,7 +243,7 @@ where
         self.snapshooters.push(Box::new(snapshooter));
     }
 
-    pub fn snapshooters(&self) -> Vec<&PutsSnapshot> {
+    pub fn snapshooters(&self) -> Vec<&dyn PutsSnapshot> {
         self.snapshooters.iter().map(|p| &**p).collect()
     }
 
@@ -405,8 +407,8 @@ pub struct ProcessorMount {
     name: Option<String>,
     title: Option<String>,
     description: Option<String>,
-    processors: Vec<Box<ProcessesTelemetryMessages>>,
-    snapshooters: Vec<Box<PutsSnapshot>>,
+    processors: Vec<Box<dyn ProcessesTelemetryMessages>>,
+    snapshooters: Vec<Box<dyn PutsSnapshot>>,
     last_activity_at: Instant,
     max_inactivity_duration: Option<Duration>,
 }
@@ -440,12 +442,12 @@ impl ProcessorMount {
     }
 
     /// Returns the processors in this `ProcessorMount`
-    pub fn processors(&self) -> Vec<&ProcessesTelemetryMessages> {
+    pub fn processors(&self) -> Vec<&dyn ProcessesTelemetryMessages> {
         self.processors.iter().map(|p| &**p).collect()
     }
 
     /// Returns the snapshooters of this `ProcessorMount`
-    pub fn snapshooters(&self) -> Vec<&PutsSnapshot> {
+    pub fn snapshooters(&self) -> Vec<&dyn PutsSnapshot> {
         self.snapshooters.iter().map(|s| &**s).collect()
     }
 

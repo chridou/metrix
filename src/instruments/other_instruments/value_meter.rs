@@ -3,12 +3,10 @@ use std::time::{Duration, Instant};
 
 use metrics::metrics::{Meter as MMeter, StdMeter};
 
-use instruments::meter::{MeterRate, MeterSnapshot};
-use instruments::{Instrument, Update, Updates};
-
-use snapshot::{ItemKind, Snapshot};
-use util;
-use {Descriptive, PutsSnapshot};
+use crate::instruments::meter::{MeterRate, MeterSnapshot};
+use crate::instruments::{Instrument, Update, Updates};
+use crate::snapshot::Snapshot;
+use crate::{Descriptive, PutsSnapshot};
 
 /// A meter that is ticked by values instead of observations
 pub struct ValueMeter {

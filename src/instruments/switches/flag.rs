@@ -1,7 +1,7 @@
-use instruments::{Instrument, Update, Updates};
-use snapshot::Snapshot;
-use util;
-use {Descriptive, PutsSnapshot};
+use crate::instruments::{Instrument, Update, Updates};
+use crate::snapshot::Snapshot;
+use crate::util;
+use crate::{Descriptive, PutsSnapshot};
 
 use super::NameAlternation;
 
@@ -57,7 +57,7 @@ impl Flag {
 
     /// Show the inverted value. Name will be adjusted with `name_alternation`.
     pub fn show_inverted(&mut self, name_alternation: NameAlternation) {
-        self.show_inverted = Some(name_alternation.into())
+        self.show_inverted = Some(name_alternation)
     }
 
     /// Show the inverted value. Name will be prefixed with `prefix`.

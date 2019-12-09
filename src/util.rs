@@ -1,10 +1,10 @@
 use std::fmt;
 
-use snapshot::{ItemKind, Snapshot};
-use Descriptive;
+use crate::snapshot::{ItemKind, Snapshot};
+use crate::Descriptive;
 
-const TITLE_FIELD_LABEL: &'static str = "_title";
-const DESCRIPTION_FIELD_LABEL: &'static str = "_description";
+const TITLE_FIELD_LABEL: &str = "_title";
+const DESCRIPTION_FIELD_LABEL: &str = "_description";
 
 pub fn put_default_descriptives<T>(what: &T, into: &mut Snapshot, add_descriptive_parts: bool)
 where

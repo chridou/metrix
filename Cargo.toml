@@ -9,6 +9,7 @@ license = "Apache-2.0/MIT"
 name = "metrix"
 readme = "README.md"
 repository = "https://github.com/chridou/metrix"
+edition="2018"
 
 [badges]
 [badges.travis-ci]

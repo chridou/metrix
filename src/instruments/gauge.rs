@@ -1,9 +1,9 @@
 use std::time::{Duration, Instant};
 
-use instruments::{Instrument, Update, Updates};
-use snapshot::Snapshot;
-use util;
-use {Descriptive, PutsSnapshot, DECR, INCR};
+use crate::instruments::{Instrument, Update, Updates};
+use crate::snapshot::Snapshot;
+use crate::util;
+use crate::{Descriptive, PutsSnapshot, DECR, INCR};
 
 /// Simply returns the value that has been observed last.
 ///

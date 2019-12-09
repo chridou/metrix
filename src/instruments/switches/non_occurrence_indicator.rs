@@ -1,18 +1,18 @@
 use std::time::{Duration, Instant};
 
-use instruments::{Instrument, Update, Updates};
-use snapshot::Snapshot;
-use util;
-use {Descriptive, PutsSnapshot};
+use crate::instruments::{Instrument, Update, Updates};
+use crate::snapshot::Snapshot;
+use crate::util;
+use crate::{Descriptive, PutsSnapshot};
 
 use super::NameAlternation;
 
-/// Changes the state based on the abscence of
+/// Changes the state based on the absence of
 /// an observation
 /// within a given time.
 ///
 /// Can be used for alerting, e.g. if something
-/// expected was not observed within a given timeframe.
+/// expected was not observed within a given time-frame.
 ///
 /// Note:
 /// The first occurrence will be when this instrument is

@@ -1,8 +1,7 @@
-use instruments::{Instrument, Update, Updates};
-
-use snapshot::Snapshot;
-use util;
-use {Descriptive, PutsSnapshot};
+use crate::instruments::{Instrument, Update, Updates};
+use crate::snapshot::Snapshot;
+use crate::util;
+use crate::{Descriptive, PutsSnapshot};
 
 /// A simple ever increasing counter
 ///

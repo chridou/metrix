@@ -1,10 +1,10 @@
 use std::time::{Duration, Instant};
 
-use instruments::meter::{MeterRate, MeterSnapshot};
-use instruments::{BorrowedLabelAndUpdate, Instrument, Meter, Update, Updates};
-use snapshot::{ItemKind, Snapshot};
-use util;
-use {Descriptive, HandlesObservations, Observation, PutsSnapshot};
+use crate::instruments::meter::{MeterRate, MeterSnapshot};
+use crate::instruments::{BorrowedLabelAndUpdate, Instrument, Meter, Update, Updates};
+use crate::snapshot::{ItemKind, Snapshot};
+use crate::util;
+use crate::{Descriptive, HandlesObservations, Observation, PutsSnapshot};
 
 pub struct MultiMeter<L> {
     name: String,
