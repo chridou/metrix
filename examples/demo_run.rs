@@ -75,6 +75,9 @@ fn create_foo_metrics() -> (TelemetryTransmitterSync<FooLabel>, ProcessorMount) 
     polled_instrument.set_description("A counter that is increased when a snapshot is polled");
     foo_b_panel.add_snapshooter(polled_instrument);
 
+    let staircase_timer = StaircaseTimer::new("staircase");
+    foo_b_panel.add_instrument(staircase_timer);
+
     let mut cockpit = Cockpit::new("foo_cockpit");
     cockpit.add_panel(foo_a_panel);
     cockpit.add_panel(foo_b_panel);
