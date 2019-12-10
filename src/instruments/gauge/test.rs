@@ -156,6 +156,27 @@ fn non_empty_gauge_updates_with_duration() {
 }
 
 #[test]
+fn gauge_for_all_labels() {
+    let mut gauge_adapter = Gauge::new("").for_all_labels();
+    assert_eq!(gauge_adapter.gauge().get(), None);
+
+    gauge_adapter.handle_observation(&Observation::observed_one_value_now(1, Increment));
+    assert_eq!(gauge_adapter.gauge().get(), Some(1));
+
+    gauge_adapter.handle_observation(&Observation::observed_one_value_now(2, Decrement));
+    assert_eq!(gauge_adapter.gauge().get(), Some(0));
+
+    gauge_adapter.handle_observation(&Observation::observed_one_value_now(3, 10));
+    assert_eq!(gauge_adapter.gauge().get(), Some(10));
+
+    gauge_adapter.handle_observation(&Observation::observed_one_value_now(
+        4,
+        (1, TimeUnit::Milliseconds),
+    ));
+    assert_eq!(gauge_adapter.gauge().get(), Some(1_000));
+}
+
+#[test]
 fn gauge_for_label_label_exists() {
     let mut gauge_adapter = Gauge::new("").for_label(1);
     assert_eq!(gauge_adapter.gauge().get(), None);
@@ -164,6 +185,9 @@ fn gauge_for_label_label_exists() {
     assert_eq!(gauge_adapter.gauge().get(), Some(1));
 
     gauge_adapter.handle_observation(&Observation::observed_one_value_now(1, Decrement));
+    assert_eq!(gauge_adapter.gauge().get(), Some(0));
+
+    gauge_adapter.handle_observation(&Observation::observed_one_value_now(0, Decrement));
     assert_eq!(gauge_adapter.gauge().get(), Some(0));
 
     gauge_adapter.handle_observation(&Observation::observed_one_value_now(1, 10));
@@ -207,9 +231,9 @@ fn gauge_for_labels() {
 
     gauge_adapter.handle_observation(&Observation::observed_one_value_now(
         "c",
-        (1, TimeUnit::Milliseconds),
+        (1, TimeUnit::Seconds),
     ));
-    assert_eq!(gauge_adapter.gauge().get(), Some(1_000));
+    assert_eq!(gauge_adapter.gauge().get(), Some(1_000_000));
 }
 
 #[test]
