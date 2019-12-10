@@ -68,7 +68,7 @@ pub struct Panel<L> {
 
 impl<L> Panel<L>
 where
-    L: Clone + Eq + Send + 'static,
+    L: Eq + Send + 'static,
 {
     /// Create a new `Panel` without a name which dispatches observations
     /// with the given label
@@ -311,7 +311,7 @@ where
 
 impl<L> PutsSnapshot for Panel<L>
 where
-    L: Clone + Eq + Send + 'static,
+    L: Eq + Send + 'static,
 {
     fn put_snapshot(&self, into: &mut Snapshot, descriptive: bool) {
         if let Some(ref name) = self.name {
@@ -327,7 +327,7 @@ where
 
 impl<L> HandlesObservations for Panel<L>
 where
-    L: Clone + Eq + Send + 'static,
+    L: Eq + Send + 'static,
 {
     type Label = L;
 

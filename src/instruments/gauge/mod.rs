@@ -425,7 +425,7 @@ where
 
 impl<L> HandlesObservations for GaugeAdapter<L>
 where
-    L: Clone + Eq + Send + 'static,
+    L: Eq + Send + 'static,
 {
     type Label = L;
 
@@ -473,7 +473,7 @@ where
 
 impl<L> Updates for GaugeAdapter<L>
 where
-    L: Clone + Eq + Send + 'static,
+    L: Eq + Send + 'static,
 {
     fn update(&mut self, with: &Update) -> usize {
         self.gauge.update(with)

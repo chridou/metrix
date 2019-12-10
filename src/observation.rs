@@ -21,7 +21,7 @@ impl Default for TimeUnit {
 /// E.g. a `Meter` does not take the `value` of
 /// an `Observation::ObservedOneValue` into account but
 /// simply counts the observation as one occurrence.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug)]
 pub enum Observation<L> {
     /// Observed many occurrences with no value at the given timestamp
     Observed {
@@ -241,10 +241,7 @@ impl ObservedValue {
     }
 }
 
-impl<L> Observation<L>
-where
-    L: Clone,
-{
+impl<L> Observation<L> {
     /// Extracts the label `L` from an observation.
     pub fn label(&self) -> &L {
         match *self {

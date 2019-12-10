@@ -63,7 +63,7 @@ where
 
 impl<L, I> HandlesObservations for InstrumentAdapter<L, I>
 where
-    L: Clone + Eq + Send + 'static,
+    L: Eq + Send + 'static,
     I: Instrument,
 {
     type Label = L;

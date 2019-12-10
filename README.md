@@ -107,6 +107,8 @@ hierarchy all processors registered with the driver will only
 be driven by that driver.
 
 ## Recent changes:
+* 0.10.1
+    * Removed some unnecessary `Clone` bounds
 * 0.10.0 **Breaking Changes
     * Builder like API for instruments and panels
     * Instruments can handle observations via adapter
