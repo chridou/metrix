@@ -107,8 +107,10 @@ hierarchy all processors registered with the driver will only
 be driven by that driver.
 
 ## Recent changes:
-* 0.10.3
-    * ValueMeter can display measured time
+* 0.10.5
+    * Adapters shouldn't be instruments
+* 0.10.4
+    * Fix bug in Gauge which prevents updates
 * 0.10.2
     * Gauge can display measured time
 * 0.10.1
