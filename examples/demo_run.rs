@@ -185,7 +185,7 @@ fn main() {
         let bar_transmitter = bar_transmitter.clone();
 
         thread::spawn(move || {
-            for n in 0..5_000_000 {
+            for n in 0..5_000_000u64 {
                 foo_transmitter.observed_one_value(FooLabel::B, n, Instant::now());
                 bar_transmitter.observed_one_value(BarLabel::B, n * n, Instant::now());
             }
@@ -214,7 +214,7 @@ fn main() {
     println!(
         "Sending observations took {:?}. Sleeping 1 secs to collect remaining data. \
          Depending on your machine you might see that not all metrics have a count \
-         of 5 million obseravtions.",
+         of 5 million observations.",
         start.elapsed()
     );
 
@@ -223,7 +223,7 @@ fn main() {
     println!("\n\n\n=======================\n\n");
 
     println!(
-        "Get snapshot. If it still blocks here there are still many messges to be processed..."
+        "Get snapshot. If it still blocks here there are still many messages to be processed..."
     );
 
     println!("\n\n\n=======================\n\n");

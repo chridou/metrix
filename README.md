@@ -107,6 +107,14 @@ hierarchy all processors registered with the driver will only
 be driven by that driver.
 
 ## Recent changes:
+* 0.10.0 **Breaking Changes
+    * Builder like API for instruments and panels
+    * Instruments can handle observations via adapter
+    * Instruments and panels can accept multiple labels
+    * Gauge has different strategies for updating values
+    * `ValueScaling` removed. Instruments have a `TimeUnit` for displaying values
+    * Observations have typed values in an enum `ObservedValue`
+    * Deprecated magic values `INCR`, `DECR`, `TRUE`, `FALSE`. There are variants for these observation now.
 * 0.9.24
     * Processers check whether they are disconnected
 * 0.9.23
