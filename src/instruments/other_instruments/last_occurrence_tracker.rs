@@ -1,6 +1,6 @@
 use std::time::Instant;
 
-use crate::instruments::{Instrument, Update, Updates};
+use crate::instruments::{Instrument, InstrumentAdapter, Update, Updates};
 use crate::snapshot::Snapshot;
 use crate::util;
 use crate::{Descriptive, PutsSnapshot};
@@ -16,7 +16,7 @@ pub struct LastOccurrenceTracker {
 }
 
 impl LastOccurrenceTracker {
-    pub fn new_with_defaults<T: Into<String>>(name: T) -> LastOccurrenceTracker {
+    pub fn new<T: Into<String>>(name: T) -> LastOccurrenceTracker {
         LastOccurrenceTracker {
             name: name.into(),
             title: None,
@@ -27,45 +27,67 @@ impl LastOccurrenceTracker {
         }
     }
 
-    /// Gets the name of this `LastOccurrenceTracker`
-    pub fn name(&self) -> &str {
+    pub fn new_with_defaults<T: Into<String>>(name: T) -> LastOccurrenceTracker {
+        Self::new(name)
+    }
+
+    pub fn get_name(&self) -> &str {
         &self.name
     }
 
-    /// Set the name if this `LastOccurrenceTracker`.
-    ///
-    /// The name is a path segment within a `Snapshot`
     pub fn set_name<T: Into<String>>(&mut self, name: T) {
         self.name = name.into();
     }
 
-    /// Sets the `title` of this `LastOccurrenceTracker`.
-    ///
-    /// A title can be part of a descriptive `Snapshot`
+    pub fn name<T: Into<String>>(mut self, name: T) -> Self {
+        self.set_name(name);
+        self
+    }
+
     pub fn set_title<T: Into<String>>(&mut self, title: T) {
         self.title = Some(title.into())
     }
 
-    /// Sets the `description` of this `LastOccurrenceTracker`.
-    ///
-    /// A description can be part of a descriptive `Snapshot`
+    pub fn title<T: Into<String>>(mut self, title: T) -> Self {
+        self.set_title(title);
+        self
+    }
+
     pub fn set_description<T: Into<String>>(&mut self, description: T) {
         self.description = Some(description.into())
     }
 
-    /// Set whether the current value should be inverted in a snapshot or
-    /// not
+    pub fn description<T: Into<String>>(mut self, description: T) -> Self {
+        self.set_description(description);
+        self
+    }
+
+    /// Set whether the current value should be inverted in a snapshot or not
     ///
     /// Default is `false`
-    pub fn set_invert(&mut self, invert: bool) {
+    pub fn set_invert_enabled(&mut self, invert: bool) {
         self.invert = invert
+    }
+
+    /// Set whether the current value should be inverted in a snapshot or not
+    ///
+    /// Default is `false`
+    pub fn invert_enabled(mut self, invert: bool) -> Self {
+        self.set_invert_enabled(invert);
+        self
     }
 
     /// The current value should be inverted in a snapshot
     ///
     /// Same as `self.set_invert(true);`
-    pub fn enable_invert(&mut self) {
-        self.invert = true
+    pub fn inverted(mut self) -> Self {
+        self.set_invert_enabled(true);
+        self
+    }
+
+    /// return whether invert is on or off
+    pub fn is_inverted(&self) -> bool {
+        self.invert
     }
 
     /// If set to `true` possible `None`s that would
@@ -77,13 +99,48 @@ impl LastOccurrenceTracker {
         self.make_none_zero = make_zero
     }
 
+    /// If set to `true` possible `None`s that would
+    /// be returned will instead be `0`.
+    ///
+    /// Hint: This instrument will return `None` unless there
+    /// was at least one occurrence recorded.
+    pub fn make_none_zero(mut self, make_zero: bool) -> Self {
+        self.set_make_none_zero(make_zero);
+        self
+    }
+
     /// return whether `make_none_zero` is on or off
-    pub fn make_none_zero(&self) -> bool {
+    pub fn get_make_none_zero(&self) -> bool {
         self.make_none_zero
     }
 
-    /// Returns the current state
-    pub fn elapsed_since_last_occurrence(&self) -> Option<u64> {
+    /// Creates an `InstrumentAdapter` that makes this instrument
+    /// react on observations on the given label.
+    pub fn for_label<L: Eq>(self, label: L) -> InstrumentAdapter<L, Self> {
+        InstrumentAdapter::for_label(label, self)
+    }
+
+    /// Creates an `InstrumentAdapter` that makes this instrument
+    /// react on observations with the given labels.
+    ///
+    /// If `labels` is empty the instrument will not react to any observations
+    pub fn for_labels<L: Eq>(self, labels: Vec<L>) -> InstrumentAdapter<L, Self> {
+        InstrumentAdapter::for_labels(labels, self)
+    }
+
+    /// Creates an `InstrumentAdapter` that makes this instrument react on
+    /// all observations.
+    pub fn for_all_labels<L: Eq>(self) -> InstrumentAdapter<L, Self> {
+        InstrumentAdapter::new(self)
+    }
+
+    /// Creates an `InstrumentAdapter` that makes this instrument to no
+    /// observations.
+    pub fn adapter<L: Eq>(self) -> InstrumentAdapter<L, Self> {
+        InstrumentAdapter::deaf(self)
+    }
+
+    fn elapsed_since_last_occurrence(&self) -> Option<u64> {
         self.happened_last
             .map(|last| (Instant::now() - last).as_secs())
     }
@@ -98,7 +155,7 @@ impl PutsSnapshot for LastOccurrenceTracker {
         if let Some(v) = self.elapsed_since_last_occurrence() {
             into.items.push((self.name.clone(), v.into()));
         } else {
-            if self.make_none_zero() {
+            if self.get_make_none_zero() {
                 into.items.push((self.name.clone(), 0.into()));
             }
         }

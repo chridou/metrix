@@ -1,7 +1,7 @@
-use crate::instruments::{Instrument, Update, Updates};
+use crate::instruments::{Instrument, InstrumentAdapter, Update, Updates};
 use crate::snapshot::Snapshot;
 use crate::util;
-use crate::{Descriptive, PutsSnapshot};
+use crate::{Descriptive, ObservedValue, PutsSnapshot};
 
 use super::NameAlternation;
 
@@ -19,64 +19,128 @@ pub struct Flag {
 }
 
 impl Flag {
-    pub fn new_with_defaults<T: Into<String>>(name: T, initial_state: Option<bool>) -> Self {
+    pub fn new<T: Into<String>>(name: T) -> Self {
         Self {
             name: name.into(),
             title: None,
             description: None,
-            state: initial_state,
+            state: None,
             show_inverted: None,
         }
     }
 
-    /// Gets the name of this `Flag`
-    pub fn name(&self) -> &str {
+    pub fn new_with_state<T: Into<String>>(name: T, initial_state: bool) -> Self {
+        Self::new(name).state(initial_state)
+    }
+
+    pub fn get_name(&self) -> &str {
         &self.name
     }
 
-    /// Set the name if this `Flag`.
-    ///
-    /// The name is a path segment within a `Snapshot`
     pub fn set_name<T: Into<String>>(&mut self, name: T) {
         self.name = name.into();
     }
 
-    /// Sets the `title` of this `Flag`.
-    ///
-    /// A title can be part of a descriptive `Snapshot`
+    pub fn name<T: Into<String>>(mut self, name: T) -> Self {
+        self.set_name(name);
+        self
+    }
+
     pub fn set_title<T: Into<String>>(&mut self, title: T) {
         self.title = Some(title.into())
     }
 
-    /// Sets the `description` of this `Flag`.
-    ///
-    /// A description can be part of a descriptive `Snapshot`
+    pub fn title<T: Into<String>>(mut self, title: T) -> Self {
+        self.set_title(title);
+        self
+    }
+
     pub fn set_description<T: Into<String>>(&mut self, description: T) {
         self.description = Some(description.into())
     }
 
+    pub fn description<T: Into<String>>(mut self, description: T) -> Self {
+        self.set_description(description);
+        self
+    }
+
+    pub fn state(mut self, initial_state: bool) -> Self {
+        self.state = Some(initial_state);
+        self
+    }
+
     /// Show the inverted value. Name will be adjusted with `name_alternation`.
-    pub fn show_inverted(&mut self, name_alternation: NameAlternation) {
+    pub fn set_show_inverted(&mut self, name_alternation: NameAlternation) {
         self.show_inverted = Some(name_alternation)
     }
 
+    /// Show the inverted value. Name will be adjusted with `name_alternation`.
+    pub fn show_inverted(mut self, name_alternation: NameAlternation) -> Self {
+        self.set_show_inverted(name_alternation);
+        self
+    }
+
     /// Show the inverted value. Name will be prefixed with `prefix`.
-    pub fn show_inverted_prefixed<T: Into<String>>(&mut self, prefix: T) {
-        self.show_inverted(NameAlternation::Prefix(prefix.into()))
+    pub fn set_show_inverted_prefixed<T: Into<String>>(&mut self, prefix: T) {
+        self.set_show_inverted(NameAlternation::Prefix(prefix.into()))
+    }
+
+    /// Show the inverted value. Name will be prefixed with `prefix`.
+    pub fn show_inverted_prefixed<T: Into<String>>(mut self, prefix: T) -> Self {
+        self.set_show_inverted(NameAlternation::Prefix(prefix.into()));
+        self
     }
 
     /// Show the inverted value. Name will be postfixed with `postfix`.
-    pub fn show_inverted_postfixed<T: Into<String>>(&mut self, postfix: T) {
-        self.show_inverted(NameAlternation::Postfix(postfix.into()))
+    pub fn set_show_inverted_postfixed<T: Into<String>>(&mut self, postfix: T) {
+        self.set_show_inverted(NameAlternation::Postfix(postfix.into()))
+    }
+
+    /// Show the inverted value. Name will be postfixed with `postfix`.
+    pub fn show_inverted_postfixed<T: Into<String>>(mut self, postfix: T) -> Self {
+        self.set_show_inverted(NameAlternation::Postfix(postfix.into()));
+        self
     }
 
     /// Show the inverted value. Name will be renamed with `new_name`.
-    pub fn show_inverted_renamed<T: Into<String>>(&mut self, new_name: T) {
-        self.show_inverted(NameAlternation::Rename(new_name.into()))
+    pub fn set_show_inverted_renamed<T: Into<String>>(&mut self, new_name: T) {
+        self.set_show_inverted(NameAlternation::Rename(new_name.into()))
+    }
+
+    /// Show the inverted value. Name will be renamed with `new_name`.
+    pub fn show_inverted_renamed<T: Into<String>>(mut self, new_name: T) -> Self {
+        self.set_show_inverted(NameAlternation::Rename(new_name.into()));
+        self
+    }
+
+    /// Creates an `InstrumentAdapter` that makes this instrument
+    /// react on observations on the given label.
+    pub fn for_label<L: Eq>(self, label: L) -> InstrumentAdapter<L, Self> {
+        InstrumentAdapter::for_label(label, self)
+    }
+
+    /// Creates an `InstrumentAdapter` that makes this instrument
+    /// react on observations with the given labels.
+    ///
+    /// If `labels` is empty the instrument will not react to any observations
+    pub fn for_labels<L: Eq>(self, labels: Vec<L>) -> InstrumentAdapter<L, Self> {
+        InstrumentAdapter::for_labels(labels, self)
+    }
+
+    /// Creates an `InstrumentAdapter` that makes this instrument react on
+    /// all observations.
+    pub fn for_all_labels<L: Eq>(self) -> InstrumentAdapter<L, Self> {
+        InstrumentAdapter::new(self)
+    }
+
+    /// Creates an `InstrumentAdapter` that makes this instrument to no
+    /// observations.
+    pub fn adapter<L: Eq>(self) -> InstrumentAdapter<L, Self> {
+        InstrumentAdapter::deaf(self)
     }
 
     /// Returns the current state
-    pub fn state(&self) -> Option<bool> {
+    pub fn get_state(&self) -> Option<bool> {
         self.state
     }
 }
@@ -100,12 +164,16 @@ impl PutsSnapshot for Flag {
 impl Updates for Flag {
     fn update(&mut self, with: &Update) -> usize {
         match *with {
-            Update::ObservationWithValue(value, _) => {
-                if value == 0 {
-                    self.state = Some(false)
-                } else {
-                    self.state = Some(true)
-                }
+            Update::ObservationWithValue(ObservedValue::Bool(v), _) => {
+                self.state = Some(v);
+                1
+            }
+            Update::ObservationWithValue(ObservedValue::SignedInteger(v), _) => {
+                self.state = Some(v != 0);
+                1
+            }
+            Update::ObservationWithValue(ObservedValue::UnsignedInteger(v), _) => {
+                self.state = Some(v != 0);
                 1
             }
             _ => 0,

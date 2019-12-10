@@ -46,7 +46,7 @@ impl PutsSnapshot for PolledCounter {
 }
 
 fn create_foo_metrics() -> (TelemetryTransmitterSync<FooLabel>, ProcessorMount) {
-    let mut foo_a_panel = Panel::with_name(FooLabel::A, "foo_a_panel");
+    let mut foo_a_panel = Panel::named(FooLabel::A, "foo_a_panel");
     foo_a_panel.set_counter(Counter::new_with_defaults("foo_a_counter"));
     let mut gauge = Gauge::new_with_defaults("foo_a_gauge");
     gauge.set_title("title");
@@ -75,7 +75,7 @@ fn create_foo_metrics() -> (TelemetryTransmitterSync<FooLabel>, ProcessorMount) 
     polled_instrument.set_description("A counter that is increased when a snapshot is polled");
     foo_b_panel.add_snapshooter(polled_instrument);
 
-    let mut cockpit = Cockpit::new("foo_cockpit", None);
+    let mut cockpit = Cockpit::new("foo_cockpit");
     cockpit.add_panel(foo_a_panel);
     cockpit.add_panel(foo_b_panel);
     cockpit.set_title("foo_cockpit_title");
@@ -92,13 +92,13 @@ fn create_foo_metrics() -> (TelemetryTransmitterSync<FooLabel>, ProcessorMount) 
 }
 
 fn create_bar_metrics() -> (TelemetryTransmitterSync<BarLabel>, ProcessorMount) {
-    let mut bar_a_panel = Panel::with_name(BarLabel::A, "bar_a_panel");
+    let mut bar_a_panel = Panel::named(BarLabel::A, "bar_a_panel");
     bar_a_panel.set_counter(Counter::new_with_defaults("bar_a_counter"));
     bar_a_panel.set_gauge(Gauge::new_with_defaults("bar_a_gauge"));
     bar_a_panel.set_meter(Meter::new_with_defaults("bar_a_meter"));
     bar_a_panel.set_histogram(Histogram::new_with_defaults("bar_a_histogram"));
 
-    let mut bar_a_cockpit = Cockpit::without_name(Some(ValueScaling::NanosToMicros));
+    let mut bar_a_cockpit = Cockpit::without_name();
     bar_a_cockpit.add_panel(bar_a_panel);
 
     let mut bar_b_panel = Panel::new(BarLabel::B);
@@ -107,16 +107,16 @@ fn create_bar_metrics() -> (TelemetryTransmitterSync<BarLabel>, ProcessorMount) 
     bar_b_panel.set_meter(Meter::new_with_defaults("bar_b_meter"));
     bar_b_panel.set_histogram(Histogram::new_with_defaults("bar_b_histogram"));
 
-    let mut bar_b_cockpit = Cockpit::new("bar_b_cockpit", None);
+    let mut bar_b_cockpit = Cockpit::new("bar_b_cockpit");
     bar_b_cockpit.add_panel(bar_b_panel);
 
-    let mut bar_c_panel = Panel::with_name(BarLabel::C, "bar_c_panel");
+    let mut bar_c_panel = Panel::named(BarLabel::C, "bar_c_panel");
     bar_c_panel.set_counter(Counter::new_with_defaults("bar_c_counter"));
     bar_c_panel.set_gauge(Gauge::new_with_defaults("bar_c_gauge"));
     bar_c_panel.set_meter(Meter::new_with_defaults("bar_c_meter"));
     bar_c_panel.set_histogram(Histogram::new_with_defaults("bar_c_histogram"));
 
-    let mut bar_c_cockpit = Cockpit::new("bar_c_cockpit", None);
+    let mut bar_c_cockpit = Cockpit::new("bar_c_cockpit");
     bar_c_cockpit.add_panel(bar_c_panel);
 
     let (tx, mut processor) = TelemetryProcessor::new_pair_without_name();
@@ -185,7 +185,7 @@ fn main() {
         let bar_transmitter = bar_transmitter.clone();
 
         thread::spawn(move || {
-            for n in 0..5_000_000 {
+            for n in 0..5_000_000u64 {
                 foo_transmitter.observed_one_value(FooLabel::B, n, Instant::now());
                 bar_transmitter.observed_one_value(BarLabel::B, n * n, Instant::now());
             }
@@ -214,7 +214,7 @@ fn main() {
     println!(
         "Sending observations took {:?}. Sleeping 1 secs to collect remaining data. \
          Depending on your machine you might see that not all metrics have a count \
-         of 5 million obseravtions.",
+         of 5 million observations.",
         start.elapsed()
     );
 
@@ -223,7 +223,7 @@ fn main() {
     println!("\n\n\n=======================\n\n");
 
     println!(
-        "Get snapshot. If it still blocks here there are still many messges to be processed..."
+        "Get snapshot. If it still blocks here there are still many messages to be processed..."
     );
 
     println!("\n\n\n=======================\n\n");

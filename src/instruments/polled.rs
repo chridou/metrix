@@ -37,7 +37,7 @@ where
     }
 
     /// Gets the name of this `PollingInstrument`
-    pub fn name(&self) -> &str {
+    pub fn get_name(&self) -> &str {
         &self.name
     }
 
@@ -105,5 +105,67 @@ where
         } else {
             self.put_values_into_snapshot(into, descriptive);
         }
+    }
+}
+
+pub struct ConstantValue {
+    name: String,
+    title: Option<String>,
+    description: Option<String>,
+    value: ItemKind,
+}
+
+impl ConstantValue {
+    pub fn new<T: Into<String>, V: Into<ItemKind>>(name: T, value: V) -> Self {
+        ConstantValue {
+            name: name.into(),
+            title: None,
+            description: None,
+            value: value.into(),
+        }
+    }
+
+    /// Set the name if this `PollingInstrument`.
+    ///
+    /// The name is a path segment within a `Snapshot` if
+    /// `self.create_group_with_name` is set to true.
+    pub fn set_name<T: Into<String>>(&mut self, name: T) {
+        self.name = name.into();
+    }
+
+    /// Gets the name of this `PollingInstrument`
+    pub fn get_name(&self) -> &str {
+        &self.name
+    }
+
+    /// Sets the `title` of this `PollingInstrument`.
+    ///
+    /// A title can be part of a descriptive `Snapshot`
+    pub fn set_title<T: Into<String>>(&mut self, title: T) {
+        self.title = Some(title.into())
+    }
+
+    /// Sets the `description` of this `PollingInstrument`.
+    ///
+    /// A description can be part of a descriptive `Snapshot`
+    pub fn set_description<T: Into<String>>(&mut self, description: T) {
+        self.description = Some(description.into())
+    }
+}
+
+impl PutsSnapshot for ConstantValue {
+    fn put_snapshot(&self, into: &mut Snapshot, descriptive: bool) {
+        util::put_postfixed_descriptives(self, &self.name, into, descriptive);
+        into.items.push((self.name.clone(), self.value.clone()));
+    }
+}
+
+impl Descriptive for ConstantValue {
+    fn title(&self) -> Option<&str> {
+        self.title.as_ref().map(|n| &**n)
+    }
+
+    fn description(&self) -> Option<&str> {
+        self.description.as_ref().map(|n| &**n)
     }
 }
