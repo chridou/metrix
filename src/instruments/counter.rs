@@ -99,8 +99,8 @@ impl Counter {
     /// react on observations with the given labels.
     ///
     /// If `labels` is empty the instrument will not react to any observations
-    pub fn for_labels<L: Eq>(self, label: Vec<L>) -> InstrumentAdapter<L, Self> {
-        InstrumentAdapter::for_labels(label, self)
+    pub fn for_labels<L: Eq>(self, labels: Vec<L>) -> InstrumentAdapter<L, Self> {
+        InstrumentAdapter::for_labels(labels, self)
     }
 
     /// Creates an `InstrumentAdapter` that makes this instrument react on
