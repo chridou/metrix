@@ -79,23 +79,6 @@ where
     }
 }
 
-impl<L, I> Updates for InstrumentAdapter<L, I>
-where
-    L: Clone + Eq + Send + 'static,
-    I: Instrument,
-{
-    fn update(&mut self, with: &Update) -> usize {
-        self.instrument.update(with)
-    }
-}
-
-impl<L, I> Instrument for InstrumentAdapter<L, I>
-where
-    L: Clone + Eq + Send + 'static,
-    I: Instrument,
-{
-}
-
 impl<L, I> PutsSnapshot for InstrumentAdapter<L, I>
 where
     L: Send + 'static,

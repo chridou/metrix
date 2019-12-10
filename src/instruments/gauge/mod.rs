@@ -488,17 +488,6 @@ where
     }
 }
 
-impl<L> Updates for GaugeAdapter<L>
-where
-    L: Eq + Send + 'static,
-{
-    fn update(&mut self, with: &Update) -> usize {
-        self.gauge.update(with)
-    }
-}
-
-impl<L> Instrument for GaugeAdapter<L> where L: Clone + Eq + Send + 'static {}
-
 impl<L> PutsSnapshot for GaugeAdapter<L>
 where
     L: Send + 'static,
