@@ -6,7 +6,7 @@ use metrics::metrics::{Meter as MMeter, StdMeter};
 use crate::instruments::meter::{MeterRate, MeterSnapshot};
 use crate::instruments::{Instrument, InstrumentAdapter, Update, Updates};
 use crate::snapshot::Snapshot;
-use crate::{Descriptive, PutsSnapshot};
+use crate::{Descriptive, ObservedValue, PutsSnapshot, TimeUnit};
 
 /// A meter that is ticked by values instead of observations
 pub struct ValueMeter {
@@ -19,6 +19,7 @@ pub struct ValueMeter {
     one_minute_rate_enabled: bool,
     five_minute_rate_enabled: bool,
     fifteen_minute_rate_enabled: bool,
+    display_time_unit: TimeUnit,
 }
 
 impl ValueMeter {
@@ -33,6 +34,7 @@ impl ValueMeter {
             one_minute_rate_enabled: true,
             five_minute_rate_enabled: false,
             fifteen_minute_rate_enabled: false,
+            display_time_unit: TimeUnit::default(),
         }
     }
 
@@ -131,6 +133,14 @@ impl ValueMeter {
         self
     }
 
+    pub fn set_display_time_unit(&mut self, display_time_unit: TimeUnit) {
+        self.display_time_unit = display_time_unit
+    }
+    pub fn display_time_unit(mut self, display_time_unit: TimeUnit) -> Self {
+        self.set_display_time_unit(display_time_unit);
+        self
+    }
+
     /// Creates an `InstrumentAdapter` that makes this instrument
     /// react on observations on the given label.
     pub fn for_label<L: Eq>(self, label: L) -> InstrumentAdapter<L, Self> {
@@ -225,14 +235,23 @@ impl PutsSnapshot for ValueMeter {
 impl Updates for ValueMeter {
     fn update(&mut self, with: &Update) -> usize {
         match *with {
-            Update::ObservationWithValue(v, _) => {
-                if let Some(v) = v.convert_to_i64() {
-                    self.inner_meter.mark(v);
+            Update::ObservationWithValue(observed_value, _) => match observed_value {
+                ObservedValue::Duration(time, unit) => {
+                    let v =
+                        super::super::duration_to_display_value(time, unit, self.display_time_unit);
+                    self.inner_meter.mark(v as i64);
+
                     1
-                } else {
-                    0
                 }
-            }
+                other => {
+                    if let Some(v) = other.convert_to_i64() {
+                        self.inner_meter.mark(v);
+                        1
+                    } else {
+                        0
+                    }
+                }
+            },
             _ => 0,
         }
     }
