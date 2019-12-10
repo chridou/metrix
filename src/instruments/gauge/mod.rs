@@ -251,7 +251,7 @@ impl Gauge {
 
     fn next_value(&self, current: Option<i64>, observed: ObservedValue) -> Option<i64> {
         match observed {
-            ObservedValue::ChangedBy(d) => current.map(|c| c + d),
+            ObservedValue::ChangedBy(d) => current.map(|c| c + d).or_else(|| Some(d)),
             ObservedValue::Duration(time, unit) => {
                 let value = super::duration_to_display_value(time, unit, self.display_time_unit);
                 Some(value as i64)
@@ -522,3 +522,6 @@ enum GaugeUpdateStrategy<L> {
     DeltasOnly(LabelFilter<L>),
     IncDecOnLabels(LabelFilter<L>, LabelFilter<L>),
 }
+
+#[cfg(test)]
+mod test;

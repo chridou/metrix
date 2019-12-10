@@ -153,3 +153,29 @@ impl Descriptive for Counter {
         self.description.as_ref().map(|n| &**n)
     }
 }
+
+#[cfg(test)]
+mod test {
+    use std::time::Instant;
+
+    use super::*;
+
+    #[test]
+    fn updates() {
+        let mut counter = Counter::new("");
+
+        assert_eq!(counter.get(), 0);
+
+        counter.update(&Update::Observation(Instant::now()));
+        assert_eq!(counter.get(), 1);
+
+        counter.update(&Update::Observations(1, Instant::now()));
+        assert_eq!(counter.get(), 2);
+
+        counter.update(&Update::Observations(3, Instant::now()));
+        assert_eq!(counter.get(), 5);
+
+        counter.update(&Update::ObservationWithValue(33.into(), Instant::now()));
+        assert_eq!(counter.get(), 6);
+    }
+}
