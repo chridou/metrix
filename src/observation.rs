@@ -39,6 +39,44 @@ pub enum Observation<L> {
     },
 }
 
+impl<L> Observation<L> {
+    pub fn observed(label: L, count: u64, timestamp: Instant) -> Self {
+        Observation::Observed {
+            label,
+            count,
+            timestamp,
+        }
+    }
+
+    pub fn observed_now(label: L, count: u64) -> Self {
+        Self::observed(label, count, Instant::now())
+    }
+
+    pub fn observed_one(label: L, timestamp: Instant) -> Self {
+        Observation::ObservedOne { label, timestamp }
+    }
+
+    pub fn observed_one_now(label: L) -> Self {
+        Self::observed_one(label, Instant::now())
+    }
+
+    pub fn observed_one_value<T: Into<ObservedValue>>(
+        label: L,
+        value: T,
+        timestamp: Instant,
+    ) -> Self {
+        Observation::ObservedOneValue {
+            label,
+            value: value.into(),
+            timestamp,
+        }
+    }
+
+    pub fn observed_one_value_now<T: Into<ObservedValue>>(label: L, value: T) -> Self {
+        Self::observed_one_value(label, value, Instant::now())
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 pub enum ObservedValue {
     SignedInteger(i64),
