@@ -4,7 +4,8 @@ use crate::instruments::{BorrowedLabelAndUpdate, Instrument, LabelFilter, Update
 use crate::snapshot::Snapshot;
 use crate::util;
 use crate::{
-    Descriptive, HandlesObservations, Observation, ObservedValue, PutsSnapshot, DECR, INCR,
+    Descriptive, HandlesObservations, Observation, ObservedValue, PutsSnapshot, TimeUnit, DECR,
+    INCR,
 };
 
 /// Simply returns the value that has been observed last.
@@ -32,6 +33,7 @@ pub struct Gauge {
     description: Option<String>,
     value: Option<State>,
     memorize_extrema: Option<Duration>,
+    display_time_unit: TimeUnit,
 }
 
 impl Gauge {
@@ -42,6 +44,7 @@ impl Gauge {
             description: None,
             value: None,
             memorize_extrema: None,
+            display_time_unit: TimeUnit::default(),
         }
     }
 
@@ -100,6 +103,15 @@ impl Gauge {
     /// If set to None the peak and bottom values will not be shown.
     pub fn memorize_extrema(mut self, d: Duration) -> Self {
         self.set_memorize_extrema(d);
+        self
+    }
+
+    pub fn set_display_time_unit(&mut self, display_time_unit: TimeUnit) {
+        self.display_time_unit = display_time_unit
+    }
+
+    pub fn display_time_unit(mut self, display_time_unit: TimeUnit) -> Self {
+        self.set_display_time_unit(display_time_unit);
         self
     }
 
@@ -194,11 +206,12 @@ impl Gauge {
         };
 
         if let Some(mut state) = self.value.take() {
-            let next_value = if let Some(next_value) = next_value(Some(state.current), observed) {
-                next_value
-            } else {
-                state.current
-            };
+            let next_value =
+                if let Some(next_value) = self.next_value(Some(state.current), observed) {
+                    next_value
+                } else {
+                    state.current
+                };
 
             if let Some(ext_dur) = self.memorize_extrema {
                 let now = Instant::now();
@@ -219,7 +232,7 @@ impl Gauge {
             state.current = next_value;
             self.value = Some(state);
         } else {
-            self.value = next_value(None, observed).map(|next_value| {
+            self.value = self.next_value(None, observed).map(|next_value| {
                 let now = Instant::now();
                 State {
                     current: next_value,
@@ -235,12 +248,16 @@ impl Gauge {
     pub fn get(&self) -> Option<i64> {
         self.value.as_ref().map(|v| v.current)
     }
-}
 
-fn next_value(current: Option<i64>, observed: ObservedValue) -> Option<i64> {
-    match observed {
-        ObservedValue::ChangedBy(d) => current.map(|c| c + d),
-        x => x.convert_to_i64().or_else(|| current),
+    fn next_value(&self, current: Option<i64>, observed: ObservedValue) -> Option<i64> {
+        match observed {
+            ObservedValue::ChangedBy(d) => current.map(|c| c + d),
+            ObservedValue::Duration(time, unit) => {
+                let value = super::duration_to_display_value(time, unit, self.display_time_unit);
+                Some(value as i64)
+            }
+            x => x.convert_to_i64().or_else(|| current),
+        }
     }
 }
 
