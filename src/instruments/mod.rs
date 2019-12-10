@@ -233,3 +233,109 @@ fn duration_to_display_value(time: u64, current_unit: TimeUnit, target_unit: Tim
         (Seconds, Seconds) => time,
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::duration_to_display_value;
+    use crate::TimeUnit;
+
+    #[test]
+    fn duration_to_display_value_from_nanos() {
+        let nanos = 1_234_567_890;
+        assert_eq!(
+            duration_to_display_value(nanos, TimeUnit::Nanoseconds, TimeUnit::Nanoseconds),
+            1_234_567_890,
+            "to nanos"
+        );
+        assert_eq!(
+            duration_to_display_value(nanos, TimeUnit::Nanoseconds, TimeUnit::Microseconds),
+            1_234_567,
+            "to micros"
+        );
+        assert_eq!(
+            duration_to_display_value(nanos, TimeUnit::Nanoseconds, TimeUnit::Milliseconds),
+            1_234,
+            "to millis"
+        );
+        assert_eq!(
+            duration_to_display_value(nanos, TimeUnit::Nanoseconds, TimeUnit::Seconds),
+            1,
+            "to seconds"
+        );
+    }
+
+    #[test]
+    fn duration_to_display_value_from_micros() {
+        let micros = 1_234_567;
+        assert_eq!(
+            duration_to_display_value(micros, TimeUnit::Microseconds, TimeUnit::Nanoseconds),
+            1_234_567_000,
+            "to nanos"
+        );
+        assert_eq!(
+            duration_to_display_value(micros, TimeUnit::Microseconds, TimeUnit::Microseconds),
+            1_234_567,
+            "to micros"
+        );
+        assert_eq!(
+            duration_to_display_value(micros, TimeUnit::Microseconds, TimeUnit::Milliseconds),
+            1_234,
+            "to millis"
+        );
+        assert_eq!(
+            duration_to_display_value(micros, TimeUnit::Microseconds, TimeUnit::Seconds),
+            1,
+            "to seconds"
+        );
+    }
+
+    #[test]
+    fn duration_to_display_value_from_millis() {
+        let millis = 1_234;
+        assert_eq!(
+            duration_to_display_value(millis, TimeUnit::Milliseconds, TimeUnit::Nanoseconds),
+            1_234_000_000,
+            "to nanos"
+        );
+        assert_eq!(
+            duration_to_display_value(millis, TimeUnit::Milliseconds, TimeUnit::Microseconds),
+            1_234_000,
+            "to micros"
+        );
+        assert_eq!(
+            duration_to_display_value(millis, TimeUnit::Milliseconds, TimeUnit::Milliseconds),
+            1_234,
+            "to millis"
+        );
+        assert_eq!(
+            duration_to_display_value(millis, TimeUnit::Milliseconds, TimeUnit::Seconds),
+            1,
+            "to seconds"
+        );
+    }
+
+    #[test]
+    fn duration_to_display_value_from_seconds() {
+        let seconds = 1;
+        assert_eq!(
+            duration_to_display_value(seconds, TimeUnit::Seconds, TimeUnit::Nanoseconds),
+            1_000_000_000,
+            "to nanos"
+        );
+        assert_eq!(
+            duration_to_display_value(seconds, TimeUnit::Seconds, TimeUnit::Microseconds),
+            1_000_000,
+            "to micros"
+        );
+        assert_eq!(
+            duration_to_display_value(seconds, TimeUnit::Seconds, TimeUnit::Milliseconds),
+            1_000,
+            "to millis"
+        );
+        assert_eq!(
+            duration_to_display_value(seconds, TimeUnit::Seconds, TimeUnit::Seconds),
+            1,
+            "to seconds"
+        );
+    }
+}
