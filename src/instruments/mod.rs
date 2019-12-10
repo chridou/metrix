@@ -235,7 +235,118 @@ fn duration_to_display_value(time: u64, current_unit: TimeUnit, target_unit: Tim
 }
 
 #[cfg(test)]
-mod test {
+mod test_label_filter {
+    use super::*;
+
+    #[test]
+    fn empty_filter() {
+        let filter = LabelFilter::AcceptNone;
+        assert!(!filter.accepts(&1));
+    }
+
+    #[test]
+    fn accept_all_filter() {
+        let filter = LabelFilter::AcceptAll;
+        assert!(filter.accepts(&1));
+        assert!(filter.accepts(&2));
+        assert!(filter.accepts(&3));
+    }
+
+    #[test]
+    fn accept_one_filter() {
+        let filter = LabelFilter::One(1);
+        assert!(!filter.accepts(&0));
+        assert!(filter.accepts(&1));
+        assert!(!filter.accepts(&2));
+        assert!(!filter.accepts(&3));
+        assert!(!filter.accepts(&4));
+        assert!(!filter.accepts(&5));
+        assert!(!filter.accepts(&6));
+    }
+
+    #[test]
+    fn accept_two_filter() {
+        let filter = LabelFilter::Two(1, 2);
+        assert!(!filter.accepts(&0));
+        assert!(filter.accepts(&1));
+        assert!(filter.accepts(&2));
+        assert!(!filter.accepts(&3));
+        assert!(!filter.accepts(&4));
+        assert!(!filter.accepts(&5));
+        assert!(!filter.accepts(&6));
+    }
+
+    #[test]
+    fn accept_three_filter() {
+        let filter = LabelFilter::Three(1, 2, 3);
+        assert!(!filter.accepts(&0));
+        assert!(filter.accepts(&1));
+        assert!(filter.accepts(&2));
+        assert!(filter.accepts(&3));
+        assert!(!filter.accepts(&4));
+        assert!(!filter.accepts(&5));
+        assert!(!filter.accepts(&6));
+    }
+
+    #[test]
+    fn accept_four_filter() {
+        let filter = LabelFilter::Four(1, 2, 3, 4);
+        assert!(!filter.accepts(&0));
+        assert!(filter.accepts(&1));
+        assert!(filter.accepts(&2));
+        assert!(filter.accepts(&3));
+        assert!(filter.accepts(&4));
+        assert!(!filter.accepts(&5));
+        assert!(!filter.accepts(&6));
+    }
+
+    #[test]
+    fn accept_five_filter() {
+        let filter = LabelFilter::Five(1, 2, 3, 4, 5);
+        assert!(!filter.accepts(&0));
+        assert!(filter.accepts(&1));
+        assert!(filter.accepts(&2));
+        assert!(filter.accepts(&3));
+        assert!(filter.accepts(&4));
+        assert!(filter.accepts(&5));
+        assert!(!filter.accepts(&6));
+    }
+
+    #[test]
+    fn accept_many_filter() {
+        let filter = LabelFilter::Many(vec![1, 2, 3, 4, 5]);
+        assert!(!filter.accepts(&0));
+        assert!(filter.accepts(&1));
+        assert!(filter.accepts(&2));
+        assert!(filter.accepts(&3));
+        assert!(filter.accepts(&4));
+        assert!(filter.accepts(&5));
+        assert!(!filter.accepts(&6));
+    }
+
+    #[test]
+    fn many_filters() {
+        let max = 20;
+        for n in 1..max {
+            let mut labels = Vec::new();
+            for i in 1..=n {
+                labels.push(i);
+            }
+
+            let filter = LabelFilter::many(labels);
+
+            assert!(!filter.accepts(&0));
+            assert!(!filter.accepts(&max));
+
+            for i in 1..=n {
+                assert!(filter.accepts(&i));
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod test_time_conversion {
     use super::duration_to_display_value;
     use crate::TimeUnit;
 

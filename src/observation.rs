@@ -124,7 +124,7 @@ impl From<Duration> for ObservedValue {
 
 impl From<(u64, TimeUnit)> for ObservedValue {
     fn from(d: (u64, TimeUnit)) -> Self {
-        ObservedValue::Duration(d.0.into(), d.1)
+        ObservedValue::Duration(d.0, d.1)
     }
 }
 
@@ -199,9 +199,9 @@ impl ObservedValue {
                 }
             }
 
-            ObservedValue::Bool(v) => None,
+            ObservedValue::Bool(_) => None,
             ObservedValue::Duration(_, _) => None,
-            ObservedValue::ChangedBy(v) => None,
+            ObservedValue::ChangedBy(_) => None,
         }
     }
 
@@ -223,9 +223,9 @@ impl ObservedValue {
                 }
             }
 
-            ObservedValue::Bool(v) => None,
+            ObservedValue::Bool(_) => None,
             ObservedValue::Duration(_, _) => None,
-            ObservedValue::ChangedBy(v) => None,
+            ObservedValue::ChangedBy(_) => None,
         }
     }
 
@@ -233,10 +233,10 @@ impl ObservedValue {
         match *self {
             ObservedValue::SignedInteger(v) => Some(v != 0),
             ObservedValue::UnsignedInteger(v) => Some(v != 0),
-            ObservedValue::Float(v) => None,
+            ObservedValue::Float(_) => None,
             ObservedValue::Bool(v) => Some(v),
             ObservedValue::Duration(_, _) => None,
-            ObservedValue::ChangedBy(v) => None,
+            ObservedValue::ChangedBy(_) => None,
         }
     }
 }

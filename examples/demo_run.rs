@@ -46,7 +46,7 @@ impl PutsSnapshot for PolledCounter {
 }
 
 fn create_foo_metrics() -> (TelemetryTransmitterSync<FooLabel>, ProcessorMount) {
-    let mut foo_a_panel = Panel::with_name(FooLabel::A, "foo_a_panel");
+    let mut foo_a_panel = Panel::named(FooLabel::A, "foo_a_panel");
     foo_a_panel.set_counter(Counter::new_with_defaults("foo_a_counter"));
     let mut gauge = Gauge::new_with_defaults("foo_a_gauge");
     gauge.set_title("title");
