@@ -110,109 +110,30 @@
 //!
 //! Copyright (c) 2018 Christian Douven
 //!
-extern crate exponential_decay_histogram;
-extern crate json;
 #[cfg(feature = "log")]
 #[macro_use]
 extern crate log;
-extern crate crossbeam_channel;
-extern crate futures;
-extern crate metrics;
 
 use snapshot::Snapshot;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use cockpit::Cockpit;
-use instruments::{Panel, ValueScaling};
+use instruments::Panel;
 use processor::TelemetryMessage;
+
+pub use observation::*;
+pub use processor::AggregatesProcessors;
 
 pub mod cockpit;
 pub mod driver;
 pub mod instruments;
+mod observation;
 pub mod processor;
 pub mod snapshot;
+
 pub(crate) mod util;
 
-/// An observation that has been made.
-///
-/// Be aware that not all instruments handle all
-/// observations or values.
-/// E.g. a `Meter` does not take the `value` of
-/// an `Observation::ObservedOneValue` into account but
-/// simply counts the observation as one occurence.
-#[derive(Clone)]
-pub enum Observation<L> {
-    /// Observed many occurances at th given timestamp
-    Observed {
-        label: L,
-        count: u64,
-        timestamp: Instant,
-    },
-    /// Observed one occurrence at the given timestamp
-    ObservedOne { label: L, timestamp: Instant },
-    /// Observed one occurence with a value at a given timestamp.
-    ObservedOneValue {
-        label: L,
-        value: u64,
-        timestamp: Instant,
-    },
-}
-
-impl<L> Observation<L>
-where
-    L: Clone,
-{
-    /// Extracts the label `L` from an observation.
-    pub fn label(&self) -> &L {
-        match *self {
-            Observation::Observed { ref label, .. } => label,
-            Observation::ObservedOne { ref label, .. } => label,
-            Observation::ObservedOneValue { ref label, .. } => label,
-        }
-    }
-
-    /// Scale by the given `ValueScaling`
-    ///
-    /// This will clone the `Observation`
-    pub fn scaled(&self, scaling: ValueScaling) -> Observation<L> {
-        let mut cloned = (*self).clone();
-
-        match cloned {
-            Observation::ObservedOneValue { ref mut value, .. } => match scaling {
-                ValueScaling::NanosToMillis => *value = *value / 1_000_000,
-                ValueScaling::NanosToMicros => *value = *value / 1_000,
-            },
-            _ => (),
-        }
-
-        cloned
-    }
-}
-
-impl<L> Observation<L> {
-    pub fn timestamp(&self) -> Instant {
-        match *self {
-            Observation::Observed { timestamp, .. } => timestamp,
-            Observation::ObservedOne { timestamp, .. } => timestamp,
-            Observation::ObservedOneValue { timestamp, .. } => timestamp,
-        }
-    }
-}
-
-pub trait ObservationLike {
-    fn timestamp(&self) -> Instant;
-}
-
-impl<L> ObservationLike for Observation<L> {
-    fn timestamp(&self) -> Instant {
-        match *self {
-            Observation::Observed { timestamp, .. } => timestamp,
-            Observation::ObservedOne { timestamp, .. } => timestamp,
-            Observation::ObservedOneValue { timestamp, .. } => timestamp,
-        }
-    }
-}
 /// Something that can react on `Observation`s where
 /// the `Label` is the type of the label.
 ///
@@ -223,14 +144,34 @@ pub trait HandlesObservations: PutsSnapshot + Send + 'static {
 }
 
 /// Const for setting boolean values. `true` is `1`.
+#[deprecated(since = "0.10.0", note = "use a bool directly")]
 pub const TRUE: u64 = 1;
 /// Const for setting boolean values. `false` is `0`.
+#[deprecated(since = "0.10.0", note = "use a bool directly")]
 pub const FALSE: u64 = 0;
 
 /// Const for incrementing on instruments with support. `INCR` is `std::u64::MAX`.
+#[deprecated(since = "0.10.0", note = "use crate::Increment")]
 pub const INCR: u64 = std::u64::MAX;
 /// Const for decrementing on instruments with support. `DECR` is `std::u64::MAX -1`.
+#[deprecated(since = "0.10.0", note = "use crate::Decrement")]
 pub const DECR: u64 = std::u64::MAX - 1;
+
+/// Increments a value by one (e.g. in a `Gauge`)
+#[derive(Debug, Copy, Clone)]
+pub struct Increment;
+/// Increments a value by the given amount (e.g. in a `Gauge`)
+#[derive(Debug, Copy, Clone)]
+pub struct IncrementBy(pub u32);
+/// Decrements a value by one (e.g. in a `Gauge`)
+#[derive(Debug, Copy, Clone)]
+pub struct Decrement;
+/// Decrements a value by the given amount (e.g. in a `Gauge`)
+#[derive(Debug, Copy, Clone)]
+pub struct DecrementBy(u32);
+/// Changes a value by the given amount (e.g. in a `Gauge`)
+#[derive(Debug, Copy, Clone)]
+pub struct ChangeBy(pub i64);
 
 /// Transmits telemetry data to the backend.
 ///
@@ -241,9 +182,9 @@ pub trait TransmitsTelemetryData<L> {
     /// Transit an observation to the backend.
     fn transmit(&self, observation: Observation<L>) -> &Self;
 
-    /// Observed `count` occurences at time `timestamp`
+    /// Observed `count` occurrences at time `timestamp`
     ///
-    /// Convinience method. Simply calls `transmit`
+    /// Convenience method. Simply calls `transmit`
     fn observed(&self, label: L, count: u64, timestamp: Instant) -> &Self {
         self.transmit(Observation::Observed {
             label,
@@ -252,20 +193,25 @@ pub trait TransmitsTelemetryData<L> {
         })
     }
 
-    /// Observed one occurence at time `timestamp`
+    /// Observed one occurrence at time `timestamp`
     ///
-    /// Convinience method. Simply calls `transmit`
+    /// Convenience method. Simply calls `transmit`
     fn observed_one(&self, label: L, timestamp: Instant) -> &Self {
         self.transmit(Observation::ObservedOne { label, timestamp })
     }
 
-    /// Observed one occurence with value `value` at time `timestamp`
+    /// Observed one occurrence with value `value` at time `timestamp`
     ///
-    /// Convinience method. Simply calls `transmit`
-    fn observed_one_value(&self, label: L, value: u64, timestamp: Instant) -> &Self {
+    /// Convenience method. Simply calls `transmit`
+    fn observed_one_value<V: Into<ObservedValue>>(
+        &self,
+        label: L,
+        value: V,
+        timestamp: Instant,
+    ) -> &Self {
         self.transmit(Observation::ObservedOneValue {
             label,
-            value,
+            value: value.into(),
             timestamp,
         })
     }
@@ -273,45 +219,44 @@ pub trait TransmitsTelemetryData<L> {
     /// Sends a `Duration` as an observed value observed at `timestamp`.
     /// The `Duration` is converted to nanoseconds.
     fn observed_duration(&self, label: L, duration: Duration, timestamp: Instant) -> &Self {
-        let nanos = (duration.as_secs() * 1_000_000_000) + (duration.subsec_nanos() as u64);
-        self.observed_one_value(label, nanos, timestamp)
+        self.observed_one_value(label, duration, timestamp)
     }
 
-    /// Observed `count` occurences at now.
+    /// Observed `count` occurrences at now.
     ///
-    /// Convinience method. Simply calls `observed` with
+    /// Convenience method. Simply calls `observed` with
     /// the current timestamp.
     fn observed_now(&self, label: L, count: u64) -> &Self {
         self.observed(label, count, Instant::now())
     }
 
-    /// Observed one occurence now
+    /// Observed one occurrence now
     ///
-    /// Convinience method. Simply calls `observed_one` with
+    /// Convenience method. Simply calls `observed_one` with
     /// the current timestamp.
     fn observed_one_now(&self, label: L) -> &Self {
         self.observed_one(label, Instant::now())
     }
 
-    /// Observed one occurence with value `value` now
+    /// Observed one occurrence with value `value` now
     ///
-    /// Convinience method. Simply calls `observed_one_value` with
+    /// Convenience method. Simply calls `observed_one_value` with
     /// the current timestamp.
-    fn observed_one_value_now(&self, label: L, value: u64) -> &Self {
+    fn observed_one_value_now<V: Into<ObservedValue>>(&self, label: L, value: V) -> &Self {
         self.observed_one_value(label, value, Instant::now())
     }
 
     /// Sends a `Duration` as an observed value observed with the current
     /// timestamp.
     ///
-    /// The `Duration` is converted to nanoseconds.
+    /// The `Duration` is converted to nanoseconds internally.
     fn observed_one_duration_now(&self, label: L, duration: Duration) -> &Self {
         self.observed_duration(label, duration, Instant::now())
     }
 
     /// Measures the time from `from` until now.
     ///
-    /// The resultiong duration is an observed value
+    /// The resulting duration is an observed value
     /// with the measured duration in nanoseconds.
     fn measure_time(&self, label: L, from: Instant) -> &Self {
         let now = Instant::now();
@@ -323,7 +268,9 @@ pub trait TransmitsTelemetryData<L> {
     }
 
     /// Add a handler.
-    fn add_handler(&self, handler: Box<HandlesObservations<Label = L>>) -> &Self;
+    fn add_handler<H: HandlesObservations<Label = L>>(&self, handler: H) -> &Self
+    where
+        L: Send + 'static;
 
     /// Add a `Copckpit`
     fn add_cockpit(&self, cockpit: Cockpit<L>) -> &Self;
@@ -363,8 +310,14 @@ impl<L> TransmitsTelemetryData<L> for TelemetryTransmitter<L> {
         self
     }
 
-    fn add_handler(&self, handler: Box<HandlesObservations<Label = L>>) -> &Self {
-        if let Err(err) = self.sender.send(TelemetryMessage::AddHandler(handler)) {
+    fn add_handler<H: HandlesObservations<Label = L>>(&self, handler: H) -> &Self
+    where
+        L: Send + 'static,
+    {
+        if let Err(err) = self
+            .sender
+            .send(TelemetryMessage::AddHandler(Box::new(handler)))
+        {
             util::log_error(format!("Failed to add handler: {}", err));
         };
         self
@@ -415,12 +368,15 @@ impl<L> TransmitsTelemetryData<L> for TelemetryTransmitterSync<L> {
         self
     }
 
-    fn add_handler(&self, handler: Box<HandlesObservations<Label = L>>) -> &Self {
+    fn add_handler<H: HandlesObservations<Label = L>>(&self, handler: H) -> &Self
+    where
+        L: Send + 'static,
+    {
         if let Err(err) = self
             .sender
             .lock()
             .unwrap()
-            .send(TelemetryMessage::AddHandler(handler))
+            .send(TelemetryMessage::AddHandler(Box::new(handler)))
         {
             util::log_error(format!("Failed to add handler: {}", err));
         };

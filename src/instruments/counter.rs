@@ -1,4 +1,4 @@
-use crate::instruments::{Instrument, Update, Updates};
+use crate::instruments::{Instrument, InstrumentAdapter, Update, Updates};
 use crate::snapshot::Snapshot;
 use crate::util;
 use crate::{Descriptive, PutsSnapshot};
@@ -31,13 +31,47 @@ pub struct Counter {
 }
 
 impl Counter {
-    pub fn new_with_defaults<T: Into<String>>(name: T) -> Counter {
+    pub fn new<T: Into<String>>(name: T) -> Counter {
         Counter {
             name: name.into(),
             title: None,
             description: None,
             count: 0,
         }
+    }
+    pub fn new_with_defaults<T: Into<String>>(name: T) -> Counter {
+        Self::new(name)
+    }
+
+    pub fn get_name(&self) -> &str {
+        &self.name
+    }
+
+    pub fn set_name<T: Into<String>>(&mut self, name: T) {
+        self.name = name.into();
+    }
+
+    pub fn name<T: Into<String>>(mut self, name: T) -> Self {
+        self.set_name(name);
+        self
+    }
+
+    pub fn set_title<T: Into<String>>(&mut self, title: T) {
+        self.title = Some(title.into())
+    }
+
+    pub fn title<T: Into<String>>(mut self, title: T) -> Self {
+        self.set_title(title);
+        self
+    }
+
+    pub fn set_description<T: Into<String>>(&mut self, description: T) {
+        self.description = Some(description.into())
+    }
+
+    pub fn description<T: Into<String>>(mut self, description: T) -> Self {
+        self.set_description(description);
+        self
     }
 
     /// Increase the stored value by one.
@@ -55,30 +89,30 @@ impl Counter {
         self.count
     }
 
-    /// Gets the name of this `Counter`
-    pub fn name(&self) -> &str {
-        &self.name
+    /// Creates an `InstrumentAdapter` that makes this instrument
+    /// react on observations on the given label.
+    pub fn for_label<L: Eq>(self, label: L) -> InstrumentAdapter<L, Self> {
+        InstrumentAdapter::for_label(label, self)
     }
 
-    /// Set the name if this `Counter`.
+    /// Creates an `InstrumentAdapter` that makes this instrument
+    /// react on observations with the given labels.
     ///
-    /// The name is a path segment within a `Snapshot`
-    pub fn set_name<T: Into<String>>(&mut self, name: T) {
-        self.name = name.into();
+    /// If `labels` is empty the instrument will not react to any observations
+    pub fn for_labels<L: Eq>(self, label: Vec<L>) -> InstrumentAdapter<L, Self> {
+        InstrumentAdapter::for_labels(label, self)
     }
 
-    /// Sets the `title` of this `Counter`.
-    ///
-    /// A title can be part of a descriptive `Snapshot`
-    pub fn set_title<T: Into<String>>(&mut self, title: T) {
-        self.title = Some(title.into())
+    /// Creates an `InstrumentAdapter` that makes this instrument react on
+    /// all observations.
+    pub fn for_all_labels<L: Eq>(self) -> InstrumentAdapter<L, Self> {
+        InstrumentAdapter::new(self)
     }
 
-    /// Sets the `description` of this `Counter`.
-    ///
-    /// A description can be part of a descriptive `Snapshot`
-    pub fn set_description<T: Into<String>>(&mut self, description: T) {
-        self.description = Some(description.into())
+    /// Creates an `InstrumentAdapter` that makes this instrument to no
+    /// observations.
+    pub fn adapter<L: Eq>(self) -> InstrumentAdapter<L, Self> {
+        InstrumentAdapter::deaf(self)
     }
 }
 

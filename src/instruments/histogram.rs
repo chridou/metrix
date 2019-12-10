@@ -2,10 +2,10 @@ use std::time::{Duration, Instant};
 
 use exponential_decay_histogram::ExponentialDecayHistogram;
 
-use crate::instruments::{Instrument, Update, Updates};
+use crate::instruments::{Instrument, InstrumentAdapter, Update, Updates};
 use crate::snapshot::{ItemKind, Snapshot};
 use crate::util;
-use crate::{Descriptive, PutsSnapshot};
+use crate::{Descriptive, ObservedValue, PutsSnapshot, TimeUnit};
 
 /// For tracking values. E.g. request latencies
 pub struct Histogram {
@@ -16,10 +16,11 @@ pub struct Histogram {
     last_update: Instant,
     max_inactivity_duration: Option<Duration>,
     reset_after_inactivity: bool,
+    display_time_unit: TimeUnit,
 }
 
 impl Histogram {
-    pub fn new_with_defaults<T: Into<String>>(name: T) -> Histogram {
+    pub fn new<T: Into<String>>(name: T) -> Histogram {
         let inner_histogram = ExponentialDecayHistogram::new();
         Histogram {
             name: name.into(),
@@ -29,10 +30,15 @@ impl Histogram {
             last_update: Instant::now(),
             max_inactivity_duration: None,
             reset_after_inactivity: true,
+            display_time_unit: TimeUnit::default(),
         }
     }
 
-    pub fn name(&self) -> &str {
+    pub fn new_with_defaults<T: Into<String>>(name: T) -> Histogram {
+        Self::new(name)
+    }
+
+    pub fn get_name(&self) -> &str {
         &self.name
     }
 
@@ -40,12 +46,27 @@ impl Histogram {
         self.name = name.into();
     }
 
+    pub fn name<T: Into<String>>(mut self, name: T) -> Self {
+        self.set_name(name);
+        self
+    }
+
     pub fn set_title<T: Into<String>>(&mut self, title: T) {
         self.title = Some(title.into())
     }
 
+    pub fn title<T: Into<String>>(mut self, title: T) -> Self {
+        self.set_title(title);
+        self
+    }
+
     pub fn set_description<T: Into<String>>(&mut self, description: T) {
         self.description = Some(description.into())
+    }
+
+    pub fn description<T: Into<String>>(mut self, description: T) -> Self {
+        self.set_description(description);
+        self
     }
 
     /// Sets the maximum amount of time this histogram may be
@@ -56,13 +77,66 @@ impl Histogram {
         self.max_inactivity_duration = Some(limit);
     }
 
+    /// Sets the maximum amount of time this histogram may be
+    /// inactive until no more snapshots are taken
+    ///
+    /// Default is no inactivity tracking.
+    pub fn inactivity_limit(mut self, limit: Duration) -> Self {
+        self.set_inactivity_limit(limit);
+        self
+    }
+
     /// Reset the histogram if inactivity tracking was enabled
     /// and the histogram was inactive.
     ///
     /// The default is `true`. Only has an effect if a `max_inactivity_duration`
     /// is set.
-    pub fn reset_after_inactivity(&mut self, reset: bool) {
+    pub fn set_reset_after_inactivity(&mut self, reset: bool) {
         self.reset_after_inactivity = reset;
+    }
+
+    /// Reset the histogram if inactivity tracking was enabled
+    /// and the histogram was inactive.
+    ///
+    /// The default is `true`. Only has an effect if a `max_inactivity_duration`
+    /// is set.
+    pub fn reset_after_inactivity(mut self, reset: bool) -> Self {
+        self.set_reset_after_inactivity(reset);
+        self
+    }
+
+    pub fn set_display_time_unit(&mut self, display_time_unit: TimeUnit) {
+        self.display_time_unit = display_time_unit
+    }
+    pub fn display_time_unit(mut self, display_time_unit: TimeUnit) -> Self {
+        self.set_display_time_unit(display_time_unit);
+        self
+    }
+
+    /// Creates an `InstrumentAdapter` that makes this instrument
+    /// react on observations on the given label.
+    pub fn for_label<L: Eq>(self, label: L) -> InstrumentAdapter<L, Self> {
+        InstrumentAdapter::for_label(label, self)
+    }
+
+    /// Creates an `InstrumentAdapter` that makes this instrument
+    /// react on observations with the given labels.
+    ///
+    /// If `labels` is empty the instrument will not react to any observations
+    pub fn for_labels<L: Eq>(self, label: Vec<L>) -> InstrumentAdapter<L, Self> {
+        InstrumentAdapter::for_labels(label, self)
+    }
+
+    /// Creates an `InstrumentAdapter` that makes this instrument react on
+    /// all observations.
+    pub fn for_all_labels<L: Eq>(self) -> InstrumentAdapter<L, Self> {
+        InstrumentAdapter::new(self)
+    }
+
+    /// Creates an `InstrumentAdapter` that makes this instrument to no
+    /// observations.
+    pub fn adapter<L: Eq>(self) -> InstrumentAdapter<L, Self> {
+        InstrumentAdapter::deaf(self)
     }
 
     fn put_values_into_snapshot(&self, into: &mut Snapshot) {
@@ -131,16 +205,32 @@ impl Updates for Histogram {
         self.last_update = Instant::now();
 
         match *with {
-            Update::ObservationWithValue(v, t) => {
-                if t > self.last_update {
-                    self.inner_histogram.update_at(t, v as i64);
-                    self.last_update = t
+            Update::ObservationWithValue(ObservedValue::Duration(time, time_unit), timestamp) => {
+                let d = super::duration_to_display_value(time, time_unit, self.display_time_unit);
+                if timestamp > self.last_update {
+                    self.inner_histogram.update_at(timestamp, d as i64);
+                    self.last_update = timestamp
                 } else {
-                    self.inner_histogram.update(v as i64);
+                    self.inner_histogram.update(d as i64);
                     self.last_update = Instant::now();
                 }
                 1
             }
+            Update::ObservationWithValue(v, timestamp) => {
+                if let Some(v) = v.convert_to_i64() {
+                    if timestamp > self.last_update {
+                        self.inner_histogram.update_at(timestamp, v);
+                        self.last_update = timestamp
+                    } else {
+                        self.inner_histogram.update(v);
+                        self.last_update = Instant::now();
+                    }
+                    1
+                } else {
+                    0
+                }
+            }
+
             _ => 0,
         }
     }

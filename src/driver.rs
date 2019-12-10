@@ -651,20 +651,20 @@ impl DriverInstruments {
             .update(&Update::Observation(now));
         self.collection_times_us
             .update(&Update::ObservationWithValue(
-                duration_to_micros(now - collection_started),
+                (now - collection_started).into(),
                 now,
             ));
         if outcome.processed > 0 {
             self.observations_processed_per_second
                 .update(&Update::Observations(outcome.processed as u64, now));
             self.observations_processed_per_collection
-                .update(&Update::ObservationWithValue(outcome.processed as u64, now));
+                .update(&Update::ObservationWithValue(outcome.processed.into(), now));
         }
         if outcome.dropped > 0 {
             self.observations_dropped_per_second
                 .update(&Update::Observations(outcome.dropped as u64, now));
             self.observations_dropped_per_collection
-                .update(&Update::ObservationWithValue(outcome.dropped as u64, now));
+                .update(&Update::ObservationWithValue(outcome.dropped.into(), now));
             self.dropped_observations_alarm
                 .update(&Update::Observation(now));
         }
@@ -683,7 +683,7 @@ impl DriverInstruments {
         self.snapshots_per_second.update(&Update::Observation(now));
         self.snapshots_times_us
             .update(&Update::ObservationWithValue(
-                duration_to_micros(now - snapshot_started),
+                (now - snapshot_started).into(),
                 now,
             ));
     }

@@ -3,7 +3,7 @@ use std::time::{Duration, Instant};
 
 use metrics::metrics::{Meter as MMeter, StdMeter};
 
-use crate::instruments::{Instrument, Update, Updates};
+use crate::instruments::{Instrument, InstrumentAdapter, Update, Updates};
 use crate::snapshot::{ItemKind, Snapshot};
 use crate::util;
 use crate::{Descriptive, PutsSnapshot};
@@ -13,7 +13,7 @@ use crate::{Descriptive, PutsSnapshot};
 /// This meter count occurrences. An occurrence with values is
 /// counted as 1 occurrence.
 ///
-/// To get rates on values use `instruments::other_instruments::ValeMeter`
+/// To get rates on values use `instruments::other_instruments::ValueMeter`
 pub struct Meter {
     name: String,
     title: Option<String>,
@@ -27,7 +27,7 @@ pub struct Meter {
 }
 
 impl Meter {
-    pub fn new_with_defaults<T: Into<String>>(name: T) -> Meter {
+    pub fn new<T: Into<String>>(name: T) -> Meter {
         Meter {
             name: name.into(),
             title: None,
@@ -41,7 +41,11 @@ impl Meter {
         }
     }
 
-    pub fn name(&self) -> &str {
+    pub fn new_with_defaults<T: Into<String>>(name: T) -> Meter {
+        Self::new(name)
+    }
+
+    pub fn get_name(&self) -> &str {
         &self.name
     }
 
@@ -49,12 +53,27 @@ impl Meter {
         self.name = name.into();
     }
 
+    pub fn name<T: Into<String>>(mut self, name: T) -> Self {
+        self.set_name(name);
+        self
+    }
+
     pub fn set_title<T: Into<String>>(&mut self, title: T) {
         self.title = Some(title.into())
     }
 
+    pub fn title<T: Into<String>>(mut self, title: T) -> Self {
+        self.set_title(title);
+        self
+    }
+
     pub fn set_description<T: Into<String>>(&mut self, description: T) {
         self.description = Some(description.into())
+    }
+
+    pub fn description<T: Into<String>>(mut self, description: T) -> Self {
+        self.set_description(description);
+        self
     }
 
     /// Rates below this value will be shown as zero.
@@ -64,11 +83,27 @@ impl Meter {
         self.lower_cutoff = cutoff
     }
 
+    /// Rates below this value will be shown as zero.
+    ///
+    /// Default is 0.001
+    pub fn lower_cutoff(mut self, cutoff: f64) -> Self {
+        self.set_lower_cutoff(cutoff);
+        self
+    }
+
     /// Enable tracking of one minute rates.
     ///
     /// Default: enabled
-    pub fn set_enable_one_minute_rate_enabled(&mut self, enabled: bool) {
+    pub fn set_one_minute_rate_enabled(&mut self, enabled: bool) {
         self.one_minute_rate_enabled = enabled;
+    }
+
+    /// Enable tracking of one minute rates.
+    ///
+    /// Default: enabled
+    pub fn one_minute_rate_enabled(mut self, enabled: bool) -> Self {
+        self.set_one_minute_rate_enabled(enabled);
+        self
     }
 
     /// Enable tracking of five minute rates.
@@ -78,11 +113,53 @@ impl Meter {
         self.five_minute_rate_enabled = enabled;
     }
 
+    /// Enable tracking of five minute rates.
+    ///
+    /// Default: disabled
+    pub fn five_minute_rate_enabled(mut self, enabled: bool) -> Self {
+        self.set_five_minute_rate_enabled(enabled);
+        self
+    }
+
     /// Enable tracking of one minute rates.
     ///
     /// Default: disabled
     pub fn set_fifteen_minute_rate_enabled(&mut self, enabled: bool) {
         self.fifteen_minute_rate_enabled = enabled;
+    }
+
+    /// Enable tracking of one minute rates.
+    ///
+    /// Default: disabled
+    pub fn fifteen_minute_rate_enabled(mut self, enabled: bool) -> Self {
+        self.set_fifteen_minute_rate_enabled(enabled);
+        self
+    }
+
+    /// Creates an `InstrumentAdapter` that makes this instrument
+    /// react on observations on the given label.
+    pub fn for_label<L: Eq>(self, label: L) -> InstrumentAdapter<L, Self> {
+        InstrumentAdapter::for_label(label, self)
+    }
+
+    /// Creates an `InstrumentAdapter` that makes this instrument
+    /// react on observations with the given labels.
+    ///
+    /// If `labels` is empty the instrument will not react to any observations
+    pub fn for_labels<L: Eq>(self, label: Vec<L>) -> InstrumentAdapter<L, Self> {
+        InstrumentAdapter::for_labels(label, self)
+    }
+
+    /// Creates an `InstrumentAdapter` that makes this instrument react on
+    /// all observations.
+    pub fn for_all_labels<L: Eq>(self) -> InstrumentAdapter<L, Self> {
+        InstrumentAdapter::new(self)
+    }
+
+    /// Creates an `InstrumentAdapter` that makes this instrument to no
+    /// observations.
+    pub fn adapter<L: Eq>(self) -> InstrumentAdapter<L, Self> {
+        InstrumentAdapter::deaf(self)
     }
 
     pub(crate) fn get_snapshot(&self) -> MeterSnapshot {
