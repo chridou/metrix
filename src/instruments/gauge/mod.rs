@@ -21,7 +21,7 @@ use crate::{
 ///
 /// let mut gauge = Gauge::new_with_defaults("example");
 /// assert_eq!(None, gauge.get());
-/// let update = Update::ObservationWithValue(12, Instant::now());
+/// let update = Update::ObservationWithValue(12.into(), Instant::now());
 /// gauge.update(&update);
 ///
 /// assert_eq!(Some(12), gauge.get());

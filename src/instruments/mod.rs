@@ -123,6 +123,7 @@ pub trait Instrument: Updates + PutsSnapshot {}
 /// ```
 /// use std::time::Instant;
 /// use metrix::instruments::*;
+/// use metrix::{HandlesObservations, Observation};
 ///
 /// #[derive(Clone, PartialEq, Eq)]
 /// struct SuccessfulRequests;
@@ -135,17 +136,21 @@ pub trait Instrument: Updates + PutsSnapshot {}
 /// assert_eq!(0, counter.get());
 /// assert_eq!(None, gauge.get());
 ///
-/// let mut panel = Panel::with_name(SuccessfulRequests, "successful_requests");
+/// let mut panel = Panel::named(SuccessfulRequests, "successful_requests");
 /// panel.set_counter(counter);
 /// panel.set_gauge(gauge);
 /// panel.set_meter(meter);
 /// panel.set_histogram(histogram);
 ///
-/// let update = Update::ObservationWithValue(12, Instant::now());
-/// panel.update(&update);
+/// let observation = Observation::ObservedOneValue {
+///        label: SuccessfulRequests,
+///        value: 12.into(),
+///        timestamp: Instant::now(),
+/// };
+/// panel.handle_observation(&observation);
 ///
-/// assert_eq!(Some(1), panel.counter().map(|c| c.get()));
-/// assert_eq!(Some(12), panel.gauge().and_then(|g| g.get()));
+/// assert_eq!(Some(1), panel.get_counter().map(|c| c.get()));
+/// assert_eq!(Some(12), panel.get_gauge().and_then(|g| g.get()));
 /// ```
 pub struct Panel<L> {
     label_filter: LabelFilter<L>,
