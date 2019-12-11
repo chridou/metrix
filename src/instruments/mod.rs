@@ -16,6 +16,7 @@ pub use self::switches::*;
 pub use crate::cockpit::Cockpit;
 
 mod counter;
+mod fundamentals;
 mod gauge;
 mod histogram;
 mod instrument_adapter;

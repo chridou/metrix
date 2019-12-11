@@ -452,5 +452,5 @@ pub trait Descriptive {
 pub trait PutsSnapshot: Send + 'static {
     /// Puts the current snapshot values into the given `Snapshot` thereby
     /// following the guidelines of `PutsSnapshot`.
-    fn put_snapshot(&self, into: &mut Snapshot, descriptive: bool);
+    fn put_snapshot(&mut self, into: &mut Snapshot, descriptive: bool);
 }

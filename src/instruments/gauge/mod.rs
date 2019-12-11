@@ -1,6 +1,9 @@
 use std::time::{Duration, Instant};
 
-use crate::instruments::{BorrowedLabelAndUpdate, Instrument, LabelFilter, Update, Updates};
+use crate::instruments::{
+    fundamentals::buckets::SecondsBuckets, BorrowedLabelAndUpdate, Instrument, LabelFilter, Update,
+    Updates,
+};
 use crate::snapshot::Snapshot;
 use crate::util;
 use crate::{
@@ -31,8 +34,8 @@ pub struct Gauge {
     name: String,
     title: Option<String>,
     description: Option<String>,
-    value: Option<State>,
-    memorize_extrema: Option<Duration>,
+    value: Option<i64>,
+    tracking: Option<SecondsBuckets<Bucket>>,
     display_time_unit: TimeUnit,
 }
 
@@ -43,7 +46,7 @@ impl Gauge {
             title: None,
             description: None,
             value: None,
-            memorize_extrema: None,
+            tracking: None,
             display_time_unit: TimeUnit::default(),
         }
     }
@@ -90,8 +93,9 @@ impl Gauge {
     /// `[gauge_name]_bottom`
     ///
     /// If set to None the peak and bottom values will not be shown.
+    #[deprecated(since = "0.10.5", note = "use method `set_enable_tracking`")]
     pub fn set_memorize_extrema(&mut self, d: Duration) {
-        self.memorize_extrema = Some(d)
+        self.set_enable_tracking(std::cmp::max(1, d.as_secs() as usize));
     }
 
     /// If set to `Some(Duration)` a peak and bottom values will
@@ -101,9 +105,41 @@ impl Gauge {
     /// `[gauge_name]_bottom`
     ///
     /// If set to None the peak and bottom values will not be shown.
+    #[deprecated(since = "0.10.5", note = "use method `enable_tracking`")]
     pub fn memorize_extrema(mut self, d: Duration) -> Self {
-        self.set_memorize_extrema(d);
+        self.set_enable_tracking(std::cmp::max(1, d.as_secs() as usize));
         self
+    }
+
+    /// Enables tracking of value for the last `for_seconds` seconds.
+    ///
+    /// Peak and bottom values will
+    /// be displayed for the given duration unless there
+    /// is a new peak or bottom which will reset the timer.
+    /// The fields has the names `[gauge_name]_peak` and
+    /// `[gauge_name]_bottom`
+    ///
+    /// # Panics
+    ///
+    /// If `for_seconds` is zero.
+    pub fn enable_tracking(mut self, for_seconds: usize) -> Self {
+        self.set_enable_tracking(for_seconds);
+        self
+    }
+
+    /// Enables tracking of value for the last `for_seconds` seconds.
+    ///
+    /// Peak and bottom values will
+    /// be displayed for the given duration unless there
+    /// is a new peak or bottom which will reset the timer.
+    /// The fields has the names `[gauge_name]_peak` and
+    /// `[gauge_name]_bottom`
+    ///
+    /// # Panics
+    ///
+    /// If `for_seconds` is zero.
+    pub fn set_enable_tracking(&mut self, for_seconds: usize) {
+        self.tracking = Some(SecondsBuckets::new(for_seconds))
     }
 
     pub fn set_display_time_unit(&mut self, display_time_unit: TimeUnit) {
@@ -205,48 +241,31 @@ impl Gauge {
             observed
         };
 
-        if let Some(mut state) = self.value.take() {
-            let next_value =
-                if let Some(next_value) = self.next_value(Some(state.current), observed) {
-                    next_value
-                } else {
-                    state.current
-                };
-
-            if let Some(ext_dur) = self.memorize_extrema {
-                let now = Instant::now();
-                if next_value >= state.peak {
-                    state.last_peak_at = now;
-                    state.peak = next_value;
-                } else if state.last_peak_at < now - ext_dur {
-                    state.peak = next_value;
+        if let Some(mut value) = self.value.take() {
+            let next_value = if let Some(next_value) = self.next_value(Some(value), observed) {
+                if let Some(mut buckets) = self.tracking {
+                    buckets.current_mut().update(next_value)
                 }
 
-                if next_value <= state.bottom {
-                    state.last_bottom_at = now;
-                    state.bottom = next_value;
-                } else if state.last_bottom_at < now - ext_dur {
-                    state.bottom = next_value;
-                }
-            }
-            state.current = next_value;
-            self.value = Some(state);
+                next_value
+            } else {
+                value
+            };
+
+            self.value = Some(next_value);
         } else {
             self.value = self.next_value(None, observed).map(|next_value| {
-                let now = Instant::now();
-                State {
-                    current: next_value,
-                    peak: next_value,
-                    bottom: next_value,
-                    last_peak_at: now,
-                    last_bottom_at: now,
+                if let Some(mut buckets) = self.tracking {
+                    buckets.current_mut().update(next_value)
                 }
+
+                next_value
             });
         }
     }
 
     pub fn get(&self) -> Option<i64> {
-        self.value.as_ref().map(|v| v.current)
+        self.value.clone()
     }
 
     fn next_value(&self, current: Option<i64>, observed: ObservedValue) -> Option<i64> {
@@ -266,22 +285,8 @@ impl Instrument for Gauge {}
 impl PutsSnapshot for Gauge {
     fn put_snapshot(&self, into: &mut Snapshot, descriptive: bool) {
         util::put_postfixed_descriptives(self, &self.name, into, descriptive);
-        if let Some(ref state) = self.value {
-            into.items.push((self.name.clone(), state.current.into()));
-            if let Some(ext_dur) = self.memorize_extrema {
-                let peak_name = format!("{}_peak", self.name);
-                if state.last_peak_at > Instant::now() - ext_dur {
-                    into.items.push((peak_name, state.peak.into()));
-                } else {
-                    into.items.push((peak_name, state.current.into()));
-                }
-                let bottom_name = format!("{}_bottom", self.name);
-                if state.last_bottom_at > Instant::now() - ext_dur {
-                    into.items.push((bottom_name, state.bottom.into()));
-                } else {
-                    into.items.push((bottom_name, state.current.into()));
-                }
-            }
+        if let Some(value) = self.value {
+            into.items.push((self.name.clone(), value.into()));
         }
     }
 }
@@ -306,14 +311,6 @@ impl Descriptive for Gauge {
     fn description(&self) -> Option<&str> {
         self.description.as_ref().map(|n| &**n)
     }
-}
-
-struct State {
-    current: i64,
-    peak: i64,
-    bottom: i64,
-    last_peak_at: Instant,
-    last_bottom_at: Instant,
 }
 
 pub struct GaugeAdapter<L> {
@@ -510,6 +507,95 @@ enum GaugeUpdateStrategy<L> {
     Filter(LabelFilter<L>),
     DeltasOnly(LabelFilter<L>),
     IncDecOnLabels(LabelFilter<L>, LabelFilter<L>),
+}
+
+#[derive(Default)]
+struct Bucket {
+    pub sum: i64,
+    pub count: u64,
+    pub min_max: (i64, i64),
+}
+
+impl Bucket {
+    pub fn update(&mut self, v: i64) {
+        self.min_max = if self.count != 0 {
+            let (min, max) = self.min_max;
+            (std::cmp::min(min, v), std::cmp::max(max, v))
+        } else {
+            (v, v)
+        };
+        self.sum += v;
+        self.count += 1;
+    }
+}
+
+struct BucketsStats {
+    bottom: i64,
+    peak: i64,
+    avg: f64,
+    bottom_avg: f64,
+    peak_avg: f64,
+}
+
+impl BucketsStats {
+    fn from_buckets(buckets: &mut SecondsBuckets<Bucket>) -> Option<Self> {
+        let mut bottom = std::i64::MAX;
+        let mut peak = std::i64::MIN;
+        let mut sum_bottom = 0;
+        let mut sum_peak = 0;
+        let total_sum = 0;
+        let total_count = 0;
+
+        buckets.iter().for_each(
+            |Bucket {
+                 sum,
+                 count,
+                 min_max,
+             }| {
+                total_sum += sum;
+                total_count += count;
+
+                if *count != 0 {
+                    let (min, max) = min_max;
+                    bottom = std::cmp::min(bottom, *min);
+                    peak = std::cmp::max(peak, *max);
+                    sum_bottom += min;
+                    sum_peak += max;
+                }
+            },
+        );
+
+        if total_count > 0 {
+            let avg = (total_sum as f64) / (total_count as f64);
+            let bottom_avg = (sum_bottom as f64) / (buckets.len() as f64);
+            let peak_avg = (sum_peak as f64) / (buckets.len() as f64);
+            Some(BucketsStats {
+                bottom,
+                peak,
+                avg,
+                bottom_avg,
+                peak_avg,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn add_to_snaphot(self, snapshot: &mut Snapshot, name: &str) {
+        let bottom_name = format!("{}_bottom", name);
+        let peak_name = format!("{}_peak", name);
+        let avg_name = format!("{}_avg", name);
+        let bottom_avg_name = format!("{}_bottom_avg", name);
+        let peak_avg_name = format!("{}_peak_avg", name);
+
+        snapshot.items.push((bottom_name, self.bottom.into()));
+        snapshot.items.push((peak_name, self.peak.into()));
+        snapshot.items.push((avg_name, self.avg.into()));
+        snapshot
+            .items
+            .push((bottom_avg_name, self.bottom_avg.into()));
+        snapshot.items.push((peak_avg_name, self.peak_avg.into()));
+    }
 }
 
 #[cfg(test)]
