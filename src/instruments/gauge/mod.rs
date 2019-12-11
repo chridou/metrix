@@ -1,4 +1,5 @@
-use std::time::{Duration, Instant};
+use std::cell::RefCell;
+use std::time::Duration;
 
 use crate::instruments::{
     fundamentals::buckets::SecondsBuckets, BorrowedLabelAndUpdate, Instrument, LabelFilter, Update,
@@ -35,7 +36,7 @@ pub struct Gauge {
     title: Option<String>,
     description: Option<String>,
     value: Option<i64>,
-    tracking: Option<SecondsBuckets<Bucket>>,
+    tracking: Option<RefCell<SecondsBuckets<Bucket>>>,
     display_time_unit: TimeUnit,
 }
 
@@ -95,7 +96,7 @@ impl Gauge {
     /// If set to None the peak and bottom values will not be shown.
     #[deprecated(since = "0.10.5", note = "use method `set_enable_tracking`")]
     pub fn set_memorize_extrema(&mut self, d: Duration) {
-        self.set_enable_tracking(std::cmp::max(1, d.as_secs() as usize));
+        self.set_tracking(std::cmp::max(1, d.as_secs() as usize));
     }
 
     /// If set to `Some(Duration)` a peak and bottom values will
@@ -107,7 +108,7 @@ impl Gauge {
     /// If set to None the peak and bottom values will not be shown.
     #[deprecated(since = "0.10.5", note = "use method `enable_tracking`")]
     pub fn memorize_extrema(mut self, d: Duration) -> Self {
-        self.set_enable_tracking(std::cmp::max(1, d.as_secs() as usize));
+        self.set_tracking(std::cmp::max(1, d.as_secs() as usize));
         self
     }
 
@@ -122,8 +123,8 @@ impl Gauge {
     /// # Panics
     ///
     /// If `for_seconds` is zero.
-    pub fn enable_tracking(mut self, for_seconds: usize) -> Self {
-        self.set_enable_tracking(for_seconds);
+    pub fn tracking(mut self, for_seconds: usize) -> Self {
+        self.set_tracking(for_seconds);
         self
     }
 
@@ -138,8 +139,8 @@ impl Gauge {
     /// # Panics
     ///
     /// If `for_seconds` is zero.
-    pub fn set_enable_tracking(&mut self, for_seconds: usize) {
-        self.tracking = Some(SecondsBuckets::new(for_seconds))
+    pub fn set_tracking(&mut self, for_seconds: usize) {
+        self.tracking = Some(RefCell::new(SecondsBuckets::new(for_seconds)))
     }
 
     pub fn set_display_time_unit(&mut self, display_time_unit: TimeUnit) {
@@ -241,12 +242,14 @@ impl Gauge {
             observed
         };
 
-        if let Some(mut value) = self.value.take() {
+        if let Some(value) = self.value.take() {
             let next_value = if let Some(next_value) = self.next_value(Some(value), observed) {
-                if let Some(mut buckets) = self.tracking {
-                    buckets.current_mut().update(next_value)
+                if let Some(ref buckets) = self.tracking {
+                    match buckets.try_borrow_mut() {
+                        Ok(mut borrowed) => borrowed.current_mut().update(next_value),
+                        Err(_err) => crate::util::log_error("borrow mut in gauge::set failed!"),
+                    }
                 }
-
                 next_value
             } else {
                 value
@@ -255,8 +258,11 @@ impl Gauge {
             self.value = Some(next_value);
         } else {
             self.value = self.next_value(None, observed).map(|next_value| {
-                if let Some(mut buckets) = self.tracking {
-                    buckets.current_mut().update(next_value)
+                if let Some(ref buckets) = self.tracking {
+                    match buckets.try_borrow_mut() {
+                        Ok(mut borrowed) => borrowed.current_mut().update(next_value),
+                        Err(_err) => crate::util::log_error("borrow mut in gauge::set failed!"),
+                    }
                 }
 
                 next_value
@@ -287,6 +293,16 @@ impl PutsSnapshot for Gauge {
         util::put_postfixed_descriptives(self, &self.name, into, descriptive);
         if let Some(value) = self.value {
             into.items.push((self.name.clone(), value.into()));
+            if let Some(ref buckets) = self.tracking {
+                match buckets.try_borrow_mut() {
+                    Ok(mut borrowed) => BucketsStats::from_buckets(&mut *borrowed)
+                        .into_iter()
+                        .for_each(|stats| stats.add_to_snaphot(into, &self.name)),
+                    Err(_err) => {
+                        crate::util::log_error("borrow mut in gauge::put_snapshot failed!")
+                    }
+                }
+            }
         }
     }
 }
@@ -543,8 +559,8 @@ impl BucketsStats {
         let mut peak = std::i64::MIN;
         let mut sum_bottom = 0;
         let mut sum_peak = 0;
-        let total_sum = 0;
-        let total_count = 0;
+        let mut total_sum = 0;
+        let mut total_count = 0;
 
         buckets.iter().for_each(
             |Bucket {

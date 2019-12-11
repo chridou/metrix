@@ -718,8 +718,10 @@ impl DriverInstruments {
     }
 }
 
+/*
 #[inline]
 fn duration_to_micros(d: Duration) -> u64 {
     let nanos = (d.as_secs() * 1_000_000_000) + (d.subsec_nanos() as u64);
     nanos / 1000
 }
+*/

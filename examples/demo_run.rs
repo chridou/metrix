@@ -59,7 +59,7 @@ fn create_foo_metrics() -> (TelemetryTransmitterSync<FooLabel>, ProcessorMount) 
 
     let mut foo_b_panel = Panel::new(FooLabel::B);
     foo_b_panel.set_counter(Counter::new_with_defaults("foo_b_counter"));
-    let mut gauge = Gauge::new_with_defaults("foo_b_gauge");
+    let mut gauge = Gauge::new_with_defaults("foo_b_gauge").tracking(15);
     gauge.set_title("title");
     gauge.set_description("description");
     foo_b_panel.set_gauge(gauge);

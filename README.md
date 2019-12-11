@@ -107,6 +107,9 @@ hierarchy all processors registered with the driver will only
 be driven by that driver.
 
 ## Recent changes:
+* 0.10.6
+    * Gauge has sliding window for tracking peak values
+    * added more builder like methods
 * 0.10.5
     * Adapters shouldn't be instruments
 * 0.10.4

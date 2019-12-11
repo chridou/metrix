@@ -50,7 +50,19 @@ where
     ///
     /// If there is a name set, this will group the inner components in the
     /// snapshot.
+    #[deprecated(
+        since = "0.10.6",
+        note = "use get_name. this method will change its signature"
+    )]
     pub fn name(&self) -> Option<&str> {
+        self.get_name()
+    }
+
+    /// Returns the name of this cockpit.
+    ///
+    /// If there is a name set, this will group the inner components in the
+    /// snapshot.
+    pub fn get_name(&self) -> Option<&str> {
         self.name.as_ref().map(|n| &**n)
     }
 
@@ -122,7 +134,16 @@ where
     }
 
     /// Returns all the handlers.
+    #[deprecated(
+        since = "0.10.6",
+        note = "use get_handlers. this method will change its signature"
+    )]
     pub fn handlers(&self) -> Vec<&dyn HandlesObservations<Label = L>> {
+        self.get_handlers()
+    }
+
+    /// Returns all the handlers.
+    pub fn get_handlers(&self) -> Vec<&dyn HandlesObservations<Label = L>> {
         self.handlers.iter().map(|h| &**h).collect()
     }
 
@@ -139,8 +160,26 @@ where
         self.snapshooters.push(Box::new(snapshooter));
     }
 
+    /// Adds a snapshooter.
+    ///
+    /// A snapshooter will only be invoked when a `Snapshot` is requested.
+    /// It will never receive an `Observation`.
+    pub fn snapshooter<T: PutsSnapshot>(mut self, snapshooter: T) -> Self {
+        self.add_snapshooter(snapshooter);
+        self
+    }
+
     /// Returns all snapshooters.
+    #[deprecated(
+        since = "0.10.6",
+        note = "use get_snapshooters. this method will change its signature"
+    )]
     pub fn snapshooters(&self) -> Vec<&dyn PutsSnapshot> {
+        self.get_snapshooters()
+    }
+
+    /// Returns all snapshooters.
+    pub fn get_snapshooters(&self) -> Vec<&dyn PutsSnapshot> {
         self.snapshooters.iter().map(|p| &**p).collect()
     }
 

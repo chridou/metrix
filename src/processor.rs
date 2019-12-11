@@ -221,18 +221,48 @@ where
         self.cockpits.push(cockpit)
     }
 
+    /// Add a `Cockpit`
+    pub fn cockpit(mut self, cockpit: Cockpit<L>) -> Self {
+        self.add_cockpit(cockpit);
+        self
+    }
+
     /// Returns all contained `Cockpit`s
+    #[deprecated(
+        since = "0.10.6",
+        note = "use get_cockpits. this method will change its signature"
+    )]
     pub fn cockpits(&self) -> Vec<&Cockpit<L>> {
+        self.get_cockpits()
+    }
+
+    /// Returns all contained `Cockpit`s
+    pub fn get_cockpits(&self) -> Vec<&Cockpit<L>> {
         self.cockpits.iter().map(|p| p).collect()
     }
 
     /// Add a (custom) handler for `Observation`s.
-    pub fn add_handler(&mut self, handler: Box<dyn HandlesObservations<Label = L>>) {
-        self.handlers.push(handler);
+    pub fn add_handler<T: HandlesObservations<Label = L>>(&mut self, handler: T) {
+        self.handlers.push(Box::new(handler));
+    }
+
+    /// Add a (custom) handler for `Observation`s.
+    pub fn handler<T: HandlesObservations<Label = L>>(mut self, handler: T) -> Self {
+        self.add_handler(handler);
+        self
     }
 
     /// Returns all the handlers
+    #[deprecated(
+        since = "0.10.6",
+        note = "use get_handlers. this method will change its signature"
+    )]
     pub fn handlers(&self) -> Vec<&dyn HandlesObservations<Label = L>> {
+        self.get_handlers()
+    }
+
+    /// Returns all the handlers
+    pub fn get_handlers(&self) -> Vec<&dyn HandlesObservations<Label = L>> {
         self.handlers.iter().map(|h| &**h).collect()
     }
 
@@ -243,11 +273,35 @@ where
         self.snapshooters.push(Box::new(snapshooter));
     }
 
+    /// Add a snapshooter that simply creates some `Snapshot` defined
+    /// by it's internal logic. Usually it polls something when a
+    /// `Snapshot` is requested.
+    pub fn snapshooter<S: PutsSnapshot>(mut self, snapshooter: S) -> Self {
+        self.add_snapshooter(snapshooter);
+        self
+    }
+
+    #[deprecated(
+        since = "0.10.6",
+        note = "use get_snapshooters. this method will change its signature"
+    )]
     pub fn snapshooters(&self) -> Vec<&dyn PutsSnapshot> {
+        self.get_snapshooters()
+    }
+
+    pub fn get_snapshooters(&self) -> Vec<&dyn PutsSnapshot> {
         self.snapshooters.iter().map(|p| &**p).collect()
     }
 
+    #[deprecated(
+        since = "0.10.6",
+        note = "use get_name. this method will change its signature"
+    )]
     pub fn name(&self) -> Option<&str> {
+        self.get_name()
+    }
+
+    pub fn get_name(&self) -> Option<&str> {
         self.name.as_ref().map(|n| &**n)
     }
 
@@ -260,6 +314,13 @@ where
     /// inactive until no more snapshots are taken
     pub fn set_inactivity_limit(&mut self, limit: Duration) {
         self.max_inactivity_duration = Some(limit);
+    }
+
+    /// Sets the maximum amount of time this processor may be
+    /// inactive until no more snapshots are taken
+    pub fn inactivity_limit(mut self, limit: Duration) -> Self {
+        self.set_inactivity_limit(limit);
+        self
     }
 
     fn put_values_into_snapshot(&self, into: &mut Snapshot, descriptive: bool) {
@@ -328,7 +389,7 @@ where
                     processed += 1;
                 }
                 Ok(TelemetryMessage::AddHandler(h)) => {
-                    self.add_handler(h);
+                    self.handlers.push(h);
                     processed += 1;
                 }
                 Ok(TelemetryMessage::AddPanel {
@@ -338,9 +399,9 @@ where
                     if let Some(ref mut cockpit) = self
                         .cockpits
                         .iter_mut()
-                        .find(|c| c.name() == Some(&cockpit_name))
+                        .find(|c| c.get_name() == Some(&cockpit_name))
                     {
-                        let _ = cockpit.add_panel(panel);
+                        cockpit.add_panel(panel);
                     }
                     processed += 1;
                 }
