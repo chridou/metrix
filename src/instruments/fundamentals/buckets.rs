@@ -1,4 +1,4 @@
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use super::{Clock, WallClock};
 
@@ -88,7 +88,7 @@ where
         if d == 0 {
             return;
         }
-        self.last_tick = now;
+        self.last_tick += Duration::from_secs(d);
         let d = d as usize;
 
         if d == 1 {
@@ -473,6 +473,42 @@ mod test {
         assert_eq!(vec![0, 0, 1], buckets.iter().copied().collect::<Vec<_>>());
         clock.advance_by(Duration::from_millis(500));
         assert_eq!(vec![0, 0, 0], buckets.iter().copied().collect::<Vec<_>>());
+    }
+
+    #[test]
+    fn non_equidistant_advance() {
+        let clock = ManualOffsetClock::default();
+        let mut buckets = SecondsBuckets::<u32, _>::with_clock(5, clock.clone());
+        *buckets.current_mut() = 1;
+
+        assert_eq!(
+            vec![1, 0, 0, 0, 0],
+            buckets.iter().copied().collect::<Vec<_>>()
+        );
+
+        clock.advance_by(Duration::from_millis(1500));
+        assert_eq!(
+            vec![0, 1, 0, 0, 0],
+            buckets.iter().copied().collect::<Vec<_>>()
+        );
+
+        clock.advance_by(Duration::from_millis(500));
+        assert_eq!(
+            vec![0, 0, 1, 0, 0],
+            buckets.iter().copied().collect::<Vec<_>>()
+        );
+
+        clock.advance_by(Duration::from_millis(1500));
+        assert_eq!(
+            vec![0, 0, 0, 1, 0],
+            buckets.iter().copied().collect::<Vec<_>>()
+        );
+
+        clock.advance_by(Duration::from_millis(500));
+        assert_eq!(
+            vec![0, 0, 0, 0, 1],
+            buckets.iter().copied().collect::<Vec<_>>()
+        );
     }
 
     #[test]

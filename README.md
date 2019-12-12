@@ -107,6 +107,8 @@ hierarchy all processors registered with the driver will only
 be driven by that driver.
 
 ## Recent changes:
+* 0.10.8
+    * BUGFIX: Gauge tracked with non-equidistant intervals
 * 0.10.7
     * allow remapping of updates
     * filter for valid labels by predicates
