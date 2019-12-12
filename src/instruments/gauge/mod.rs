@@ -3,7 +3,7 @@ use std::time::Duration;
 
 use crate::instruments::{
     fundamentals::buckets::SecondsBuckets, BorrowedLabelAndUpdate, Instrument, LabelFilter, Update,
-    Updates,
+    UpdateModifier, Updates,
 };
 use crate::snapshot::Snapshot;
 use crate::util;
@@ -172,6 +172,16 @@ impl Gauge {
         GaugeAdapter::new(self)
     }
 
+    /// Creates a `GaugeAdapter` that makes this instrument react on
+    /// observations with labels specified by the predicate.
+    pub fn for_labels_by_predicate<L, P>(self, label_predicate: P) -> GaugeAdapter<L>
+    where
+        L: Eq,
+        P: Fn(&L) -> bool + Send + 'static,
+    {
+        GaugeAdapter::for_labels_by_predicate(label_predicate, self)
+    }
+
     /// Creates an `GaugeAdapter` that makes this instrument to rect to no
     /// observations.
     pub fn adapter<L: Eq>(self) -> GaugeAdapter<L> {
@@ -196,6 +206,14 @@ impl Gauge {
     /// decrement the value
     pub fn for_labels_deltas_only<L: Eq>(self, labels: Vec<L>) -> GaugeAdapter<L> {
         GaugeAdapter::for_labels_deltas_only(labels, self)
+    }
+
+    pub fn for_labels_deltas_only_by_predicate<L, P>(self, label_predicate: P) -> GaugeAdapter<L>
+    where
+        L: Eq,
+        P: Fn(&L) -> bool + Send + 'static,
+    {
+        GaugeAdapter::for_labels_deltas_only_by_predicate(label_predicate, self)
     }
 
     /// Creates a new adapter which dispatches observations
@@ -226,6 +244,19 @@ impl Gauge {
         decrement_on: Vec<L>,
     ) -> GaugeAdapter<L> {
         GaugeAdapter::inc_dec_on_many(increment_on, decrement_on, self)
+    }
+
+    pub fn inc_dec_by_predicates<L, PINC, PDEC>(
+        self,
+        predicate_inc: PINC,
+        predicate_dec: PDEC,
+    ) -> GaugeAdapter<L>
+    where
+        L: Eq,
+        PINC: Fn(&L) -> bool + Send + 'static,
+        PDEC: Fn(&L) -> bool + Send + 'static,
+    {
+        GaugeAdapter::inc_dec_by_predicates(predicate_inc, predicate_dec, self)
     }
 
     pub fn set(&mut self, observed: ObservedValue) {
@@ -332,6 +363,7 @@ impl Descriptive for Gauge {
 pub struct GaugeAdapter<L> {
     strategy: GaugeUpdateStrategy<L>,
     gauge: Gauge,
+    modify_update: UpdateModifier<L>,
 }
 
 impl<L> GaugeAdapter<L>
@@ -344,6 +376,7 @@ where
         Self {
             gauge,
             strategy: GaugeUpdateStrategy::Filter(LabelFilter::AcceptAll),
+            modify_update: UpdateModifier::KeepAsIs,
         }
     }
 
@@ -353,6 +386,7 @@ where
         Self {
             gauge,
             strategy: GaugeUpdateStrategy::Filter(LabelFilter::new(label)),
+            modify_update: UpdateModifier::KeepAsIs,
         }
     }
 
@@ -364,6 +398,20 @@ where
         Self {
             gauge,
             strategy: GaugeUpdateStrategy::Filter(LabelFilter::many(labels)),
+            modify_update: UpdateModifier::KeepAsIs,
+        }
+    }
+
+    /// Creates a `GaugeAdapter` that makes this instrument react on
+    /// observations with labels specified by the predicate.
+    pub fn for_labels_by_predicate<P>(label_predicate: P, gauge: Gauge) -> Self
+    where
+        P: Fn(&L) -> bool + Send + 'static,
+    {
+        Self {
+            gauge,
+            strategy: GaugeUpdateStrategy::Filter(LabelFilter::predicate(label_predicate)),
+            modify_update: UpdateModifier::KeepAsIs,
         }
     }
 
@@ -376,6 +424,7 @@ where
         Self {
             gauge,
             strategy: GaugeUpdateStrategy::DeltasOnly(LabelFilter::new(label)),
+            modify_update: UpdateModifier::KeepAsIs,
         }
     }
 
@@ -390,6 +439,20 @@ where
         Self {
             gauge,
             strategy: GaugeUpdateStrategy::DeltasOnly(LabelFilter::many(labels)),
+            modify_update: UpdateModifier::KeepAsIs,
+        }
+    }
+
+    /// Creates a `GaugeAdapter` that makes this instrument react on
+    /// observations with labels specified by the predicate.
+    pub fn for_labels_deltas_only_by_predicate<P>(label_predicate: P, gauge: Gauge) -> Self
+    where
+        P: Fn(&L) -> bool + Send + 'static,
+    {
+        Self {
+            gauge,
+            strategy: GaugeUpdateStrategy::DeltasOnly(LabelFilter::predicate(label_predicate)),
+            modify_update: UpdateModifier::KeepAsIs,
         }
     }
 
@@ -409,6 +472,7 @@ where
                 LabelFilter::new(increment_on),
                 LabelFilter::new(decrement_on),
             ),
+            modify_update: UpdateModifier::KeepAsIs,
         }
     }
 
@@ -428,6 +492,28 @@ where
                 LabelFilter::many(increment_on),
                 LabelFilter::many(decrement_on),
             ),
+            modify_update: UpdateModifier::KeepAsIs,
+        }
+    }
+
+    /// Creates a `GaugeAdapter` that makes this instrument react on
+    /// observations with labels specified by the predicate.
+    pub fn inc_dec_by_predicates<PINC, PDEC>(
+        predicate_inc: PINC,
+        predicate_dec: PDEC,
+        gauge: Gauge,
+    ) -> Self
+    where
+        PINC: Fn(&L) -> bool + Send + 'static,
+        PDEC: Fn(&L) -> bool + Send + 'static,
+    {
+        Self {
+            gauge,
+            strategy: GaugeUpdateStrategy::IncDecOnLabels(
+                LabelFilter::predicate(predicate_inc),
+                LabelFilter::predicate(predicate_dec),
+            ),
+            modify_update: UpdateModifier::KeepAsIs,
         }
     }
 
@@ -437,6 +523,7 @@ where
         Self {
             gauge,
             strategy: GaugeUpdateStrategy::Filter(LabelFilter::AcceptNone),
+            modify_update: UpdateModifier::KeepAsIs,
         }
     }
 
@@ -467,12 +554,14 @@ where
                 if !filter.accepts(label) {
                     return 0;
                 }
+                let update = self.modify_update.modify(label, update);
                 self.gauge.update(&update)
             }
             GaugeUpdateStrategy::DeltasOnly(ref filter) => {
                 if !filter.accepts(label) {
                     return 0;
                 }
+                let update = self.modify_update.modify(label, update);
 
                 match update {
                     Update::ObservationWithValue(ObservedValue::ChangedBy(_), _) => {

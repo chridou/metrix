@@ -3,9 +3,24 @@ use crate::{HandlesObservations, Observation, PutsSnapshot};
 
 use super::*;
 
+pub(crate) enum UpdateModifier<L> {
+    KeepAsIs,
+    Modify(Box<dyn Fn(&L, Update) -> Update + Send + 'static>),
+}
+
+impl<L> UpdateModifier<L> {
+    pub fn modify(&self, label: &L, update: Update) -> Update {
+        match self {
+            UpdateModifier::KeepAsIs => update,
+            UpdateModifier::Modify(ref f) => f(label, update),
+        }
+    }
+}
+
 pub struct InstrumentAdapter<L, I> {
     label_filter: LabelFilter<L>,
     instrument: I,
+    modify_update: UpdateModifier<L>,
 }
 
 impl<L, I> InstrumentAdapter<L, I>
@@ -17,6 +32,7 @@ where
         Self {
             instrument,
             label_filter: LabelFilter::AcceptAll,
+            modify_update: UpdateModifier::KeepAsIs,
         }
     }
 
@@ -24,6 +40,7 @@ where
         Self {
             instrument,
             label_filter: LabelFilter::new(label),
+            modify_update: UpdateModifier::KeepAsIs,
         }
     }
 
@@ -31,6 +48,18 @@ where
         Self {
             instrument,
             label_filter: LabelFilter::many(labels),
+            modify_update: UpdateModifier::KeepAsIs,
+        }
+    }
+
+    pub fn by_predicate<P>(predicate: P, instrument: I) -> Self
+    where
+        P: Fn(&L) -> bool + Send + 'static,
+    {
+        Self {
+            instrument,
+            label_filter: LabelFilter::predicate(predicate),
+            modify_update: UpdateModifier::KeepAsIs,
         }
     }
 
@@ -38,12 +67,8 @@ where
         Self {
             instrument,
             label_filter: LabelFilter::AcceptNone,
+            modify_update: UpdateModifier::KeepAsIs,
         }
-    }
-
-    pub fn accept_label(mut self, label: L) -> Self {
-        self.label_filter.add_label(label);
-        self
     }
 
     pub fn accept_no_labels(mut self) -> Self {
@@ -53,6 +78,14 @@ where
 
     pub fn accept_all_labels(mut self) -> Self {
         self.label_filter = LabelFilter::AcceptAll;
+        self
+    }
+
+    pub fn modify_with<F>(mut self, f: F) -> Self
+    where
+        F: Fn(&L, Update) -> Update + Send + 'static,
+    {
+        self.modify_update = UpdateModifier::Modify(Box::new(f));
         self
     }
 
@@ -73,7 +106,9 @@ where
             return 0;
         }
 
-        let BorrowedLabelAndUpdate(_label, update) = observation.into();
+        let BorrowedLabelAndUpdate(label, update) = observation.into();
+
+        let update = self.modify_update.modify(label, update);
 
         self.instrument.update(&update)
     }

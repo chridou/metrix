@@ -118,6 +118,7 @@ pub(crate) enum LabelFilter<L> {
     Four(L, L, L, L),
     Five(L, L, L, L, L),
     Many(Vec<L>),
+    Predicate(Box<dyn Fn(&L) -> bool + Send + 'static>),
 }
 
 impl<L> LabelFilter<L>
@@ -126,6 +127,13 @@ where
 {
     pub fn new(label: L) -> Self {
         Self::One(label)
+    }
+
+    pub fn predicate<P>(p: P) -> Self
+    where
+        P: Fn(&L) -> bool + Send + 'static,
+    {
+        Self::Predicate(Box::new(p))
     }
 
     pub fn many(mut labels: Vec<L>) -> Self {
@@ -182,28 +190,8 @@ where
                 label == a || label == b || label == c || label == d || label == ee
             }
             LabelFilter::Many(many) => many.contains(label),
+            LabelFilter::Predicate(ref pred) => pred(label),
         }
-    }
-
-    pub fn add_label(&mut self, label: L) {
-        let current = std::mem::replace(self, LabelFilter::AcceptNone);
-        *self = match current {
-            LabelFilter::AcceptAll => LabelFilter::AcceptAll,
-            LabelFilter::AcceptNone => LabelFilter::One(label),
-            LabelFilter::One(a) => LabelFilter::Two(a, label),
-            LabelFilter::Two(a, b) => LabelFilter::Three(a, b, label),
-            LabelFilter::Three(a, b, c) => LabelFilter::Four(a, b, c, label),
-            LabelFilter::Four(a, b, c, d) => LabelFilter::Five(a, b, c, d, label),
-            LabelFilter::Five(a, b, c, d, ee) => {
-                let mut labels = vec![a, b, c, d, ee];
-                labels.push(label);
-                LabelFilter::Many(labels)
-            }
-            LabelFilter::Many(mut labels) => {
-                labels.push(label);
-                LabelFilter::Many(labels)
-            }
-        };
     }
 }
 

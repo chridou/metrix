@@ -176,6 +176,16 @@ impl OccurrenceIndicator {
         InstrumentAdapter::new(self)
     }
 
+    /// Creates an `InstrumentAdapter` that makes this instrument react on
+    /// observations with labels specified by the predicate.
+    pub fn for_labels_by_predicate<L, P>(self, label_predicate: P) -> InstrumentAdapter<L, Self>
+    where
+        L: Eq,
+        P: Fn(&L) -> bool + Send + 'static,
+    {
+        InstrumentAdapter::by_predicate(label_predicate, self)
+    }
+
     /// Creates an `InstrumentAdapter` that makes this instrument to no
     /// observations.
     pub fn adapter<L: Eq>(self) -> InstrumentAdapter<L, Self> {
