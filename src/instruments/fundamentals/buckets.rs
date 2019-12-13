@@ -8,8 +8,8 @@ use super::{Clock, WallClock};
 pub struct SecondsBuckets<T, C = WallClock> {
     buckets: Vec<T>,
     clock: C,
-    last_tick: Instant,
-    tick_idx: usize,
+    current_time: Instant,
+    current_idx: usize,
 }
 
 impl<T> SecondsBuckets<T, WallClock>
@@ -37,32 +37,32 @@ where
             panic!("buckets must be for at least 1 seconds");
         }
 
-        let tick_idx = buckets.len() - 1;
-        let last_tick = clock.now();
+        let current_idx = buckets.len() - 1;
+        let current_time = clock.now();
         Self {
             buckets,
             clock,
-            last_tick,
-            tick_idx,
+            current_time,
+            current_idx,
         }
     }
 
     pub fn current_mut(&mut self) -> &mut T {
         self.tick();
-        &mut self.buckets[self.tick_idx]
+        &mut self.buckets[self.current_idx]
     }
 
     pub fn get_at_mut(&mut self, for_when: Instant) -> Option<&mut T> {
         self.tick();
-        if for_when > self.last_tick {
+        if for_when > self.current_time {
             return None;
         }
-        let d = (self.last_tick - for_when).as_secs() as usize;
+        let d = (self.current_time - for_when).as_secs() as usize;
         if d >= self.buckets.len() {
             return None;
         }
 
-        let offset = self.buckets.len() + self.tick_idx - d;
+        let offset = self.buckets.len() + self.current_idx - d;
         let idx = self.idx(offset);
 
         Some(&mut self.buckets[idx])
@@ -74,7 +74,7 @@ where
     pub fn iter(&mut self) -> BucketIterator<T> {
         self.tick();
         let count = self.buckets.len();
-        let idx = self.tick_idx;
+        let idx = self.current_idx;
         BucketIterator {
             buckets: &mut self.buckets,
             count,
@@ -84,29 +84,29 @@ where
 
     fn tick(&mut self) {
         let now = self.clock.now();
-        let d = (now - self.last_tick).as_secs();
+        let d = (now - self.current_time).as_secs();
         if d == 0 {
             return;
         }
-        self.last_tick += Duration::from_secs(d);
+        self.current_time += Duration::from_secs(d);
         let d = d as usize;
 
         if d == 1 {
-            self.tick_idx = self.idx(self.tick_idx + 1);
-            self.buckets[self.tick_idx] = T::default();
+            self.current_idx = self.idx(self.current_idx + 1);
+            self.buckets[self.current_idx] = T::default();
             return;
         }
 
         if d < self.buckets.len() {
             for _ in 0..d {
-                self.tick_idx = self.idx(self.tick_idx + 1);
-                self.buckets[self.tick_idx] = T::default();
+                self.current_idx = self.idx(self.current_idx + 1);
+                self.buckets[self.current_idx] = T::default();
             }
             return;
         }
 
         if d >= self.buckets.len() {
-            self.tick_idx = 0;
+            self.current_idx = 0;
             self.buckets
                 .iter_mut()
                 .for_each(|bucket| *bucket = T::default());
@@ -461,17 +461,17 @@ mod test {
         *buckets.current_mut() = 1;
 
         assert_eq!(vec![1, 0, 0], buckets.iter().copied().collect::<Vec<_>>());
-        clock.advance_by(Duration::from_millis(500));
+        clock.advance_millis(500);
         assert_eq!(vec![1, 0, 0], buckets.iter().copied().collect::<Vec<_>>());
-        clock.advance_by(Duration::from_millis(500));
+        clock.advance_millis(500);
         assert_eq!(vec![0, 1, 0], buckets.iter().copied().collect::<Vec<_>>());
-        clock.advance_by(Duration::from_millis(500));
+        clock.advance_millis(500);
         assert_eq!(vec![0, 1, 0], buckets.iter().copied().collect::<Vec<_>>());
-        clock.advance_by(Duration::from_millis(500));
+        clock.advance_millis(500);
         assert_eq!(vec![0, 0, 1], buckets.iter().copied().collect::<Vec<_>>());
-        clock.advance_by(Duration::from_millis(500));
+        clock.advance_millis(500);
         assert_eq!(vec![0, 0, 1], buckets.iter().copied().collect::<Vec<_>>());
-        clock.advance_by(Duration::from_millis(500));
+        clock.advance_millis(500);
         assert_eq!(vec![0, 0, 0], buckets.iter().copied().collect::<Vec<_>>());
     }
 
@@ -486,25 +486,25 @@ mod test {
             buckets.iter().copied().collect::<Vec<_>>()
         );
 
-        clock.advance_by(Duration::from_millis(1500));
+        clock.advance_millis(1_500);
         assert_eq!(
             vec![0, 1, 0, 0, 0],
             buckets.iter().copied().collect::<Vec<_>>()
         );
 
-        clock.advance_by(Duration::from_millis(500));
+        clock.advance_millis(500);
         assert_eq!(
             vec![0, 0, 1, 0, 0],
             buckets.iter().copied().collect::<Vec<_>>()
         );
 
-        clock.advance_by(Duration::from_millis(1500));
+        clock.advance_millis(1_500);
         assert_eq!(
             vec![0, 0, 0, 1, 0],
             buckets.iter().copied().collect::<Vec<_>>()
         );
 
-        clock.advance_by(Duration::from_millis(500));
+        clock.advance_millis(500);
         assert_eq!(
             vec![0, 0, 0, 0, 1],
             buckets.iter().copied().collect::<Vec<_>>()

@@ -52,6 +52,10 @@ pub mod manual_clock {
             *offset += by;
         }
 
+        pub fn advance_millis(&self, millis: u64) {
+            self.advance_by(Duration::from_millis(millis))
+        }
+
         pub fn advance_n_seconds(&self, secs: u64) {
             self.advance_by(Duration::from_secs(secs))
         }

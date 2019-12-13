@@ -1,28 +1,29 @@
 use std::cell::RefCell;
 use std::time::Duration;
 
-use crate::instruments::{
-    fundamentals::buckets::SecondsBuckets, BorrowedLabelAndUpdate, Instrument, LabelFilter, Update,
-    UpdateModifier, Updates,
-};
+use crate::instruments::{fundamentals::buckets::SecondsBuckets, Instrument, Update, Updates};
 use crate::snapshot::Snapshot;
 use crate::util;
-use crate::{
-    Descriptive, HandlesObservations, Observation, ObservedValue, PutsSnapshot, TimeUnit, DECR,
-    INCR,
-};
+use crate::{Descriptive, ObservedValue, PutsSnapshot, TimeUnit, DECR, INCR};
+pub use gauge_adapter::*;
+use tracking::*;
+
+mod gauge_adapter;
+mod tracking;
 
 /// Simply returns the value that has been observed last.
 ///
-/// Reacts to the following `Observation`:
+/// Reacts  `Observation::Observation::ObservedOneValue`
+/// with the following values:
+/// * `ObservedValue::ChangedBy` whoich increments or decrements the value
+/// * All `ObservedValue`s tha can be converted to an `i64` which
+/// directly set the value
 ///
-/// * `Observation::ObservedOneValue`(Update::ObservationWithValue)
-///
-/// # Example
+/// # Examples
 ///
 /// ```
-/// use std::time::Instant;
-/// use metrix::instruments::*;
+/// # use std::time::Instant;
+/// # use metrix::instruments::*;
 ///
 /// let mut gauge = Gauge::new_with_defaults("example");
 /// assert_eq!(None, gauge.get());
@@ -30,6 +31,28 @@ use crate::{
 /// gauge.update(&update);
 ///
 /// assert_eq!(Some(12), gauge.get());
+/// ```
+///
+/// ```
+/// # use std::time::Instant;
+/// # use metrix::instruments::*;
+/// use metrix::{ChangeBy, Increment, Decrement};
+///
+/// let mut gauge = Gauge::new_with_defaults("example");
+/// gauge.set(12.into());
+/// assert_eq!(Some(12), gauge.get());
+///
+/// let update = Update::ObservationWithValue(Increment.into(), Instant::now());
+/// gauge.update(&update);
+/// assert_eq!(Some(13), gauge.get());
+///
+/// let update = Update::ObservationWithValue(Decrement.into(), Instant::now());
+/// gauge.update(&update);
+/// assert_eq!(Some(12), gauge.get());
+///
+/// let update = Update::ObservationWithValue(ChangeBy(-12).into(), Instant::now());
+/// gauge.update(&update);
+/// assert_eq!(Some(0), gauge.get());
 /// ```
 pub struct Gauge {
     name: String,
@@ -87,60 +110,54 @@ impl Gauge {
         self
     }
 
-    /// If set to `Some(Duration)` a peak and bottom values will
-    /// be displayed for the given duration unless there
-    /// is a new peak or bottom which will reset the timer.
-    /// The fields has the names `[gauge_name]_peak` and
-    /// `[gauge_name]_bottom`
-    ///
-    /// If set to None the peak and bottom values will not be shown.
-    #[deprecated(since = "0.10.5", note = "use method `set_enable_tracking`")]
+    #[deprecated(since = "0.10.5", note = "use method `set_tracking`")]
     pub fn set_memorize_extrema(&mut self, d: Duration) {
         self.set_tracking(std::cmp::max(1, d.as_secs() as usize));
     }
 
-    /// If set to `Some(Duration)` a peak and bottom values will
-    /// be displayed for the given duration unless there
-    /// is a new peak or bottom which will reset the timer.
-    /// The fields has the names `[gauge_name]_peak` and
-    /// `[gauge_name]_bottom`
-    ///
-    /// If set to None the peak and bottom values will not be shown.
-    #[deprecated(since = "0.10.5", note = "use method `enable_tracking`")]
+    #[deprecated(since = "0.10.5", note = "use method `tracking`")]
     pub fn memorize_extrema(mut self, d: Duration) -> Self {
         self.set_tracking(std::cmp::max(1, d.as_secs() as usize));
         self
     }
 
     /// Enables tracking of value for the last `for_seconds` seconds.
+    /// For each interval of a second there will be a record that tracks
+    /// the minimum and maximum values of the gauge within an interval.
+    /// Also a sum and a counter to calculate averages will be recorded.
     ///
-    /// Peak and bottom values will
-    /// be displayed for the given duration unless there
-    /// is a new peak or bottom which will reset the timer.
-    /// The fields has the names `[gauge_name]_peak` and
-    /// `[gauge_name]_bottom`
+    /// If tracking is enabled, the following fields will be added:
     ///
-    /// # Panics
-    ///
-    /// If `for_seconds` is zero.
+    /// * `[gauge_name]_peak`: The peak value of all records
+    /// * `[gauge_name]_peak_min`: The smallest of the peak values of all records
+    /// * `[gauge_name]_peak_avg`: The average of the peak values for all records
+    /// * `[gauge_name]_bottom`: The bottom value of all records
+    /// * `[gauge_name]_bottom_max`: The biggest bottom value of all records
+    /// * `[gauge_name]_bottom_avg`: The average of all bottom values for all records
+    /// * `[gauge_name]_avg`: The average of all values for all records
     pub fn tracking(mut self, for_seconds: usize) -> Self {
         self.set_tracking(for_seconds);
         self
     }
 
     /// Enables tracking of value for the last `for_seconds` seconds.
+    /// For each interval of a second there will be a record that tracks
+    /// the minimum and maximum values of the gauge within an interval.
+    /// Also a sum and a counter to calculate averages will be recorded.
     ///
-    /// Peak and bottom values will
-    /// be displayed for the given duration unless there
-    /// is a new peak or bottom which will reset the timer.
-    /// The fields has the names `[gauge_name]_peak` and
-    /// `[gauge_name]_bottom`
+    /// If tracking is enabled, the following fields will be added:
     ///
-    /// # Panics
-    ///
-    /// If `for_seconds` is zero.
+    /// * `[gauge_name]_peak`: The peak value of all records
+    /// * `[gauge_name]_peak_min`: The smallest of the peak values of all records
+    /// * `[gauge_name]_peak_avg`: The average of the peak values for all records
+    /// * `[gauge_name]_bottom`: The bottom value of all records
+    /// * `[gauge_name]_bottom_max`: The biggest bottom value of all records
+    /// * `[gauge_name]_bottom_avg`: The average of all bottom values for all records
+    /// * `[gauge_name]_avg`: The average of all values for all records
     pub fn set_tracking(&mut self, for_seconds: usize) {
-        self.tracking = Some(RefCell::new(SecondsBuckets::new(for_seconds)))
+        if for_seconds != 0 {
+            self.tracking = Some(RefCell::new(SecondsBuckets::new(for_seconds)))
+        }
     }
 
     pub fn set_display_time_unit(&mut self, display_time_unit: TimeUnit) {
@@ -302,7 +319,7 @@ impl Gauge {
     }
 
     pub fn get(&self) -> Option<i64> {
-        self.value.clone()
+        self.value
     }
 
     fn next_value(&self, current: Option<i64>, observed: ObservedValue) -> Option<i64> {
@@ -328,7 +345,7 @@ impl PutsSnapshot for Gauge {
                 match buckets.try_borrow_mut() {
                     Ok(mut borrowed) => BucketsStats::from_buckets(&mut *borrowed)
                         .into_iter()
-                        .for_each(|stats| stats.add_to_snaphot(into, &self.name)),
+                        .for_each(|stats| stats.add_to_snapshot(into, &self.name)),
                     Err(_err) => {
                         crate::util::log_error("borrow mut in gauge::put_snapshot failed!")
                     }
@@ -357,349 +374,6 @@ impl Descriptive for Gauge {
 
     fn description(&self) -> Option<&str> {
         self.description.as_ref().map(|n| &**n)
-    }
-}
-
-pub struct GaugeAdapter<L> {
-    strategy: GaugeUpdateStrategy<L>,
-    gauge: Gauge,
-    modify_update: UpdateModifier<L>,
-}
-
-impl<L> GaugeAdapter<L>
-where
-    L: Eq,
-{
-    /// Creates a new adapter which dispatches all observations
-    /// to the `Gauge`
-    pub fn new(gauge: Gauge) -> Self {
-        Self {
-            gauge,
-            strategy: GaugeUpdateStrategy::Filter(LabelFilter::AcceptAll),
-            modify_update: UpdateModifier::KeepAsIs,
-        }
-    }
-
-    /// Creates a new adapter which dispatches observations
-    /// with the given label to the `Gauge`
-    pub fn for_label(label: L, gauge: Gauge) -> Self {
-        Self {
-            gauge,
-            strategy: GaugeUpdateStrategy::Filter(LabelFilter::new(label)),
-            modify_update: UpdateModifier::KeepAsIs,
-        }
-    }
-
-    /// Creates a new adapter which dispatches observations
-    /// with the given labels to the `Gauge`
-    ///
-    /// If `labels` is empty, no observations will be dispatched
-    pub fn for_labels(labels: Vec<L>, gauge: Gauge) -> Self {
-        Self {
-            gauge,
-            strategy: GaugeUpdateStrategy::Filter(LabelFilter::many(labels)),
-            modify_update: UpdateModifier::KeepAsIs,
-        }
-    }
-
-    /// Creates a `GaugeAdapter` that makes this instrument react on
-    /// observations with labels specified by the predicate.
-    pub fn for_labels_by_predicate<P>(label_predicate: P, gauge: Gauge) -> Self
-    where
-        P: Fn(&L) -> bool + Send + 'static,
-    {
-        Self {
-            gauge,
-            strategy: GaugeUpdateStrategy::Filter(LabelFilter::predicate(label_predicate)),
-            modify_update: UpdateModifier::KeepAsIs,
-        }
-    }
-
-    /// Creates a new adapter which dispatches observations
-    /// with the given label to the `Gauge`
-    ///
-    /// The Gauge will only be dispatched message that increment or
-    /// decrement the value
-    pub fn for_label_deltas_only(label: L, gauge: Gauge) -> Self {
-        Self {
-            gauge,
-            strategy: GaugeUpdateStrategy::DeltasOnly(LabelFilter::new(label)),
-            modify_update: UpdateModifier::KeepAsIs,
-        }
-    }
-
-    /// Creates a new adapter which dispatches observations
-    /// with the given labels to the `Gauge`
-    ///
-    /// If `labels` is empty, no observations will be dispatched
-    ///
-    /// The Gauge will only be dispatched message that increment or
-    /// decrement the value
-    pub fn for_labels_deltas_only(labels: Vec<L>, gauge: Gauge) -> Self {
-        Self {
-            gauge,
-            strategy: GaugeUpdateStrategy::DeltasOnly(LabelFilter::many(labels)),
-            modify_update: UpdateModifier::KeepAsIs,
-        }
-    }
-
-    /// Creates a `GaugeAdapter` that makes this instrument react on
-    /// observations with labels specified by the predicate.
-    pub fn for_labels_deltas_only_by_predicate<P>(label_predicate: P, gauge: Gauge) -> Self
-    where
-        P: Fn(&L) -> bool + Send + 'static,
-    {
-        Self {
-            gauge,
-            strategy: GaugeUpdateStrategy::DeltasOnly(LabelFilter::predicate(label_predicate)),
-            modify_update: UpdateModifier::KeepAsIs,
-        }
-    }
-
-    /// Creates a new adapter which dispatches observations
-    /// with the given labels to the `Gauge` which only increment or
-    /// decrement the `Gauge`
-    ///
-    /// The `Gauge` will increment on any observation with label `increment_on`
-    /// and decrement for any observation with label `decrement_on`.
-    ///
-    /// `increment_on` is evaluated first so
-    /// `increment_on` and `decrement_on` should not be the same label.
-    pub fn inc_dec_on(increment_on: L, decrement_on: L, gauge: Gauge) -> Self {
-        Self {
-            gauge,
-            strategy: GaugeUpdateStrategy::IncDecOnLabels(
-                LabelFilter::new(increment_on),
-                LabelFilter::new(decrement_on),
-            ),
-            modify_update: UpdateModifier::KeepAsIs,
-        }
-    }
-
-    /// Creates a new adapter which dispatches observations
-    /// with the given labels to the `Gauge` which only increment or
-    /// decrement the `Gauge`
-    ///
-    /// The `Gauge` will increment on any observation with a label in `increment_on`
-    /// and decrement for any observation with a label in `decrement_on`.
-    ///
-    /// `increment_on` is evaluated first so
-    /// `increment_on` and `decrement_on` should share labels.
-    pub fn inc_dec_on_many(increment_on: Vec<L>, decrement_on: Vec<L>, gauge: Gauge) -> Self {
-        Self {
-            gauge,
-            strategy: GaugeUpdateStrategy::IncDecOnLabels(
-                LabelFilter::many(increment_on),
-                LabelFilter::many(decrement_on),
-            ),
-            modify_update: UpdateModifier::KeepAsIs,
-        }
-    }
-
-    /// Creates a `GaugeAdapter` that makes this instrument react on
-    /// observations with labels specified by the predicate.
-    pub fn inc_dec_by_predicates<PINC, PDEC>(
-        predicate_inc: PINC,
-        predicate_dec: PDEC,
-        gauge: Gauge,
-    ) -> Self
-    where
-        PINC: Fn(&L) -> bool + Send + 'static,
-        PDEC: Fn(&L) -> bool + Send + 'static,
-    {
-        Self {
-            gauge,
-            strategy: GaugeUpdateStrategy::IncDecOnLabels(
-                LabelFilter::predicate(predicate_inc),
-                LabelFilter::predicate(predicate_dec),
-            ),
-            modify_update: UpdateModifier::KeepAsIs,
-        }
-    }
-
-    /// Creates a new adapter which dispatches **no**
-    /// observations to the `Gauge`
-    pub fn deaf(gauge: Gauge) -> Self {
-        Self {
-            gauge,
-            strategy: GaugeUpdateStrategy::Filter(LabelFilter::AcceptNone),
-            modify_update: UpdateModifier::KeepAsIs,
-        }
-    }
-
-    pub fn gauge(&self) -> &Gauge {
-        &self.gauge
-    }
-
-    pub fn gauge_mut(&mut self) -> &mut Gauge {
-        &mut self.gauge
-    }
-
-    pub fn into_inner(self) -> Gauge {
-        self.gauge
-    }
-}
-
-impl<L> HandlesObservations for GaugeAdapter<L>
-where
-    L: Eq + Send + 'static,
-{
-    type Label = L;
-
-    fn handle_observation(&mut self, observation: &Observation<Self::Label>) -> usize {
-        let BorrowedLabelAndUpdate(label, update) = observation.into();
-
-        match self.strategy {
-            GaugeUpdateStrategy::Filter(ref filter) => {
-                if !filter.accepts(label) {
-                    return 0;
-                }
-                let update = self.modify_update.modify(label, update);
-                self.gauge.update(&update)
-            }
-            GaugeUpdateStrategy::DeltasOnly(ref filter) => {
-                if !filter.accepts(label) {
-                    return 0;
-                }
-                let update = self.modify_update.modify(label, update);
-
-                match update {
-                    Update::ObservationWithValue(ObservedValue::ChangedBy(_), _) => {
-                        self.gauge.update(&update)
-                    }
-                    _ => 0,
-                }
-            }
-            GaugeUpdateStrategy::IncDecOnLabels(ref inc, ref dec) => {
-                let timestamp = observation.timestamp();
-                if inc.accepts(label) {
-                    self.gauge.update(&Update::ObservationWithValue(
-                        ObservedValue::ChangedBy(1),
-                        timestamp,
-                    ))
-                } else if dec.accepts(label) {
-                    self.gauge.update(&Update::ObservationWithValue(
-                        ObservedValue::ChangedBy(-1),
-                        timestamp,
-                    ))
-                } else {
-                    0
-                }
-            }
-        }
-    }
-}
-
-impl<L> PutsSnapshot for GaugeAdapter<L>
-where
-    L: Send + 'static,
-{
-    fn put_snapshot(&self, into: &mut Snapshot, descriptive: bool) {
-        self.gauge.put_snapshot(into, descriptive)
-    }
-}
-
-impl<L> From<Gauge> for GaugeAdapter<L>
-where
-    L: Clone + Eq + Send + 'static,
-{
-    fn from(gauge: Gauge) -> GaugeAdapter<L> {
-        GaugeAdapter::new(gauge)
-    }
-}
-
-enum GaugeUpdateStrategy<L> {
-    Filter(LabelFilter<L>),
-    DeltasOnly(LabelFilter<L>),
-    IncDecOnLabels(LabelFilter<L>, LabelFilter<L>),
-}
-
-#[derive(Default)]
-struct Bucket {
-    pub sum: i64,
-    pub count: u64,
-    pub min_max: (i64, i64),
-}
-
-impl Bucket {
-    pub fn update(&mut self, v: i64) {
-        self.min_max = if self.count != 0 {
-            let (min, max) = self.min_max;
-            (std::cmp::min(min, v), std::cmp::max(max, v))
-        } else {
-            (v, v)
-        };
-        self.sum += v;
-        self.count += 1;
-    }
-}
-
-struct BucketsStats {
-    bottom: i64,
-    peak: i64,
-    avg: f64,
-    bottom_avg: f64,
-    peak_avg: f64,
-}
-
-impl BucketsStats {
-    fn from_buckets(buckets: &mut SecondsBuckets<Bucket>) -> Option<Self> {
-        let mut bottom = std::i64::MAX;
-        let mut peak = std::i64::MIN;
-        let mut sum_bottom = 0;
-        let mut sum_peak = 0;
-        let mut total_sum = 0;
-        let mut total_count = 0;
-
-        buckets.iter().for_each(
-            |Bucket {
-                 sum,
-                 count,
-                 min_max,
-             }| {
-                total_sum += sum;
-                total_count += count;
-
-                if *count != 0 {
-                    let (min, max) = min_max;
-                    bottom = std::cmp::min(bottom, *min);
-                    peak = std::cmp::max(peak, *max);
-                    sum_bottom += min;
-                    sum_peak += max;
-                }
-            },
-        );
-
-        if total_count > 0 {
-            let avg = (total_sum as f64) / (total_count as f64);
-            let bottom_avg = (sum_bottom as f64) / (buckets.len() as f64);
-            let peak_avg = (sum_peak as f64) / (buckets.len() as f64);
-            Some(BucketsStats {
-                bottom,
-                peak,
-                avg,
-                bottom_avg,
-                peak_avg,
-            })
-        } else {
-            None
-        }
-    }
-
-    pub fn add_to_snaphot(self, snapshot: &mut Snapshot, name: &str) {
-        let bottom_name = format!("{}_bottom", name);
-        let peak_name = format!("{}_peak", name);
-        let avg_name = format!("{}_avg", name);
-        let bottom_avg_name = format!("{}_bottom_avg", name);
-        let peak_avg_name = format!("{}_peak_avg", name);
-
-        snapshot.items.push((bottom_name, self.bottom.into()));
-        snapshot.items.push((peak_name, self.peak.into()));
-        snapshot.items.push((avg_name, self.avg.into()));
-        snapshot
-            .items
-            .push((bottom_avg_name, self.bottom_avg.into()));
-        snapshot.items.push((peak_avg_name, self.peak_avg.into()));
     }
 }
 

@@ -1,6 +1,6 @@
 use std::time::Instant;
 
-use crate::{Decrement, DecrementBy, Increment, IncrementBy};
+use crate::{Decrement, DecrementBy, HandlesObservations, Increment, IncrementBy, Observation};
 
 use super::*;
 
