@@ -35,10 +35,10 @@ use super::*;
 /// assert_eq!(None, gauge.get());
 ///
 /// let mut panel = Panel::named(SuccessfulRequests, "successful_requests");
-/// panel.set_counter(counter);
-/// panel.set_gauge(gauge);
-/// panel.set_meter(meter);
-/// panel.set_histogram(histogram);
+/// panel.add_counter(counter);
+/// panel.add_gauge(gauge);
+/// panel.add_meter(meter);
+/// panel.add_histogram(histogram);
 ///
 /// let observation = Observation::ObservedOneValue {
 ///        label: SuccessfulRequests,
@@ -46,9 +46,6 @@ use super::*;
 ///        timestamp: Instant::now(),
 /// };
 /// panel.handle_observation(&observation);
-///
-/// assert_eq!(Some(1), panel.get_counter().map(|c| c.get()));
-/// assert_eq!(Some(12), panel.get_gauge().and_then(|g| g.get()));
 /// ```
 pub struct Panel<L> {
     label_filter: LabelFilter<L>,
@@ -138,56 +135,76 @@ where
         }
     }
 
+    #[deprecated(since = "0.10.9", note = "use 'add_histogram'")]
     pub fn set_counter<I: Into<InstrumentAdapter<L, Counter>>>(&mut self, counter: I) {
         self.counter = Some(counter.into());
     }
 
+    pub fn add_counter<I: Into<InstrumentAdapter<L, Counter>>>(&mut self, counter: I) {
+        if self.counter.is_none() {
+            self.counter = Some(counter.into());
+        } else {
+            self.add_handler(counter.into())
+        }
+    }
+
     pub fn counter<I: Into<InstrumentAdapter<L, Counter>>>(mut self, counter: I) -> Self {
-        self.set_counter(counter);
+        self.add_counter(counter);
         self
     }
 
-    pub fn get_counter(&self) -> Option<&Counter> {
-        self.counter.as_ref().map(|adapter| adapter.instrument())
-    }
-
+    #[deprecated(since = "0.10.9", note = "use 'add_gauge'")]
     pub fn set_gauge<I: Into<GaugeAdapter<L>>>(&mut self, gauge: I) {
         self.gauge = Some(gauge.into());
     }
 
     pub fn gauge<I: Into<GaugeAdapter<L>>>(mut self, gauge: I) -> Self {
-        self.set_gauge(gauge);
+        self.add_gauge(gauge);
         self
     }
 
-    pub fn get_gauge(&self) -> Option<&Gauge> {
-        self.gauge.as_ref().map(|adapter| adapter.gauge())
+    pub fn add_gauge<I: Into<GaugeAdapter<L>>>(&mut self, gauge: I) {
+        if self.gauge.is_none() {
+            self.gauge = Some(gauge.into());
+        } else {
+            self.add_handler(gauge.into())
+        }
     }
 
+    #[deprecated(since = "0.10.9", note = "use 'add_meter'")]
     pub fn set_meter<I: Into<InstrumentAdapter<L, Meter>>>(&mut self, meter: I) {
         self.meter = Some(meter.into());
     }
 
     pub fn meter<I: Into<InstrumentAdapter<L, Meter>>>(mut self, meter: I) -> Self {
-        self.set_meter(meter);
+        self.add_meter(meter);
         self
     }
 
-    pub fn get_meter(&self) -> Option<&Meter> {
-        self.meter.as_ref().map(|adapter| adapter.instrument())
+    pub fn add_meter<I: Into<InstrumentAdapter<L, Meter>>>(&mut self, meter: I) {
+        if self.meter.is_none() {
+            self.meter = Some(meter.into());
+        } else {
+            self.add_handler(meter.into())
+        }
     }
 
+    #[deprecated(since = "0.10.9", note = "use 'add_histogram'")]
     pub fn set_histogram<I: Into<InstrumentAdapter<L, Histogram>>>(&mut self, histogram: I) {
         self.histogram = Some(histogram.into());
     }
 
-    pub fn histogram<I: Into<InstrumentAdapter<L, Histogram>>>(mut self, histogram: I) -> Self {
-        self.set_histogram(histogram);
-        self
+    pub fn add_histogram<I: Into<InstrumentAdapter<L, Histogram>>>(&mut self, histogram: I) {
+        if self.histogram.is_none() {
+            self.histogram = Some(histogram.into());
+        } else {
+            self.add_handler(histogram.into())
+        }
     }
 
-    pub fn get_histogram(&self) -> Option<&Histogram> {
-        self.histogram.as_ref().map(|adapter| adapter.instrument())
+    pub fn histogram<I: Into<InstrumentAdapter<L, Histogram>>>(mut self, histogram: I) -> Self {
+        self.add_histogram(histogram);
+        self
     }
 
     pub fn add_snapshooter<T: PutsSnapshot>(&mut self, snapshooter: T) {
@@ -251,6 +268,15 @@ where
     /// A description can be part of a descriptive `Snapshot`
     pub fn set_description<T: Into<String>>(&mut self, description: T) {
         self.description = Some(description.into())
+    }
+
+    /// Sets the maximum amount of time this panel may be
+    /// inactive until no more snapshots are taken
+    ///
+    /// Default is no inactivity tracking.
+    pub fn inactivity_limit(mut self, limit: Duration) -> Self {
+        self.set_inactivity_limit(limit);
+        self
     }
 
     /// Sets the maximum amount of time this panel may be
