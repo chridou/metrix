@@ -2,7 +2,7 @@
 
 * 0.10.9
     * Tests and documentation for gauge [commit](https://github.com/chridou/metrix/commit/4b9939f657f1dfd59dfd2b55491df8eec904f77e)
-    * Deprecates set_instrument methods in favour of add_instrument
+    * Deprecates set_instrument methods in favour of add_instrument [commit](https://github.com/chridou/metrix/commit/2cbd31b89788c0b3b386ae9b83b3136d49d52128)
     * removed instrument getters on panel
 * 0.10.8
     * BUGFIX: Gauge tracked with non-equidistant intervals
