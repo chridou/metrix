@@ -8,6 +8,7 @@ pub use self::counter::Counter;
 pub use self::gauge::*;
 pub use self::histogram::Histogram;
 pub use self::instrument_adapter::*;
+pub use self::label_filter::*;
 pub use self::meter::Meter;
 pub use self::other_instruments::*;
 pub use self::panel::*;
@@ -20,6 +21,7 @@ mod fundamentals;
 mod gauge;
 mod histogram;
 mod instrument_adapter;
+mod label_filter;
 mod meter;
 pub mod other_instruments;
 mod panel;
@@ -109,98 +111,6 @@ pub trait Updates {
 /// Requirement for an instrument
 pub trait Instrument: Updates + PutsSnapshot {}
 
-pub(crate) enum LabelFilter<L> {
-    AcceptNone,
-    AcceptAll,
-    One(L),
-    Two(L, L),
-    Three(L, L, L),
-    Four(L, L, L, L),
-    Five(L, L, L, L, L),
-    Many(Vec<L>),
-    Predicate(Box<dyn Fn(&L) -> bool + Send + 'static>),
-}
-
-impl<L> LabelFilter<L>
-where
-    L: PartialEq + Eq,
-{
-    pub fn new(label: L) -> Self {
-        Self::One(label)
-    }
-
-    pub fn predicate<P>(p: P) -> Self
-    where
-        P: Fn(&L) -> bool + Send + 'static,
-    {
-        Self::Predicate(Box::new(p))
-    }
-
-    pub fn many(mut labels: Vec<L>) -> Self {
-        if labels.is_empty() {
-            return LabelFilter::AcceptNone;
-        }
-
-        if labels.len() == 1 {
-            return LabelFilter::One(labels.pop().unwrap());
-        }
-
-        if labels.len() == 2 {
-            let a = labels.pop().unwrap();
-            let b = labels.pop().unwrap();
-            return LabelFilter::Two(b, a);
-        }
-
-        if labels.len() == 3 {
-            let a = labels.pop().unwrap();
-            let b = labels.pop().unwrap();
-            let c = labels.pop().unwrap();
-            return LabelFilter::Three(c, b, a);
-        }
-
-        if labels.len() == 4 {
-            let a = labels.pop().unwrap();
-            let b = labels.pop().unwrap();
-            let c = labels.pop().unwrap();
-            let d = labels.pop().unwrap();
-            return LabelFilter::Four(d, c, b, a);
-        }
-
-        if labels.len() == 5 {
-            let a = labels.pop().unwrap();
-            let b = labels.pop().unwrap();
-            let c = labels.pop().unwrap();
-            let d = labels.pop().unwrap();
-            let ee = labels.pop().unwrap();
-            return LabelFilter::Five(ee, d, c, b, a);
-        }
-
-        LabelFilter::Many(labels)
-    }
-
-    pub fn accepts(&self, label: &L) -> bool {
-        match self {
-            LabelFilter::AcceptNone => false,
-            LabelFilter::AcceptAll => true,
-            LabelFilter::One(a) => label == a,
-            LabelFilter::Two(a, b) => label == a || label == b,
-            LabelFilter::Three(a, b, c) => label == a || label == b || label == c,
-            LabelFilter::Four(a, b, c, d) => label == a || label == b || label == c || label == d,
-            LabelFilter::Five(a, b, c, d, ee) => {
-                label == a || label == b || label == c || label == d || label == ee
-            }
-            LabelFilter::Many(many) => many.contains(label),
-            LabelFilter::Predicate(ref pred) => pred(label),
-        }
-    }
-}
-
-impl<L> Default for LabelFilter<L> {
-    fn default() -> Self {
-        Self::AcceptAll
-    }
-}
-
 fn duration_to_display_value(time: u64, current_unit: TimeUnit, target_unit: TimeUnit) -> u64 {
     use TimeUnit::*;
     match (current_unit, target_unit) {
@@ -220,117 +130,6 @@ fn duration_to_display_value(time: u64, current_unit: TimeUnit, target_unit: Tim
         (Seconds, Microseconds) => time * 1_000_000,
         (Seconds, Milliseconds) => time * 1_000,
         (Seconds, Seconds) => time,
-    }
-}
-
-#[cfg(test)]
-mod test_label_filter {
-    use super::*;
-
-    #[test]
-    fn empty_filter() {
-        let filter = LabelFilter::AcceptNone;
-        assert!(!filter.accepts(&1));
-    }
-
-    #[test]
-    fn accept_all_filter() {
-        let filter = LabelFilter::AcceptAll;
-        assert!(filter.accepts(&1));
-        assert!(filter.accepts(&2));
-        assert!(filter.accepts(&3));
-    }
-
-    #[test]
-    fn accept_one_filter() {
-        let filter = LabelFilter::One(1);
-        assert!(!filter.accepts(&0));
-        assert!(filter.accepts(&1));
-        assert!(!filter.accepts(&2));
-        assert!(!filter.accepts(&3));
-        assert!(!filter.accepts(&4));
-        assert!(!filter.accepts(&5));
-        assert!(!filter.accepts(&6));
-    }
-
-    #[test]
-    fn accept_two_filter() {
-        let filter = LabelFilter::Two(1, 2);
-        assert!(!filter.accepts(&0));
-        assert!(filter.accepts(&1));
-        assert!(filter.accepts(&2));
-        assert!(!filter.accepts(&3));
-        assert!(!filter.accepts(&4));
-        assert!(!filter.accepts(&5));
-        assert!(!filter.accepts(&6));
-    }
-
-    #[test]
-    fn accept_three_filter() {
-        let filter = LabelFilter::Three(1, 2, 3);
-        assert!(!filter.accepts(&0));
-        assert!(filter.accepts(&1));
-        assert!(filter.accepts(&2));
-        assert!(filter.accepts(&3));
-        assert!(!filter.accepts(&4));
-        assert!(!filter.accepts(&5));
-        assert!(!filter.accepts(&6));
-    }
-
-    #[test]
-    fn accept_four_filter() {
-        let filter = LabelFilter::Four(1, 2, 3, 4);
-        assert!(!filter.accepts(&0));
-        assert!(filter.accepts(&1));
-        assert!(filter.accepts(&2));
-        assert!(filter.accepts(&3));
-        assert!(filter.accepts(&4));
-        assert!(!filter.accepts(&5));
-        assert!(!filter.accepts(&6));
-    }
-
-    #[test]
-    fn accept_five_filter() {
-        let filter = LabelFilter::Five(1, 2, 3, 4, 5);
-        assert!(!filter.accepts(&0));
-        assert!(filter.accepts(&1));
-        assert!(filter.accepts(&2));
-        assert!(filter.accepts(&3));
-        assert!(filter.accepts(&4));
-        assert!(filter.accepts(&5));
-        assert!(!filter.accepts(&6));
-    }
-
-    #[test]
-    fn accept_many_filter() {
-        let filter = LabelFilter::Many(vec![1, 2, 3, 4, 5]);
-        assert!(!filter.accepts(&0));
-        assert!(filter.accepts(&1));
-        assert!(filter.accepts(&2));
-        assert!(filter.accepts(&3));
-        assert!(filter.accepts(&4));
-        assert!(filter.accepts(&5));
-        assert!(!filter.accepts(&6));
-    }
-
-    #[test]
-    fn many_filters() {
-        let max = 20;
-        for n in 1..max {
-            let mut labels = Vec::new();
-            for i in 1..=n {
-                labels.push(i);
-            }
-
-            let filter = LabelFilter::many(labels);
-
-            assert!(!filter.accepts(&0));
-            assert!(!filter.accepts(&max));
-
-            for i in 1..=n {
-                assert!(filter.accepts(&i));
-            }
-        }
     }
 }
 

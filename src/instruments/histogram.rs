@@ -2,7 +2,9 @@ use std::time::{Duration, Instant};
 
 use exponential_decay_histogram::ExponentialDecayHistogram;
 
-use crate::instruments::{Instrument, InstrumentAdapter, Update, Updates};
+use crate::instruments::{
+    AcceptAllLabels, Instrument, InstrumentAdapter, LabelFilter, LabelPredicate, Update, Updates,
+};
 use crate::snapshot::{ItemKind, Snapshot};
 use crate::util;
 use crate::{Descriptive, ObservedValue, PutsSnapshot, TimeUnit};
@@ -113,39 +115,46 @@ impl Histogram {
         self
     }
 
+    pub fn accept<L: Eq + Send + 'static, F: Into<LabelFilter<L>>>(
+        self,
+        accept: F,
+    ) -> InstrumentAdapter<L, Self> {
+        InstrumentAdapter::accept(accept, self)
+    }
+
     /// Creates an `InstrumentAdapter` that makes this instrument
     /// react on observations on the given label.
-    pub fn for_label<L: Eq>(self, label: L) -> InstrumentAdapter<L, Self> {
-        InstrumentAdapter::for_label(label, self)
+    pub fn for_label<L: Eq + Send + 'static>(self, label: L) -> InstrumentAdapter<L, Self> {
+        self.accept(label)
     }
 
     /// Creates an `InstrumentAdapter` that makes this instrument
     /// react on observations with the given labels.
     ///
     /// If `labels` is empty the instrument will not react to any observations
-    pub fn for_labels<L: Eq>(self, labels: Vec<L>) -> InstrumentAdapter<L, Self> {
-        InstrumentAdapter::for_labels(labels, self)
+    pub fn for_labels<L: Eq + Send + 'static>(self, labels: Vec<L>) -> InstrumentAdapter<L, Self> {
+        self.accept(labels)
     }
 
     /// Creates an `InstrumentAdapter` that makes this instrument react on
     /// all observations.
-    pub fn for_all_labels<L: Eq>(self) -> InstrumentAdapter<L, Self> {
-        InstrumentAdapter::new(self)
+    pub fn for_all_labels<L: Eq + Send + 'static>(self) -> InstrumentAdapter<L, Self> {
+        self.accept(AcceptAllLabels)
     }
 
     /// Creates an `InstrumentAdapter` that makes this instrument react on
     /// observations with labels specified by the predicate.
     pub fn for_labels_by_predicate<L, P>(self, label_predicate: P) -> InstrumentAdapter<L, Self>
     where
-        L: Eq,
+        L: Eq + Send + 'static,
         P: Fn(&L) -> bool + Send + 'static,
     {
-        InstrumentAdapter::by_predicate(label_predicate, self)
+        self.accept(LabelPredicate(label_predicate))
     }
 
     /// Creates an `InstrumentAdapter` that makes this instrument to no
     /// observations.
-    pub fn adapter<L: Eq>(self) -> InstrumentAdapter<L, Self> {
+    pub fn adapter<L: Eq + Send + 'static>(self) -> InstrumentAdapter<L, Self> {
         InstrumentAdapter::deaf(self)
     }
 

@@ -1,7 +1,10 @@
 use std::cell::RefCell;
 use std::time::Duration;
 
-use crate::instruments::{fundamentals::buckets::SecondsBuckets, Instrument, Update, Updates};
+use crate::instruments::{
+    fundamentals::buckets::SecondsBuckets, AcceptAllLabels, Instrument, LabelFilter,
+    LabelPredicate, Update, Updates,
+};
 use crate::snapshot::Snapshot;
 use crate::util;
 use crate::{Descriptive, ObservedValue, PutsSnapshot, TimeUnit, DECR, INCR};
@@ -169,40 +172,54 @@ impl Gauge {
         self
     }
 
+    pub fn accept<L: Eq + Send + 'static, F: Into<LabelFilter<L>>>(
+        self,
+        accept: F,
+    ) -> GaugeAdapter<L> {
+        GaugeAdapter::accept(accept, self)
+    }
+
     /// Creates an `GaugeAdapter` that makes this instrument
     /// react on observations on the given label.
-    pub fn for_label<L: Eq>(self, label: L) -> GaugeAdapter<L> {
-        GaugeAdapter::for_label(label, self)
+    pub fn for_label<L: Eq + Send + 'static>(self, label: L) -> GaugeAdapter<L> {
+        self.accept(label)
     }
 
     /// Creates an `GaugeAdapter` that makes this instrument
     /// react on observations with the given labels.
     ///
     /// If `labels` is empty the instrument will not react to any observations
-    pub fn for_labels<L: Eq>(self, label: Vec<L>) -> GaugeAdapter<L> {
-        GaugeAdapter::for_labels(label, self)
+    pub fn for_labels<L: Eq + Send + 'static>(self, labels: Vec<L>) -> GaugeAdapter<L> {
+        self.accept(labels)
     }
 
     /// Creates an `GaugeAdapter` that makes this instrument react on
     /// all observations.
-    pub fn for_all_labels<L: Eq>(self) -> GaugeAdapter<L> {
-        GaugeAdapter::new(self)
+    pub fn for_all_labels<L: Eq + Send + 'static>(self) -> GaugeAdapter<L> {
+        self.accept(AcceptAllLabels)
     }
 
     /// Creates a `GaugeAdapter` that makes this instrument react on
     /// observations with labels specified by the predicate.
     pub fn for_labels_by_predicate<L, P>(self, label_predicate: P) -> GaugeAdapter<L>
     where
-        L: Eq,
+        L: Eq + Send + 'static,
         P: Fn(&L) -> bool + Send + 'static,
     {
-        GaugeAdapter::for_labels_by_predicate(label_predicate, self)
+        self.accept(LabelPredicate(label_predicate))
     }
 
     /// Creates an `GaugeAdapter` that makes this instrument to rect to no
     /// observations.
-    pub fn adapter<L: Eq>(self) -> GaugeAdapter<L> {
+    pub fn adapter<L: Eq + Send + 'static>(self) -> GaugeAdapter<L> {
         GaugeAdapter::deaf(self)
+    }
+
+    pub fn deltas_only<L: Eq + Send + 'static, F: Into<LabelFilter<L>>>(
+        self,
+        accept: F,
+    ) -> GaugeAdapter<L> {
+        GaugeAdapter::deltas_only(accept, self)
     }
 
     /// Creates a new adapter which dispatches observations
@@ -210,8 +227,8 @@ impl Gauge {
     ///
     /// The Gauge will only be dispatched message that increment or
     /// decrement the value
-    pub fn for_label_deltas_only<L: Eq>(self, label: L) -> GaugeAdapter<L> {
-        GaugeAdapter::for_label_deltas_only(label, self)
+    pub fn for_label_deltas_only<L: Eq + Send + 'static>(self, label: L) -> GaugeAdapter<L> {
+        self.deltas_only(label)
     }
 
     /// Creates a new adapter which dispatches observations
@@ -221,16 +238,16 @@ impl Gauge {
     ///
     /// The Gauge will only be dispatched message that increment or
     /// decrement the value
-    pub fn for_labels_deltas_only<L: Eq>(self, labels: Vec<L>) -> GaugeAdapter<L> {
-        GaugeAdapter::for_labels_deltas_only(labels, self)
+    pub fn for_labels_deltas_only<L: Eq + Send + 'static>(self, labels: Vec<L>) -> GaugeAdapter<L> {
+        self.deltas_only(labels)
     }
 
     pub fn for_labels_deltas_only_by_predicate<L, P>(self, label_predicate: P) -> GaugeAdapter<L>
     where
-        L: Eq,
+        L: Eq + Send + 'static,
         P: Fn(&L) -> bool + Send + 'static,
     {
-        GaugeAdapter::for_labels_deltas_only_by_predicate(label_predicate, self)
+        self.deltas_only(LabelPredicate(label_predicate))
     }
 
     /// Creates a new adapter which dispatches observations
@@ -242,8 +259,16 @@ impl Gauge {
     ///
     /// `increment_on` is evaluated first so
     /// `increment_on` and `decrement_on` should not be the same label.
-    pub fn inc_dec_on<L: Eq>(self, increment_on: L, decrement_on: L) -> GaugeAdapter<L> {
-        GaugeAdapter::inc_dec_on(increment_on, decrement_on, self)
+    pub fn inc_dec_on<
+        L: Eq + Send + 'static,
+        INCR: Into<LabelFilter<L>>,
+        DECR: Into<LabelFilter<L>>,
+    >(
+        self,
+        accept_incr: INCR,
+        accept_decr: DECR,
+    ) -> GaugeAdapter<L> {
+        GaugeAdapter::inc_dec_on(accept_incr, accept_decr, self)
     }
 
     /// Creates a new adapter which dispatches observations
@@ -255,25 +280,28 @@ impl Gauge {
     ///
     /// `increment_on` is evaluated first so
     /// `increment_on` and `decrement_on` should share labels.
-    pub fn inc_dec_on_many<L: Eq>(
+    pub fn inc_dec_on_many<L: Eq + Send + 'static>(
         self,
         increment_on: Vec<L>,
         decrement_on: Vec<L>,
     ) -> GaugeAdapter<L> {
-        GaugeAdapter::inc_dec_on_many(increment_on, decrement_on, self)
+        self.inc_dec_on(increment_on, decrement_on)
     }
 
     pub fn inc_dec_by_predicates<L, PINC, PDEC>(
         self,
-        predicate_inc: PINC,
-        predicate_dec: PDEC,
+        predicate_incr: PINC,
+        predicate_decr: PDEC,
     ) -> GaugeAdapter<L>
     where
-        L: Eq,
+        L: Eq + Send + 'static,
         PINC: Fn(&L) -> bool + Send + 'static,
         PDEC: Fn(&L) -> bool + Send + 'static,
     {
-        GaugeAdapter::inc_dec_by_predicates(predicate_inc, predicate_dec, self)
+        self.inc_dec_on(
+            LabelPredicate(predicate_incr),
+            LabelPredicate(predicate_decr),
+        )
     }
 
     pub fn set(&mut self, observed: ObservedValue) {

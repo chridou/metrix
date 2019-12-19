@@ -69,57 +69,9 @@ where
 {
     /// Create a new `Panel` without a name which dispatches observations
     /// with the given label
-    pub fn new(label: L) -> Panel<L> {
-        let mut panel = Panel::accept_all();
-        panel.label_filter = LabelFilter::new(label);
-        panel
-    }
-
-    /// Create a new `Panel` with the given name which dispatches observations
-    /// with the given label
-    #[deprecated(since = "0.9.24", note = "use 'named'")]
-    pub fn with_name<T: Into<String>>(label: L, name: T) -> Panel<L> {
-        let mut panel = Panel::accept_all_named(name);
-        panel.label_filter = LabelFilter::new(label);
-        panel
-    }
-    /// Create a new `Panel` with the given name which dispatches observations
-    /// with the given label
-    pub fn named<T: Into<String>>(label: L, name: T) -> Panel<L> {
-        let mut panel = Panel::accept_all_named(name);
-        panel.label_filter = LabelFilter::new(label);
-        panel
-    }
-
-    /// Create a new `Panel` without a name which dispatches observations
-    /// with the given labels
-    pub fn accept(labels: Vec<L>) -> Self {
-        let mut panel = Panel::accept_all();
-        panel.label_filter = LabelFilter::many(labels);
-        panel
-    }
-
-    /// Create a new `Panel` with the given name which dispatches observations
-    /// with the given labels
-    pub fn accept_named<T: Into<String>>(labels: Vec<L>, name: T) -> Self {
-        let mut panel = Panel::accept_all_named(name);
-        panel.label_filter = LabelFilter::many(labels);
-        panel
-    }
-
-    /// Create a new `Panel` with the given name which dispatches all
-    /// observations
-    pub fn accept_all_named<T: Into<String>>(name: T) -> Panel<L> {
-        let mut panel = Panel::accept_all();
-        panel.name = Some(name.into());
-        panel
-    }
-
-    /// Create a new `Panel` without a name which dispatches all
-    /// observations
-    pub fn accept_all() -> Panel<L> {
+    pub fn new<F: Into<LabelFilter<L>>>(accept: F) -> Panel<L> {
         Panel {
-            label_filter: LabelFilter::AcceptAll,
+            label_filter: accept.into(),
             name: None,
             title: None,
             description: None,
@@ -133,6 +85,45 @@ where
             last_update: Instant::now(),
             max_inactivity_duration: None,
         }
+    }
+
+    /// Create a new `Panel` with the given name which dispatches observations
+    /// with the given label
+    pub fn named<T: Into<String>, F: Into<LabelFilter<L>>>(accept: F, name: T) -> Panel<L> {
+        let mut panel = Self::new(accept);
+        panel.name = Some(name.into());
+        panel
+    }
+
+    /// Create a new `Panel` with the given name which dispatches observations
+    /// with the given label
+    #[deprecated(since = "0.9.24", note = "use 'named'")]
+    pub fn with_name<T: Into<String>>(label: L, name: T) -> Panel<L> {
+        Self::named(label, name)
+    }
+
+    /// Create a new `Panel` without a name which dispatches observations
+    /// with the given labels
+    pub fn accept<F: Into<LabelFilter<L>>>(accept: F) -> Self {
+        Self::new(accept)
+    }
+
+    /// Create a new `Panel` with the given name which dispatches observations
+    /// with the given labels
+    pub fn accept_named<T: Into<String>, F: Into<LabelFilter<L>>>(accept: F, name: T) -> Self {
+        Self::named(accept, name)
+    }
+
+    /// Create a new `Panel` with the given name which dispatches all
+    /// observations
+    pub fn accept_all_named<T: Into<String>>(name: T) -> Panel<L> {
+        Self::named(AcceptAllLabels, name)
+    }
+
+    /// Create a new `Panel` without a name which dispatches all
+    /// observations
+    pub fn accept_all() -> Panel<L> {
+        Self::new(AcceptAllLabels)
     }
 
     #[deprecated(since = "0.10.9", note = "use 'add_histogram'")]

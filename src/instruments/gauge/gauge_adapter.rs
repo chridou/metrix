@@ -1,4 +1,7 @@
-use crate::instruments::{BorrowedLabelAndUpdate, LabelFilter, Update, UpdateModifier, Updates};
+use crate::instruments::{
+    AcceptAllLabels, BorrowedLabelAndUpdate, LabelFilter, LabelPredicate, Update, UpdateModifier,
+    Updates,
+};
 use crate::snapshot::Snapshot;
 use crate::{HandlesObservations, Observation, ObservedValue, PutsSnapshot};
 
@@ -12,14 +15,18 @@ pub struct GaugeAdapter<L> {
 
 impl<L> GaugeAdapter<L>
 where
-    L: Eq,
+    L: Eq + Send + 'static,
 {
     /// Creates a new adapter which dispatches all observations
     /// to the `Gauge`
     pub fn new(gauge: Gauge) -> Self {
+        Self::accept(AcceptAllLabels, gauge)
+    }
+
+    pub fn accept<F: Into<LabelFilter<L>>>(accept: F, gauge: Gauge) -> Self {
         Self {
             gauge,
-            strategy: GaugeUpdateStrategy::Filter(LabelFilter::AcceptAll),
+            strategy: GaugeUpdateStrategy::Filter(accept.into()),
             modify_update: UpdateModifier::KeepAsIs,
         }
     }
@@ -27,11 +34,7 @@ where
     /// Creates a new adapter which dispatches observations
     /// with the given label to the `Gauge`
     pub fn for_label(label: L, gauge: Gauge) -> Self {
-        Self {
-            gauge,
-            strategy: GaugeUpdateStrategy::Filter(LabelFilter::new(label)),
-            modify_update: UpdateModifier::KeepAsIs,
-        }
+        Self::accept(label, gauge)
     }
 
     /// Creates a new adapter which dispatches observations
@@ -39,11 +42,7 @@ where
     ///
     /// If `labels` is empty, no observations will be dispatched
     pub fn for_labels(labels: Vec<L>, gauge: Gauge) -> Self {
-        Self {
-            gauge,
-            strategy: GaugeUpdateStrategy::Filter(LabelFilter::many(labels)),
-            modify_update: UpdateModifier::KeepAsIs,
-        }
+        Self::accept(labels, gauge)
     }
 
     /// Creates a `GaugeAdapter` that makes this instrument react on
@@ -52,9 +51,13 @@ where
     where
         P: Fn(&L) -> bool + Send + 'static,
     {
+        Self::accept(LabelPredicate(label_predicate), gauge)
+    }
+
+    pub fn deltas_only<F: Into<LabelFilter<L>>>(accept: F, gauge: Gauge) -> Self {
         Self {
             gauge,
-            strategy: GaugeUpdateStrategy::Filter(LabelFilter::predicate(label_predicate)),
+            strategy: GaugeUpdateStrategy::DeltasOnly(accept.into()),
             modify_update: UpdateModifier::KeepAsIs,
         }
     }
@@ -65,11 +68,7 @@ where
     /// The Gauge will only be dispatched message that increment or
     /// decrement the value
     pub fn for_label_deltas_only(label: L, gauge: Gauge) -> Self {
-        Self {
-            gauge,
-            strategy: GaugeUpdateStrategy::DeltasOnly(LabelFilter::new(label)),
-            modify_update: UpdateModifier::KeepAsIs,
-        }
+        Self::deltas_only(label, gauge)
     }
 
     /// Creates a new adapter which dispatches observations
@@ -80,11 +79,7 @@ where
     /// The Gauge will only be dispatched message that increment or
     /// decrement the value
     pub fn for_labels_deltas_only(labels: Vec<L>, gauge: Gauge) -> Self {
-        Self {
-            gauge,
-            strategy: GaugeUpdateStrategy::DeltasOnly(LabelFilter::many(labels)),
-            modify_update: UpdateModifier::KeepAsIs,
-        }
+        Self::deltas_only(labels, gauge)
     }
 
     /// Creates a `GaugeAdapter` that makes this instrument react on
@@ -93,11 +88,7 @@ where
     where
         P: Fn(&L) -> bool + Send + 'static,
     {
-        Self {
-            gauge,
-            strategy: GaugeUpdateStrategy::DeltasOnly(LabelFilter::predicate(label_predicate)),
-            modify_update: UpdateModifier::KeepAsIs,
-        }
+        Self::deltas_only(LabelPredicate(label_predicate), gauge)
     }
 
     /// Creates a new adapter which dispatches observations
@@ -109,13 +100,14 @@ where
     ///
     /// `increment_on` is evaluated first so
     /// `increment_on` and `decrement_on` should not be the same label.
-    pub fn inc_dec_on(increment_on: L, decrement_on: L, gauge: Gauge) -> Self {
+    pub fn inc_dec_on<INCR: Into<LabelFilter<L>>, DECR: Into<LabelFilter<L>>>(
+        accept_incr: INCR,
+        accept_decr: DECR,
+        gauge: Gauge,
+    ) -> Self {
         Self {
             gauge,
-            strategy: GaugeUpdateStrategy::IncDecOnLabels(
-                LabelFilter::new(increment_on),
-                LabelFilter::new(decrement_on),
-            ),
+            strategy: GaugeUpdateStrategy::IncDecOnLabels(accept_incr.into(), accept_decr.into()),
             modify_update: UpdateModifier::KeepAsIs,
         }
     }
@@ -130,14 +122,7 @@ where
     /// `increment_on` is evaluated first so
     /// `increment_on` and `decrement_on` should share labels.
     pub fn inc_dec_on_many(increment_on: Vec<L>, decrement_on: Vec<L>, gauge: Gauge) -> Self {
-        Self {
-            gauge,
-            strategy: GaugeUpdateStrategy::IncDecOnLabels(
-                LabelFilter::many(increment_on),
-                LabelFilter::many(decrement_on),
-            ),
-            modify_update: UpdateModifier::KeepAsIs,
-        }
+        Self::inc_dec_on(increment_on, decrement_on, gauge)
     }
 
     /// Creates a `GaugeAdapter` that makes this instrument react on
@@ -151,14 +136,11 @@ where
         PINC: Fn(&L) -> bool + Send + 'static,
         PDEC: Fn(&L) -> bool + Send + 'static,
     {
-        Self {
+        Self::inc_dec_on(
+            LabelPredicate(predicate_inc),
+            LabelPredicate(predicate_dec),
             gauge,
-            strategy: GaugeUpdateStrategy::IncDecOnLabels(
-                LabelFilter::predicate(predicate_inc),
-                LabelFilter::predicate(predicate_dec),
-            ),
-            modify_update: UpdateModifier::KeepAsIs,
-        }
+        )
     }
 
     /// Creates a new adapter which dispatches **no**
@@ -166,7 +148,7 @@ where
     pub fn deaf(gauge: Gauge) -> Self {
         Self {
             gauge,
-            strategy: GaugeUpdateStrategy::Filter(LabelFilter::AcceptNone),
+            strategy: GaugeUpdateStrategy::Filter(LabelFilter::accept_none()),
             modify_update: UpdateModifier::KeepAsIs,
         }
     }

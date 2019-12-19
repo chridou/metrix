@@ -115,7 +115,7 @@ mod test {
     #[test]
     fn empty_bucket_returns_none() {
         let clock = ManualOffsetClock::default();
-        let mut buckets = SecondsBuckets::<Bucket, _>::with_clock(1, clock.clone());
+        let mut buckets = SecondsBuckets::<Bucket, _>::with_clock(1, clock);
 
         assert!(BucketsStats::from_buckets(&mut buckets).is_none());
     }
@@ -123,7 +123,7 @@ mod test {
     #[test]
     fn none_empty_bucket_returns_some() {
         let clock = ManualOffsetClock::default();
-        let mut buckets = SecondsBuckets::<Bucket, _>::with_clock(1, clock.clone());
+        let mut buckets = SecondsBuckets::<Bucket, _>::with_clock(1, clock);
         buckets.current_mut().update(1);
 
         assert!(BucketsStats::from_buckets(&mut buckets).is_some());
@@ -132,7 +132,7 @@ mod test {
     #[test]
     fn one_bucket_works_correctly_with_one_update() {
         let clock = ManualOffsetClock::default();
-        let mut buckets = SecondsBuckets::<Bucket, _>::with_clock(1, clock.clone());
+        let mut buckets = SecondsBuckets::<Bucket, _>::with_clock(1, clock);
         buckets.current_mut().update(1);
 
         let stats = BucketsStats::from_buckets(&mut buckets).unwrap();

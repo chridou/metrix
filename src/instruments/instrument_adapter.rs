@@ -25,59 +25,55 @@ pub struct InstrumentAdapter<L, I> {
 
 impl<L, I> InstrumentAdapter<L, I>
 where
-    L: Eq,
+    L: Eq + Send + 'static,
     I: Instrument,
 {
     pub fn new(instrument: I) -> Self {
         Self {
             instrument,
-            label_filter: LabelFilter::AcceptAll,
+            label_filter: LabelFilter::accept_all(),
+            modify_update: UpdateModifier::KeepAsIs,
+        }
+    }
+
+    pub fn accept<F: Into<LabelFilter<L>>>(accept: F, instrument: I) -> Self {
+        Self {
+            instrument,
+            label_filter: accept.into(),
             modify_update: UpdateModifier::KeepAsIs,
         }
     }
 
     pub fn for_label(label: L, instrument: I) -> Self {
-        Self {
-            instrument,
-            label_filter: LabelFilter::new(label),
-            modify_update: UpdateModifier::KeepAsIs,
-        }
+        Self::accept(label, instrument)
     }
 
     pub fn for_labels(labels: Vec<L>, instrument: I) -> Self {
-        Self {
-            instrument,
-            label_filter: LabelFilter::many(labels),
-            modify_update: UpdateModifier::KeepAsIs,
-        }
+        Self::accept(labels, instrument)
     }
 
     pub fn by_predicate<P>(predicate: P, instrument: I) -> Self
     where
         P: Fn(&L) -> bool + Send + 'static,
     {
-        Self {
-            instrument,
-            label_filter: LabelFilter::predicate(predicate),
-            modify_update: UpdateModifier::KeepAsIs,
-        }
+        Self::accept(LabelPredicate(predicate), instrument)
     }
 
     pub fn deaf(instrument: I) -> Self {
         Self {
             instrument,
-            label_filter: LabelFilter::AcceptNone,
+            label_filter: LabelFilter::accept_none(),
             modify_update: UpdateModifier::KeepAsIs,
         }
     }
 
     pub fn accept_no_labels(mut self) -> Self {
-        self.label_filter = LabelFilter::AcceptNone;
+        self.label_filter = LabelFilter::accept_none();
         self
     }
 
     pub fn accept_all_labels(mut self) -> Self {
-        self.label_filter = LabelFilter::AcceptAll;
+        self.label_filter = LabelFilter::accept_all();
         self
     }
 
