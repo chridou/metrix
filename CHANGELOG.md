@@ -1,7 +1,7 @@
 ## CHANGELOG:
 
 * 0.10.10
-    * Added a LabelFilter that can be used to filter for labels
+    * Added a LabelFilter that can be used to filter for labels [commit](https://github.com/chridou/metrix/commit/75b142d6a791dc3b0654985f2f7333b60014b004)
 * 0.10.9
     * Tests and documentation for gauge [commit](https://github.com/chridou/metrix/commit/4b9939f657f1dfd59dfd2b55491df8eec904f77e)
     * Deprecates set_instrument methods in favour of add_instrument [commit](https://github.com/chridou/metrix/commit/2cbd31b89788c0b3b386ae9b83b3136d49d52128)
