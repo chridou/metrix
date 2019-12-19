@@ -29,7 +29,7 @@ where
 
     pub fn accept_none() -> Self {
         Self {
-            internal: LabelFilterInternal::AcceptNone,
+            internal: LabelFilterInternal::accept_none(),
         }
     }
 
@@ -216,48 +216,6 @@ where
         Self::Predicate(Box::new(p))
     }
 
-    pub fn many(mut labels: Vec<L>) -> Self {
-        if labels.is_empty() {
-            return LabelFilterInternal::AcceptNone;
-        }
-
-        if labels.len() == 1 {
-            return LabelFilterInternal::One(labels.pop().unwrap());
-        }
-
-        if labels.len() == 2 {
-            let a = labels.pop().unwrap();
-            let b = labels.pop().unwrap();
-            return LabelFilterInternal::Two(b, a);
-        }
-
-        if labels.len() == 3 {
-            let a = labels.pop().unwrap();
-            let b = labels.pop().unwrap();
-            let c = labels.pop().unwrap();
-            return LabelFilterInternal::Three(c, b, a);
-        }
-
-        if labels.len() == 4 {
-            let a = labels.pop().unwrap();
-            let b = labels.pop().unwrap();
-            let c = labels.pop().unwrap();
-            let d = labels.pop().unwrap();
-            return LabelFilterInternal::Four(d, c, b, a);
-        }
-
-        if labels.len() == 5 {
-            let a = labels.pop().unwrap();
-            let b = labels.pop().unwrap();
-            let c = labels.pop().unwrap();
-            let d = labels.pop().unwrap();
-            let ee = labels.pop().unwrap();
-            return LabelFilterInternal::Five(ee, d, c, b, a);
-        }
-
-        LabelFilterInternal::Many(labels)
-    }
-
     pub fn add_label(&mut self, label: L) {
         let old = std::mem::replace(self, LabelFilterInternal::AcceptNone);
         *self = match old {
@@ -423,6 +381,14 @@ mod test_label_filter {
 mod test_label_filter_internal {
     use super::*;
 
+    fn many<L: Eq + Send + 'static>(labels: Vec<L>) -> LabelFilterInternal<L> {
+        let mut f = LabelFilterInternal::AcceptNone;
+        for l in labels {
+            f.add_label(l);
+        }
+        f
+    }
+
     #[test]
     fn empty_filter() {
         let filter = LabelFilterInternal::AcceptNone;
@@ -518,7 +484,7 @@ mod test_label_filter_internal {
                 labels.push(i);
             }
 
-            let filter = LabelFilterInternal::many(labels);
+            let filter = many(labels);
 
             assert!(!filter.accepts(&0));
             assert!(!filter.accepts(&max));
