@@ -1,5 +1,6 @@
 ## CHANGELOG:
-
+* 0.10.11
+    * Transfer the meter from metrics 0.2 here since the crate in that repository has changed to a whole new project
 * 0.10.10
     * Added a LabelFilter that can be used to filter for labels [commit](https://github.com/chridou/metrix/commit/75b142d6a791dc3b0654985f2f7333b60014b004)
 * 0.10.9

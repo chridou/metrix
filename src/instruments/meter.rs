@@ -1,7 +1,7 @@
 use std::cell::Cell;
 use std::time::{Duration, Instant};
 
-use metrics::metrics::{Meter as MMeter, StdMeter};
+use crate::instruments::fundamentals::metrics_meter::{Meter as MMeter, StdMeter};
 
 use crate::instruments::{
     AcceptAllLabels, Instrument, InstrumentAdapter, LabelFilter, LabelPredicate, Update, Updates,

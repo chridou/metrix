@@ -19,7 +19,6 @@ repository = "chridou/metrix"
 [dependencies]
 exponential-decay-histogram = "0.1"
 json = "0.12"
-metrics = "0.2.0"
 crossbeam-channel = "0.4"
 futures = "0.1"
 log = { version = "0.4", optional = true }
