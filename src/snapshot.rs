@@ -480,3 +480,9 @@ impl From<bool> for ItemKind {
         ItemKind::Boolean(what)
     }
 }
+
+impl From<Snapshot> for ItemKind {
+    fn from(what: Snapshot) -> ItemKind {
+        ItemKind::Snapshot(what)
+    }
+}

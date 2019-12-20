@@ -79,6 +79,7 @@ impl Meter for StdMeter {
     }
 
     /// Return the given EWMA for a rate like 1, 5, 15 minutes
+    #[allow(clippy::float_cmp)]
     fn rate(&self, rate: f64) -> f64 {
         let mut s = self.data.lock().unwrap();
         self.tick_inner(&mut s);
@@ -103,6 +104,7 @@ impl Meter for StdMeter {
 }
 
 impl StdMeter {
+    #[cfg(test)]
     pub fn new() -> Arc<Self> {
         Arc::new(Self::default())
     }
@@ -229,7 +231,7 @@ impl EWMA {
     pub fn new_by_alpha(alpha: f64) -> Self {
         EWMA {
             uncounted: AtomicUsize::new(0),
-            alpha: alpha,
+            alpha,
             rate: 0.0,
             init: false,
         }
@@ -243,6 +245,9 @@ impl EWMA {
 }
 
 #[cfg(test)]
+#[allow(clippy::float_cmp)]
+#[allow(clippy::unreadable_literal)]
+#[allow(clippy::excessive_precision)]
 mod test_ewma {
     use super::*;
 

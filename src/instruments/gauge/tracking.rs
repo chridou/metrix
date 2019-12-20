@@ -106,6 +106,7 @@ impl BucketsStats {
 }
 
 #[cfg(test)]
+#[allow(clippy::float_cmp)]
 mod test {
     use crate::instruments::fundamentals::buckets::SecondsBuckets;
     use crate::instruments::fundamentals::ManualOffsetClock;
@@ -148,7 +149,7 @@ mod test {
     #[test]
     fn one_bucket_works_correctly_with_two_different_updates_in_the_same_bucket() {
         let clock = ManualOffsetClock::default();
-        let mut buckets = SecondsBuckets::<Bucket, _>::with_clock(1, clock.clone());
+        let mut buckets = SecondsBuckets::<Bucket, _>::with_clock(1, clock);
         buckets.current_mut().update(1);
         buckets.current_mut().update(2);
 

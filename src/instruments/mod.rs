@@ -21,6 +21,8 @@ mod fundamentals;
 mod gauge;
 mod histogram;
 mod instrument_adapter;
+#[cfg(feature = "jemalloc-ctl")]
+pub mod jemalloc;
 mod label_filter;
 mod meter;
 pub mod other_instruments;
