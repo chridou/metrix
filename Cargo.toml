@@ -17,9 +17,10 @@ branch = "master"
 repository = "chridou/metrix"
 
 [dependencies]
-exponential-decay-histogram = "0.1"
-json = "0.12"
 crossbeam-channel = "0.4"
-futures = "0.1"
-log = { version = "0.4", optional = true }
+exponential-decay-histogram = "0.1"
+futures = { package = "futures", version = "0.3" }
+futures01 = { package = "futures", version = "0.1", optional = true }
 jemalloc-ctl = { version = "0.3.3", optional = true }
+json = "0.12"
+log = { version = "0.4", optional = true }
