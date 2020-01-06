@@ -2,6 +2,8 @@
 * 0.11.0
     * Cockpits and Processors do not accept multiple items with the same name
     * `TelemetryTransmitterSync` is deprecated since the `TelemetryTransmitter` is sync
+    * Upgrade to futures 0.3
+    * futures 0.1 compatibility via `futures01` feature
 * 0.10.15
     * DataDisplay - Reset value is also initial value
 * 0.10.14
