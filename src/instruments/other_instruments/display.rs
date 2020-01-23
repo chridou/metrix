@@ -7,24 +7,20 @@ use crate::snapshot::{ItemKind, Snapshot};
 use crate::util;
 use crate::{Descriptive, PutsSnapshot};
 
-/// A `DataDisplay` is 'tapped' by an `Observation`
-/// and then stays on for some time.
+/// A `DataDisplay` simply displays the value of an observation
 ///
 ///
-/// The `DataDisplay` works exactly like a switch in
-/// a staircase: You press the switch and the light will
-/// stay on for some time. Here it is an `Observation` that
-/// pushes the switch and the light is a boolean that will
-/// be set to `true` for some time. When triggered while
-/// already on, the time being `true` will be prolonged.
+/// The `DataDisplay` has the capability reset its value
+/// after a given time. This can be useful if manually resetting the
+/// value after a finished "task" is not desired or possible.
 ///
-/// The state written to a `Snapshot` can be inverted.
+/// By default the value does not reset.
 pub struct DataDisplay {
     name: String,
     title: Option<String>,
     description: Option<String>,
     value: Option<ItemKind>,
-    stay_on_for: Option<Duration>,
+    reset_after: Option<Duration>,
     stay_on_until: Option<Instant>,
 }
 
@@ -35,7 +31,7 @@ impl DataDisplay {
             title: None,
             description: None,
             value: None,
-            stay_on_for: None,
+            reset_after: None,
             stay_on_until: None,
         }
     }
@@ -75,24 +71,24 @@ impl DataDisplay {
         self
     }
 
-    /// Sets duration after which the internal state switches back to `false`
+    /// Sets duration after which the internal state switches back to `no value`
     ///
     /// Default is 60 seconds
-    pub fn set_stay_on_for(&mut self, d: Duration) {
-        self.stay_on_for = Some(d);
+    pub fn set_reset_after(&mut self, d: Duration) {
+        self.reset_after = Some(d);
     }
 
-    /// Sets duration after which the internal state switches back to `false`
+    /// Sets duration after which the internal state switches back to `no value`
     ///
     /// Default is 60 seconds
-    pub fn stay_on_for(mut self, d: Duration) -> Self {
-        self.set_stay_on_for(d);
+    pub fn reset_after(mut self, d: Duration) -> Self {
+        self.set_reset_after(d);
         self
     }
 
-    /// Gets duration after which the internal state switches back to `false`
-    pub fn get_stay_on_for(&self) -> Option<Duration> {
-        self.stay_on_for
+    /// Gets duration after which the internal state switches back to `no value`
+    pub fn get_reset_after(&self) -> Option<Duration> {
+        self.reset_after
     }
 
     pub fn accept<L: Eq + Send + 'static, F: Into<LabelFilter<L>>>(
@@ -167,8 +163,8 @@ impl PutsSnapshot for DataDisplay {
 impl Updates for DataDisplay {
     fn update(&mut self, update: &Update) -> usize {
         if let Some(value) = update.observed_value().and_then(|v| v.to_item_kind()) {
-            if let Some(stay_on_for) = self.stay_on_for {
-                self.stay_on_until = Some(Instant::now() + stay_on_for);
+            if let Some(reset_after) = self.reset_after {
+                self.stay_on_until = Some(Instant::now() + reset_after);
             }
             self.value = Some(value);
             1
