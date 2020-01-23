@@ -4,6 +4,8 @@ use std::time::Duration;
 
 use json::{stringify, stringify_pretty, JsonValue};
 
+use crate::observation::ObservedValue;
+
 /// A `Snapshot` which contains measured values
 /// at a point in time.
 #[derive(Debug, Clone, PartialEq)]
@@ -18,8 +20,8 @@ impl Default for Snapshot {
 }
 
 impl Snapshot {
-    pub fn push<K: Into<String>>(&mut self, k: K, v: ItemKind) {
-        self.items.push((k.into(), v))
+    pub fn push<K: Into<String>, V: Into<ItemKind>>(&mut self, k: K, v: V) {
+        self.items.push((k.into(), v.into()))
     }
 
     /// Find an item on a path with a given a separator.
@@ -367,6 +369,19 @@ impl fmt::Display for ItemKind {
             UInt(v) => write!(f, "{}", v),
             Int(v) => write!(f, "{}", v),
             Snapshot(ref snapshot) => write!(f, "Snapshot({} items)", snapshot.items.len()),
+        }
+    }
+}
+
+impl From<ObservedValue> for Option<ItemKind> {
+    fn from(ov: ObservedValue) -> Self {
+        match ov {
+            ObservedValue::SignedInteger(v) => Some(v.into()),
+            ObservedValue::UnsignedInteger(v) => Some(v.into()),
+            ObservedValue::Float(v) => Some(v.into()),
+            ObservedValue::Bool(v) => Some(v.into()),
+            ObservedValue::Duration(_, _) => None,
+            ObservedValue::ChangedBy(_) => None,
         }
     }
 }

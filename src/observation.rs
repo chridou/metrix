@@ -1,5 +1,7 @@
 use std::time::{Duration, Instant};
 
+use crate::snapshot::ItemKind;
+
 #[derive(Debug, Clone, Copy)]
 pub enum TimeUnit {
     Nanoseconds,
@@ -85,6 +87,19 @@ pub enum ObservedValue {
     Bool(bool),
     Duration(u64, TimeUnit),
     ChangedBy(i64),
+}
+
+impl ObservedValue {
+    pub fn to_item_kind(&self) -> Option<ItemKind> {
+        match self {
+            Self::SignedInteger(v) => Some((*v).into()),
+            Self::UnsignedInteger(v) => Some((*v).into()),
+            Self::Float(v) => Some((*v).into()),
+            Self::Bool(v) => Some((*v).into()),
+            Self::Duration(_, _) => None,
+            Self::ChangedBy(_) => None,
+        }
+    }
 }
 
 impl From<i64> for ObservedValue {
