@@ -10,7 +10,7 @@ use crate::{Descriptive, PutsSnapshot};
 /// A `DataDisplay` simply displays the value of an observation
 ///
 ///
-/// The `DataDisplay` has the capability reset its value
+/// The `DataDisplay` has the capability to reset its value
 /// after a given time. This can be useful if manually resetting the
 /// value after a finished "task" is not desired or possible.
 ///
