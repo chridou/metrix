@@ -14,7 +14,8 @@ use crate::{Descriptive, PutsSnapshot};
 /// after a given time. This can be useful if manually resetting the
 /// value after a finished "task" is not desired or possible.
 ///
-/// By default the value does not reset.
+/// By default the value does not reset. The `reset_value` can
+/// be set to a specific value. By default it is `None`.
 pub struct DataDisplay {
     name: String,
     title: Option<String>,
@@ -22,6 +23,7 @@ pub struct DataDisplay {
     value: Option<ItemKind>,
     reset_after: Option<Duration>,
     stay_on_until: Option<Instant>,
+    reset_value: Option<ItemKind>,
 }
 
 impl DataDisplay {
@@ -33,6 +35,7 @@ impl DataDisplay {
             value: None,
             reset_after: None,
             stay_on_until: None,
+            reset_value: None,
         }
     }
 
@@ -71,14 +74,14 @@ impl DataDisplay {
         self
     }
 
-    /// Sets duration after which the internal state switches back to `no value`
+    /// Sets duration after which the internal state switches back to `reset value`
     ///
     /// Default is 60 seconds
     pub fn set_reset_after(&mut self, d: Duration) {
         self.reset_after = Some(d);
     }
 
-    /// Sets duration after which the internal state switches back to `no value`
+    /// Sets duration after which the internal state switches back to `reset value`
     ///
     /// Default is 60 seconds
     pub fn reset_after(mut self, d: Duration) -> Self {
@@ -86,9 +89,31 @@ impl DataDisplay {
         self
     }
 
-    /// Gets duration after which the internal state switches back to `no value`
+    /// Gets duration after which the internal state switches back to `reset value`
     pub fn get_reset_after(&self) -> Option<Duration> {
         self.reset_after
+    }
+
+    /// Sets `reset value` to be displayed after a reset
+    ///
+    /// Default is `None`
+    pub fn set_reset_value<T: Into<ItemKind>>(&mut self, v: T) {
+        self.reset_value = Some(v.into());
+    }
+
+    /// Sets `reset value` to be displayed after a reset
+    ///
+    /// Default is `None`
+    pub fn reset_value<T: Into<ItemKind>>(mut self, v: T) -> Self {
+        self.set_reset_value(v);
+        self
+    }
+
+    /// gets `reset value` to be displayed after a reset
+    ///
+    /// Default is `None`
+    pub fn get_reset_value(&self) -> Option<&ItemKind> {
+        self.reset_value.as_ref()
     }
 
     pub fn accept<L: Eq + Send + 'static, F: Into<LabelFilter<L>>>(
@@ -140,7 +165,7 @@ impl DataDisplay {
             if stay_on_until >= Instant::now() {
                 self.value.clone()
             } else {
-                None
+                self.reset_value.clone()
             }
         } else {
             self.value.clone()

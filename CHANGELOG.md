@@ -1,5 +1,7 @@
 ## CHANGELOG:
 
+* 0.10.14
+    * `DataDisplay` has a default value to switch back to.
 * 0.10.13
     * Added instrument `DataDisplay` which simply displays an observation (for some time).
 * 0.10.12
