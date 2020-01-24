@@ -1,4 +1,7 @@
 ## CHANGELOG:
+
+* 0.10.13
+    * Added instrument `DataDisplay` which simply displays an observation (for some time).
 * 0.10.12
     * Add instrument to collect data from jemalloc. Requires feature `jemalloc-ctl`.
     * Impl `From<Snapshot>` for `ItemKind.

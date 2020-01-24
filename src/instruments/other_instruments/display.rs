@@ -1,35 +1,42 @@
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use crate::instruments::{
     AcceptAllLabels, Instrument, InstrumentAdapter, LabelFilter, LabelPredicate, Update, Updates,
 };
-use crate::snapshot::Snapshot;
+use crate::snapshot::{ItemKind, Snapshot};
 use crate::util;
 use crate::{Descriptive, PutsSnapshot};
 
-/// Tracks how many seconds elapsed since the last occurrence
-pub struct LastOccurrenceTracker {
+/// A `DataDisplay` simply displays the value of an observation
+///
+///
+/// The `DataDisplay` has the capability to reset its value
+/// after a given time. This can be useful if manually resetting the
+/// value after a finished "task" is not desired or possible.
+///
+/// By default the value does not reset.
+pub struct DataDisplay {
     name: String,
     title: Option<String>,
     description: Option<String>,
-    happened_last: Option<Instant>,
-    invert: bool,
-    make_none_zero: bool,
+    value: Option<ItemKind>,
+    reset_after: Option<Duration>,
+    stay_on_until: Option<Instant>,
 }
 
-impl LastOccurrenceTracker {
-    pub fn new<T: Into<String>>(name: T) -> LastOccurrenceTracker {
-        LastOccurrenceTracker {
+impl DataDisplay {
+    pub fn new<T: Into<String>>(name: T) -> DataDisplay {
+        DataDisplay {
             name: name.into(),
             title: None,
             description: None,
-            happened_last: None,
-            invert: false,
-            make_none_zero: false,
+            value: None,
+            reset_after: None,
+            stay_on_until: None,
         }
     }
 
-    pub fn new_with_defaults<T: Into<String>>(name: T) -> LastOccurrenceTracker {
+    pub fn new_with_defaults<T: Into<String>>(name: T) -> DataDisplay {
         Self::new(name)
     }
 
@@ -64,56 +71,24 @@ impl LastOccurrenceTracker {
         self
     }
 
-    /// Set whether the current value should be inverted in a snapshot or not
+    /// Sets duration after which the internal state switches back to `no value`
     ///
-    /// Default is `false`
-    pub fn set_invert_enabled(&mut self, invert: bool) {
-        self.invert = invert
+    /// Default is 60 seconds
+    pub fn set_reset_after(&mut self, d: Duration) {
+        self.reset_after = Some(d);
     }
 
-    /// Set whether the current value should be inverted in a snapshot or not
+    /// Sets duration after which the internal state switches back to `no value`
     ///
-    /// Default is `false`
-    pub fn invert_enabled(mut self, invert: bool) -> Self {
-        self.set_invert_enabled(invert);
+    /// Default is 60 seconds
+    pub fn reset_after(mut self, d: Duration) -> Self {
+        self.set_reset_after(d);
         self
     }
 
-    /// The current value should be inverted in a snapshot
-    ///
-    /// Same as `self.set_invert(true);`
-    pub fn inverted(mut self) -> Self {
-        self.set_invert_enabled(true);
-        self
-    }
-
-    /// return whether invert is on or off
-    pub fn is_inverted(&self) -> bool {
-        self.invert
-    }
-
-    /// If set to `true` possible `None`s that would
-    /// be returned will instead be `0`.
-    ///
-    /// Hint: This instrument will return `None` unless there
-    /// was at least one occurrence recorded.
-    pub fn set_make_none_zero(&mut self, make_zero: bool) {
-        self.make_none_zero = make_zero
-    }
-
-    /// If set to `true` possible `None`s that would
-    /// be returned will instead be `0`.
-    ///
-    /// Hint: This instrument will return `None` unless there
-    /// was at least one occurrence recorded.
-    pub fn make_none_zero(mut self, make_zero: bool) -> Self {
-        self.set_make_none_zero(make_zero);
-        self
-    }
-
-    /// return whether `make_none_zero` is on or off
-    pub fn get_make_none_zero(&self) -> bool {
-        self.make_none_zero
+    /// Gets duration after which the internal state switches back to `no value`
+    pub fn get_reset_after(&self) -> Option<Duration> {
+        self.reset_after
     }
 
     pub fn accept<L: Eq + Send + 'static, F: Into<LabelFilter<L>>>(
@@ -159,34 +134,47 @@ impl LastOccurrenceTracker {
         InstrumentAdapter::deaf(self)
     }
 
-    fn elapsed_since_last_occurrence(&self) -> Option<u64> {
-        self.happened_last
-            .map(|last| (Instant::now() - last).as_secs())
-    }
-}
-
-impl Instrument for LastOccurrenceTracker {}
-
-impl PutsSnapshot for LastOccurrenceTracker {
-    fn put_snapshot(&self, into: &mut Snapshot, descriptive: bool) {
-        util::put_postfixed_descriptives(self, &self.name, into, descriptive);
-
-        if let Some(v) = self.elapsed_since_last_occurrence() {
-            into.push(self.name.clone(), v);
-        } else if self.get_make_none_zero() {
-            into.push(self.name.clone(), 0);
+    /// Returns the current state
+    pub fn value(&self) -> Option<ItemKind> {
+        if let Some(stay_on_until) = self.stay_on_until {
+            if stay_on_until >= Instant::now() {
+                self.value.clone()
+            } else {
+                None
+            }
+        } else {
+            self.value.clone()
         }
     }
 }
 
-impl Updates for LastOccurrenceTracker {
-    fn update(&mut self, _: &Update) -> usize {
-        self.happened_last = Some(Instant::now());
-        1
+impl Instrument for DataDisplay {}
+
+impl PutsSnapshot for DataDisplay {
+    fn put_snapshot(&self, into: &mut Snapshot, descriptive: bool) {
+        util::put_postfixed_descriptives(self, &self.name, into, descriptive);
+
+        if let Some(value) = self.value() {
+            into.push(self.name.clone(), value);
+        }
     }
 }
 
-impl Descriptive for LastOccurrenceTracker {
+impl Updates for DataDisplay {
+    fn update(&mut self, update: &Update) -> usize {
+        if let Some(value) = update.observed_value().and_then(|v| v.to_item_kind()) {
+            if let Some(reset_after) = self.reset_after {
+                self.stay_on_until = Some(Instant::now() + reset_after);
+            }
+            self.value = Some(value);
+            1
+        } else {
+            0
+        }
+    }
+}
+
+impl Descriptive for DataDisplay {
     fn title(&self) -> Option<&str> {
         self.title.as_ref().map(|n| &**n)
     }

@@ -41,6 +41,15 @@ pub enum Update {
     ObservationWithValue(ObservedValue, Instant),
 }
 
+impl Update {
+    pub fn observed_value(&self) -> Option<&ObservedValue> {
+        match self {
+            Update::ObservationWithValue(ref v, _) => Some(v),
+            Update::Observation(_) | Update::Observations(_, _) => None,
+        }
+    }
+}
+
 /// A label with the associated `Update`
 ///
 /// This is basically a split `Observation`
