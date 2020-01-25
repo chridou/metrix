@@ -1,5 +1,6 @@
 ## CHANGELOG:
-
+* 0.10.15
+    * DataDisplay - Reset value is also initial value
 * 0.10.14
     * `DataDisplay` has a default value to switch back to.
 * 0.10.13

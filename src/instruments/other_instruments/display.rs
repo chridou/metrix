@@ -94,14 +94,17 @@ impl DataDisplay {
         self.reset_after
     }
 
-    /// Sets `reset value` to be displayed after a reset
+    /// Sets `reset value` to be displayed after a reset and as an initial
+    /// value
     ///
     /// Default is `None`
     pub fn set_reset_value<T: Into<ItemKind>>(&mut self, v: T) {
         self.reset_value = Some(v.into());
+        self.value = self.reset_value.clone();
     }
 
-    /// Sets `reset value` to be displayed after a reset
+    /// Sets `reset value` to be displayed after a reset and as an initial
+    /// value
     ///
     /// Default is `None`
     pub fn reset_value<T: Into<ItemKind>>(mut self, v: T) -> Self {
