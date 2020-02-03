@@ -651,3 +651,15 @@ impl Descriptive for ProcessorMount {
         self.description.as_ref().map(|n| &**n)
     }
 }
+
+#[test]
+fn the_telemetry_transmitter_is_sync() {
+    fn is_sync<T>(_proc: T)
+    where
+        T: super::TransmitsTelemetryData<()> + Sync,
+    {
+    }
+
+    let (tx, _rx) = TelemetryProcessor::new_pair_without_name();
+    is_sync(tx);
+}

@@ -297,10 +297,6 @@ pub trait TransmitsTelemetryData<L> {
 }
 
 /// Transmits `Observation`s to the backend
-///
-/// This struct does **not** implement the `Sync` trait
-/// and can therefore not be shared between threads.
-/// See `synced()` method.
 #[derive(Clone)]
 pub struct TelemetryTransmitter<L> {
     sender: crossbeam_channel::Sender<TelemetryMessage<L>>,
@@ -311,6 +307,7 @@ where
     L: Send + 'static,
 {
     /// Get a `TelemetryTransmitterSync`.
+    #[deprecated(since = "0.10.16", note = "Use TelemetryTransmitter since it is sync")]
     pub fn synced(&self) -> TelemetryTransmitterSync<L> {
         TelemetryTransmitterSync {
             sender: Arc::new(Mutex::new(self.sender.clone())),
@@ -389,6 +386,7 @@ impl<L> TransmitsTelemetryData<L> for TelemetryTransmitter<L> {
 /// struct wraps the `Sender` in an `Arc<Mutex<_>>` so that
 /// it can be shared between threads.
 #[derive(Clone)]
+#[deprecated(since = "0.10.16", note = "Use TelemetryTransmitter since it is sync")]
 pub struct TelemetryTransmitterSync<L> {
     sender: Arc<Mutex<crossbeam_channel::Sender<TelemetryMessage<L>>>>,
 }
