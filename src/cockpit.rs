@@ -94,7 +94,8 @@ where
     /// A `Panel` will receive only those `Observation`s where
     /// labels match.
     ///
-    /// There can be multiple `Panel`s for the same label.
+    /// There can **not** be multiple `Panel`s for the same label.
+    /// If one already exists, the new one will not be added.
     pub fn add_panel(&mut self, panel: Panel<L>) {
         if let Some(name) = panel.name() {
             if self
