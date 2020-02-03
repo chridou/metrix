@@ -1,4 +1,7 @@
 ## CHANGELOG:
+* 0.11.0
+    * Cockpits and Processors do not accept multiple items with the same name
+    * `TelemetryTransmitterSync` is deprecated since the `TelemetryTransmitter` is sync
 * 0.10.15
     * DataDisplay - Reset value is also initial value
 * 0.10.14
