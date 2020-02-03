@@ -30,14 +30,24 @@ pub(crate) enum TelemetryMessage<L> {
     Observation(Observation<L>),
     /// A `Cockpit` should be added
     AddCockpit(Cockpit<L>),
+    /// A `Cockpit` should be removed
+    RemoveCockpit(String),
     /// An arbitrary `HandlesObservations` should be added
     AddHandler(Box<dyn HandlesObservations<Label = L>>),
     /// Adds a panel to a cockpit with the given name
     ///
     /// This means the cockpit must have a name set.
-    AddPanel {
+    AddPanelToCockpit {
         cockpit_name: String,
         panel: Panel<L>,
+    },
+    /// Removes a panel with the given name from a cockpit
+    /// with the given name.
+    ///
+    /// This means the cockpit and the panel must have a name set.
+    RemovePanelFromCockpit {
+        cockpit_name: String,
+        panel_name: String,
     },
 }
 
@@ -217,11 +227,33 @@ where
     }
 
     /// Add a `Cockpit`
+    ///
+    /// If the cockpit has a name and another cockpit with
+    /// the same name is already present the cockpit will
+    /// not be added.
     pub fn add_cockpit(&mut self, cockpit: Cockpit<L>) {
+        if let Some(name) = cockpit.get_name() {
+            if self
+                .cockpits
+                .iter()
+                .any(|c| c.get_name().map(|n| n == name).unwrap_or(false))
+            {
+                return;
+            }
+        }
         self.cockpits.push(cockpit)
     }
 
+    fn remove_cockpit<T: AsRef<str>>(&mut self, name: T) {
+        self.cockpits
+            .retain(|c| c.get_name().map(|n| n != name.as_ref()).unwrap_or(true))
+    }
+
     /// Add a `Cockpit`
+    ///
+    /// If the cockpit has a name and another cockpit with
+    /// the same name is already present the cockpit will
+    /// not be added.
     pub fn cockpit(mut self, cockpit: Cockpit<L>) -> Self {
         self.add_cockpit(cockpit);
         self
@@ -388,11 +420,15 @@ where
                     self.add_cockpit(c);
                     processed += 1;
                 }
+                Ok(TelemetryMessage::RemoveCockpit(name)) => {
+                    self.remove_cockpit(name);
+                    processed += 1;
+                }
                 Ok(TelemetryMessage::AddHandler(h)) => {
                     self.handlers.push(h);
                     processed += 1;
                 }
-                Ok(TelemetryMessage::AddPanel {
+                Ok(TelemetryMessage::AddPanelToCockpit {
                     cockpit_name,
                     panel,
                 }) => {
@@ -402,6 +438,19 @@ where
                         .find(|c| c.get_name() == Some(&cockpit_name))
                     {
                         cockpit.add_panel(panel);
+                    }
+                    processed += 1;
+                }
+                Ok(TelemetryMessage::RemovePanelFromCockpit {
+                    cockpit_name,
+                    panel_name,
+                }) => {
+                    if let Some(ref mut cockpit) = self
+                        .cockpits
+                        .iter_mut()
+                        .find(|c| c.get_name() == Some(&cockpit_name))
+                    {
+                        cockpit.remove_panel(panel_name);
                     }
                     processed += 1;
                 }
@@ -601,4 +650,16 @@ impl Descriptive for ProcessorMount {
     fn description(&self) -> Option<&str> {
         self.description.as_ref().map(|n| &**n)
     }
+}
+
+#[test]
+fn the_telemetry_transmitter_is_sync() {
+    fn is_sync<T>(_proc: T)
+    where
+        T: super::TransmitsTelemetryData<()> + Sync,
+    {
+    }
+
+    let (tx, _rx) = TelemetryProcessor::new_pair_without_name();
+    is_sync(tx);
 }

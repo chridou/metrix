@@ -94,9 +94,28 @@ where
     /// A `Panel` will receive only those `Observation`s where
     /// labels match.
     ///
-    /// There can be multiple `Panel`s for the same label.
+    /// There can **not** be multiple `Panel`s for the same label.
+    /// If one already exists, the new one will not be added.
     pub fn add_panel(&mut self, panel: Panel<L>) {
-        self.panels.push(panel);
+        if let Some(name) = panel.name() {
+            if self
+                .panels
+                .iter()
+                .any(|p| p.name().map(|n| n == name).unwrap_or(false))
+            {
+                return;
+            }
+        }
+        self.panels.push(panel)
+    }
+
+    /// Removes a `Panel` from this cockpit.
+    ///
+    /// Removes the `Panel` with the given name from this cockpit a
+    /// a `Panel` with the given name exists
+    pub fn remove_panel<T: AsRef<str>>(&mut self, name: T) {
+        self.panels
+            .retain(|p| p.name().map(|n| n != name.as_ref()).unwrap_or(true))
     }
 
     /// Add a `Panel` to this cockpit.

@@ -273,18 +273,30 @@ pub trait TransmitsTelemetryData<L> {
         L: Send + 'static;
 
     /// Add a `Copckpit`
+    ///
+    /// If the cockpit has a name and another cockpit with
+    /// the same name is already present the cockpit will
+    /// not be added.
     fn add_cockpit(&self, cockpit: Cockpit<L>) -> &Self;
+
+    fn remove_cockpit<T: Into<String>>(&self, name: T) -> &Self;
 
     /// Add a `Panel` to a `Cockpit` if that `Cockpit` has the
     /// given name.
-    fn add_panel_to_cockpit(&self, cockpit_name: String, panel: Panel<L>) -> &Self;
+    fn add_panel_to_cockpit<T: Into<String>>(&self, cockpit_name: T, panel: Panel<L>) -> &Self;
+
+    /// Removes the panel with the given name from a cockpit
+    /// with the given name.
+    ///
+    /// This means the cockpit and the panel must have a name set.
+    fn remove_panel_from_cockpit<U: Into<String>, V: Into<String>>(
+        &self,
+        cockpit_name: U,
+        panel_name: V,
+    ) -> &Self;
 }
 
 /// Transmits `Observation`s to the backend
-///
-/// This struct does **not** implement the `Sync` trait
-/// and can therefore not be shared between threads.
-/// See `synced()` method.
 #[derive(Clone)]
 pub struct TelemetryTransmitter<L> {
     sender: crossbeam_channel::Sender<TelemetryMessage<L>>,
@@ -295,6 +307,7 @@ where
     L: Send + 'static,
 {
     /// Get a `TelemetryTransmitterSync`.
+    #[deprecated(since = "0.10.16", note = "Use TelemetryTransmitter since it is sync")]
     pub fn synced(&self) -> TelemetryTransmitterSync<L> {
         TelemetryTransmitterSync {
             sender: Arc::new(Mutex::new(self.sender.clone())),
@@ -330,10 +343,34 @@ impl<L> TransmitsTelemetryData<L> for TelemetryTransmitter<L> {
         self
     }
 
-    fn add_panel_to_cockpit(&self, cockpit_name: String, panel: Panel<L>) -> &Self {
-        if let Err(err) = self.sender.send(TelemetryMessage::AddPanel {
-            cockpit_name,
+    fn remove_cockpit<T: Into<String>>(&self, name: T) -> &Self {
+        if let Err(err) = self
+            .sender
+            .send(TelemetryMessage::RemoveCockpit(name.into()))
+        {
+            util::log_error(format!("Failed to remove cockpit: {}", err));
+        };
+        self
+    }
+
+    fn add_panel_to_cockpit<T: Into<String>>(&self, cockpit_name: T, panel: Panel<L>) -> &Self {
+        if let Err(err) = self.sender.send(TelemetryMessage::AddPanelToCockpit {
+            cockpit_name: cockpit_name.into(),
             panel,
+        }) {
+            util::log_error(format!("Failed to add panel to cockpit: {}", err));
+        };
+        self
+    }
+
+    fn remove_panel_from_cockpit<U: Into<String>, V: Into<String>>(
+        &self,
+        cockpit_name: U,
+        panel_name: V,
+    ) -> &Self {
+        if let Err(err) = self.sender.send(TelemetryMessage::RemovePanelFromCockpit {
+            cockpit_name: cockpit_name.into(),
+            panel_name: panel_name.into(),
         }) {
             util::log_error(format!("Failed to add panel to cockpit: {}", err));
         };
@@ -349,6 +386,7 @@ impl<L> TransmitsTelemetryData<L> for TelemetryTransmitter<L> {
 /// struct wraps the `Sender` in an `Arc<Mutex<_>>` so that
 /// it can be shared between threads.
 #[derive(Clone)]
+#[deprecated(since = "0.10.16", note = "Use TelemetryTransmitter since it is sync")]
 pub struct TelemetryTransmitterSync<L> {
     sender: Arc<Mutex<crossbeam_channel::Sender<TelemetryMessage<L>>>>,
 }
@@ -395,15 +433,46 @@ impl<L> TransmitsTelemetryData<L> for TelemetryTransmitterSync<L> {
         self
     }
 
-    fn add_panel_to_cockpit(&self, cockpit_name: String, panel: Panel<L>) -> &Self {
+    fn remove_cockpit<T: Into<String>>(&self, name: T) -> &Self {
         if let Err(err) = self
             .sender
             .lock()
             .unwrap()
-            .send(TelemetryMessage::AddPanel {
-                cockpit_name,
+            .send(TelemetryMessage::RemoveCockpit(name.into()))
+        {
+            util::log_error(format!("Failed to remove cockpit: {}", err));
+        };
+        self
+    }
+
+    fn add_panel_to_cockpit<T: Into<String>>(&self, cockpit_name: T, panel: Panel<L>) -> &Self {
+        if let Err(err) = self
+            .sender
+            .lock()
+            .unwrap()
+            .send(TelemetryMessage::AddPanelToCockpit {
+                cockpit_name: cockpit_name.into(),
                 panel,
             })
+        {
+            util::log_error(format!("Failed to add panel to cockpit: {}", err));
+        };
+        self
+    }
+
+    fn remove_panel_from_cockpit<U: Into<String>, V: Into<String>>(
+        &self,
+        cockpit_name: U,
+        panel_name: V,
+    ) -> &Self {
+        if let Err(err) =
+            self.sender
+                .lock()
+                .unwrap()
+                .send(TelemetryMessage::RemovePanelFromCockpit {
+                    cockpit_name: cockpit_name.into(),
+                    panel_name: panel_name.into(),
+                })
         {
             util::log_error(format!("Failed to add panel to cockpit: {}", err));
         };
