@@ -19,7 +19,7 @@ repository = "chridou/metrix"
 [dependencies]
 crossbeam-channel = "0.4"
 exponential-decay-histogram = "0.1"
-futures = { package = "futures", version = "0.3" }
+futures = { package = "futures", version = "0.3", optional = true }
 futures01 = { package = "futures", version = "0.1", optional = true }
 jemalloc-ctl = { version = "0.3.3", optional = true }
 json = "0.12"

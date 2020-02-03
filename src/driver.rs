@@ -15,10 +15,11 @@ use futures01::{
     sync::oneshot as oneshot01,
 };
 
+#[cfg(feature = "futures")]
 use futures::{
-    Future,
+    Future as Future,
     TryFutureExt,
-    channel::oneshot,
+    channel::oneshot as oneshot,
 };
 
 use crate::instruments::switches::*;
@@ -268,6 +269,7 @@ impl TelemetryDriver {
         rx.map_err(|_| GetSnapshotError)
     }
 
+    #[cfg(feature = "futures")]
     pub fn snapshot_async(
         &self,
         descriptive: bool,
@@ -375,6 +377,7 @@ enum DriverMessage {
     GetSnapshotSync(Snapshot, CrossbeamSender<Snapshot>, bool),
     #[cfg(feature = "futures01")]
     GetSnapshotAsync01(Snapshot, oneshot01::Sender<Snapshot>, bool),
+    #[cfg(feature = "futures")]
     GetSnapshotAsync(Snapshot, oneshot::Sender<Snapshot>, bool),
     SetProcessingStrategy(ProcessingStrategy),
     Pause,
@@ -430,6 +433,7 @@ fn telemetry_loop(
                     );
                     let _ = back_channel.send(snapshot);
                 }
+                #[cfg(feature = "futures")]
                 DriverMessage::GetSnapshotAsync(mut snapshot, back_channel, descriptive) => {
                     put_values_into_snapshot(
                         &mut snapshot,
