@@ -8,8 +8,19 @@ use std::time::{Duration, Instant};
 use crossbeam_channel::{
     self, Receiver as CrossbeamReceiver, Sender as CrossbeamSender, TryRecvError,
 };
-use futures::future::Future;
-use futures::sync::oneshot;
+
+#[cfg(feature = "futures01")]
+use futures01::{
+    Future as Future01,
+    sync::oneshot as oneshot01,
+};
+
+#[cfg(feature = "futures")]
+use futures::{
+    Future as Future,
+    TryFutureExt,
+    channel::oneshot as oneshot,
+};
 
 use crate::instruments::switches::*;
 use crate::instruments::*;
@@ -245,10 +256,24 @@ impl TelemetryDriver {
         rx.recv().map_err(|_err| GetSnapshotError)
     }
 
+    #[cfg(feature = "futures01")]
+    pub fn snapshot_async01(
+        &self,
+        descriptive: bool,
+    ) -> impl Future01<Item = Snapshot, Error = GetSnapshotError> + Send + 'static {
+        let snapshot = Snapshot::default();
+        let (tx, rx) = oneshot01::channel();
+        let _ = self
+            .sender
+            .send(DriverMessage::GetSnapshotAsync01(snapshot, tx, descriptive));
+        rx.map_err(|_| GetSnapshotError)
+    }
+
+    #[cfg(feature = "futures")]
     pub fn snapshot_async(
         &self,
         descriptive: bool,
-    ) -> impl Future<Item = Snapshot, Error = GetSnapshotError> + Send + 'static {
+    ) -> impl Future<Output = Result<Snapshot, GetSnapshotError>> + Send + 'static {
         let snapshot = Snapshot::default();
         let (tx, rx) = oneshot::channel();
         let _ = self
@@ -350,6 +375,9 @@ enum DriverMessage {
     AddProcessor(Box<dyn ProcessesTelemetryMessages>),
     AddSnapshooter(Box<dyn PutsSnapshot>),
     GetSnapshotSync(Snapshot, CrossbeamSender<Snapshot>, bool),
+    #[cfg(feature = "futures01")]
+    GetSnapshotAsync01(Snapshot, oneshot01::Sender<Snapshot>, bool),
+    #[cfg(feature = "futures")]
     GetSnapshotAsync(Snapshot, oneshot::Sender<Snapshot>, bool),
     SetProcessingStrategy(ProcessingStrategy),
     Pause,
@@ -393,6 +421,19 @@ fn telemetry_loop(
                     );
                     let _ = back_channel.send(snapshot);
                 }
+                #[cfg(feature = "futures01")]
+                DriverMessage::GetSnapshotAsync01(mut snapshot, back_channel, descriptive) => {
+                    put_values_into_snapshot(
+                        &mut snapshot,
+                        &processors,
+                        &snapshooters,
+                        driver_metrics.as_mut(),
+                        &descriptives,
+                        descriptive,
+                    );
+                    let _ = back_channel.send(snapshot);
+                }
+                #[cfg(feature = "futures")]
                 DriverMessage::GetSnapshotAsync(mut snapshot, back_channel, descriptive) => {
                     put_values_into_snapshot(
                         &mut snapshot,
