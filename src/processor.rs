@@ -179,7 +179,23 @@ where
     /// since otherwise the internal queue will get flooded
     /// with unprocessed observations
     pub fn new_pair<T: Into<String>>(name: T) -> (TelemetryTransmitter<L>, TelemetryProcessor<L>) {
-        Self::create(Some(name.into()), None)
+        Self::create(Some(name.into()), None, true)
+    }
+
+    /// Creates a `TelemetryTransmitter` and the corresponding
+    /// `TelemetryProcessor`
+    ///
+    /// The `name` will cause a grouping in the `Snapshot`.
+    ///
+    /// The message queue will be bound to `cap` elements.
+    /// If `block_on_full` is `false` messages will if `cap`
+    /// was reached.
+    pub fn new_pair_bounded<T: Into<String>>(
+        name: T,
+        cap: usize,
+        block_on_full: bool,
+    ) -> (TelemetryTransmitter<L>, TelemetryProcessor<L>) {
+        Self::create(Some(name.into()), Some(cap), block_on_full)
     }
 
     /// Creates a `TelemetryTransmitter` and the corresponding
@@ -191,12 +207,28 @@ where
     /// since otherwise the internal queue will get flooded
     /// with unprocessed observations
     pub fn new_pair_without_name() -> (TelemetryTransmitter<L>, TelemetryProcessor<L>) {
-        Self::create(None, None)
+        Self::create(None, None, true)
+    }
+
+    /// Creates a `TelemetryTransmitter` and the corresponding
+    /// `TelemetryProcessor`
+    ///
+    /// The `name` will cause a grouping in the `Snapshot`.
+    ///
+    /// The message queue will be bound to `cap` elements.
+    /// If `block_on_full` is `false` messages will if `cap`
+    /// was reached.
+    pub fn new_pair_bounded_without_name(
+        cap: usize,
+        block_on_full: bool,
+    ) -> (TelemetryTransmitter<L>, TelemetryProcessor<L>) {
+        Self::create(None, Some(cap), block_on_full)
     }
 
     fn create(
         name: Option<String>,
         bounded: Option<usize>,
+        use_send: bool,
     ) -> (TelemetryTransmitter<L>, TelemetryProcessor<L>) {
         let (tx, receiver) = if let Some(bound) = bounded {
             channel::bounded(bound)
@@ -204,7 +236,10 @@ where
             channel::unbounded()
         };
 
-        let transmitter = TelemetryTransmitter { sender: tx };
+        let transmitter = TelemetryTransmitter {
+            use_send,
+            sender: tx,
+        };
 
         let last_activity_at = Instant::now();
         let max_inactivity_duration = None;
