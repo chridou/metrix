@@ -45,7 +45,7 @@ impl PutsSnapshot for PolledCounter {
     }
 }
 
-fn create_foo_metrics() -> (TelemetryTransmitterSync<FooLabel>, ProcessorMount) {
+fn create_foo_metrics() -> (TelemetryTransmitter<FooLabel>, ProcessorMount) {
     let mut foo_a_panel = Panel::named(FooLabel::A, "foo_a_panel");
     foo_a_panel.add_counter(Counter::new_with_defaults("foo_a_counter"));
     let mut gauge = Gauge::new_with_defaults("foo_a_gauge");
@@ -91,10 +91,10 @@ fn create_foo_metrics() -> (TelemetryTransmitterSync<FooLabel>, ProcessorMount) 
     let mut group_processor = ProcessorMount::default();
     group_processor.add_processor(processor);
 
-    (tx.synced(), group_processor)
+    (tx, group_processor)
 }
 
-fn create_bar_metrics() -> (TelemetryTransmitterSync<BarLabel>, ProcessorMount) {
+fn create_bar_metrics() -> (TelemetryTransmitter<BarLabel>, ProcessorMount) {
     let mut bar_a_panel = Panel::named(BarLabel::A, "bar_a_panel");
     bar_a_panel.add_counter(Counter::new_with_defaults("bar_a_counter"));
     bar_a_panel.add_gauge(Gauge::new_with_defaults("bar_a_gauge"));
@@ -143,7 +143,7 @@ fn create_bar_metrics() -> (TelemetryTransmitterSync<BarLabel>, ProcessorMount) 
 
     group_processor2.add_snapshooter(polled_instrument);
 
-    (tx.synced(), group_processor2)
+    (tx, group_processor2)
 }
 
 fn main() {

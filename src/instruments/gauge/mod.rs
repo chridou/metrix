@@ -7,7 +7,7 @@ use crate::instruments::{
 };
 use crate::snapshot::Snapshot;
 use crate::util;
-use crate::{Descriptive, ObservedValue, PutsSnapshot, TimeUnit, DECR, INCR};
+use crate::{Descriptive, ObservedValue, PutsSnapshot, TimeUnit};
 pub use gauge_adapter::*;
 use tracking::*;
 
@@ -305,19 +305,6 @@ impl Gauge {
     }
 
     pub fn set(&mut self, observed: ObservedValue) {
-        // the old hack first...
-        let observed = if let Some(v) = observed.convert_to_u64() {
-            if v == INCR {
-                ObservedValue::ChangedBy(1)
-            } else if v == DECR {
-                ObservedValue::ChangedBy(-1)
-            } else {
-                observed
-            }
-        } else {
-            observed
-        };
-
         if let Some(value) = self.value.take() {
             let next_value = if let Some(next_value) = self.next_value(Some(value), observed) {
                 if let Some(ref buckets) = self.tracking {

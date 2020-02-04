@@ -1,4 +1,6 @@
 ## CHANGELOG:
+* 0.12.0
+    * Removed all deprecated items
 * 0.11.0
     * Cockpits and Processors do not accept multiple items with the same name
     * `TelemetryTransmitterSync` is deprecated since the `TelemetryTransmitter` is sync
