@@ -179,27 +179,7 @@ where
     /// since otherwise the internal queue will get flooded
     /// with unprocessed observations
     pub fn new_pair<T: Into<String>>(name: T) -> (TelemetryTransmitter<L>, TelemetryProcessor<L>) {
-        let (tx, rx) = channel::unbounded();
-
-        let transmitter = TelemetryTransmitter { sender: tx };
-
-        let last_activity_at = Instant::now();
-        let max_inactivity_duration = None;
-
-        let receiver = TelemetryProcessor {
-            name: Some(name.into()),
-            title: None,
-            description: None,
-            cockpits: Vec::new(),
-            handlers: Vec::new(),
-            snapshooters: Vec::new(),
-            receiver: rx,
-            last_activity_at,
-            max_inactivity_duration,
-            is_disconnected: false,
-        };
-
-        (transmitter, receiver)
+        Self::create(Some(name.into()), None)
     }
 
     /// Creates a `TelemetryTransmitter` and the corresponding
@@ -211,7 +191,18 @@ where
     /// since otherwise the internal queue will get flooded
     /// with unprocessed observations
     pub fn new_pair_without_name() -> (TelemetryTransmitter<L>, TelemetryProcessor<L>) {
-        let (tx, rx) = channel::unbounded();
+        Self::create(None, None)
+    }
+
+    fn create(
+        name: Option<String>,
+        bounded: Option<usize>,
+    ) -> (TelemetryTransmitter<L>, TelemetryProcessor<L>) {
+        let (tx, receiver) = if let Some(bound) = bounded {
+            channel::bounded(bound)
+        } else {
+            channel::unbounded()
+        };
 
         let transmitter = TelemetryTransmitter { sender: tx };
 
@@ -219,13 +210,13 @@ where
         let max_inactivity_duration = None;
 
         let receiver = TelemetryProcessor {
-            name: None,
+            name,
             title: None,
             description: None,
             cockpits: Vec::new(),
             handlers: Vec::new(),
             snapshooters: Vec::new(),
-            receiver: rx,
+            receiver,
             last_activity_at,
             max_inactivity_duration,
             is_disconnected: false,
