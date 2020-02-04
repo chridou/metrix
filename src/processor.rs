@@ -174,6 +174,10 @@ where
     /// `TelemetryProcessor`
     ///
     /// The `name` will cause a grouping in the `Snapshot`.
+    ///
+    /// It is important that the returned `TelemetryProcessor` gets mounted on a driver soon
+    /// since otherwise the internal queue will get flooded
+    /// with unprocessed observations
     pub fn new_pair<T: Into<String>>(name: T) -> (TelemetryTransmitter<L>, TelemetryProcessor<L>) {
         let (tx, rx) = channel::unbounded();
 
@@ -202,6 +206,10 @@ where
     /// `TelemetryProcessor`
     ///
     /// No grouping will occur unless the name is set.
+    ///
+    /// It is important that the returned `TelemetryProcessor` gets mounted on a driver soon
+    /// since otherwise the internal queue will get flooded
+    /// with unprocessed observations
     pub fn new_pair_without_name() -> (TelemetryTransmitter<L>, TelemetryProcessor<L>) {
         let (tx, rx) = channel::unbounded();
 

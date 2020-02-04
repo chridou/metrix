@@ -115,7 +115,6 @@
 extern crate log;
 
 use snapshot::Snapshot;
-use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use cockpit::Cockpit;
@@ -283,6 +282,11 @@ pub trait TransmitsTelemetryData<L> {
 }
 
 /// Transmits `Observation`s to the backend
+///
+/// It is important that the corresponding `TelemetryProcessor`
+/// gets mounted on a driver soon
+/// since otherwise the internal queue will get flooded
+/// with unprocessed observations
 #[derive(Clone)]
 pub struct TelemetryTransmitter<L> {
     sender: crossbeam_channel::Sender<TelemetryMessage<L>>,
