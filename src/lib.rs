@@ -304,12 +304,35 @@ impl<L: Send> TelemetryTransmitter<L> {
             if let Err(err) = self.sender.send(msg) {
                 util::log_warning(format!("failed to send telemetry message: {}", err))
             }
-        } else {
-            if let Err(err) = self.sender.try_send(msg) {
-                util::log_warning(format!("failed to send telemetry message: {}", err))
-            }
+        } else if let Err(err) = self.sender.try_send(msg) {
+            util::log_warning(format!("failed to send telemetry message: {}", err))
         }
         self
+    }
+
+    /// Returns true if the internal queue is full.
+    ///
+    /// Always `false` on an unbounded queue
+    pub fn is_queue_full(&self) -> bool {
+        self.sender.is_full()
+    }
+
+    /// Returns true if the internal queue is empty.
+    ///
+    /// Always `true` on an unbounded queue
+    pub fn is_queue_empty(&self) -> bool {
+        self.sender.is_empty()
+    }
+
+    pub fn queue_size(&self) -> usize {
+        self.sender.len()
+    }
+
+    /// Returns the capacity of the internal queue.
+    ///
+    /// `None` on an unbounded queue
+    pub fn queue_capacity(&self) -> Option<usize> {
+        self.sender.capacity()
     }
 }
 
