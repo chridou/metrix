@@ -114,8 +114,9 @@
 #[macro_use]
 extern crate log;
 
-use snapshot::Snapshot;
 use std::time::{Duration, Instant};
+
+use snapshot::Snapshot;
 
 use cockpit::Cockpit;
 use instruments::Panel;
@@ -290,54 +291,71 @@ pub trait TransmitsTelemetryData<L> {
 #[derive(Clone)]
 pub struct TelemetryTransmitter<L> {
     sender: crossbeam_channel::Sender<TelemetryMessage<L>>,
+    // True if we want to block in case the queue
+    // is full. Has no effect on unbounded queue
+    use_send: bool,
 }
 
-impl<L> TransmitsTelemetryData<L> for TelemetryTransmitter<L> {
-    fn transmit(&self, observation: Observation<L>) -> &Self {
-        if let Err(err) = self.sender.send(TelemetryMessage::Observation(observation)) {
-            util::log_error(format!("Failed to transmit observation: {}", err));
-        };
+impl<L: Send> TelemetryTransmitter<L> {
+    fn send(&self, msg: TelemetryMessage<L>) -> &Self {
+        if self.use_send {
+            if let Err(err) = self.sender.send(msg) {
+                util::log_warning(format!("failed to send telemetry message: {}", err))
+            }
+        } else if let Err(err) = self.sender.try_send(msg) {
+            util::log_warning(format!("failed to send telemetry message: {}", err))
+        }
         self
     }
 
-    fn add_handler<H: HandlesObservations<Label = L>>(&self, handler: H) -> &Self
-    where
-        L: Send + 'static,
-    {
-        if let Err(err) = self
-            .sender
-            .send(TelemetryMessage::AddHandler(Box::new(handler)))
-        {
-            util::log_error(format!("Failed to add handler: {}", err));
-        };
-        self
+    /// Returns `true` if the internal queue is full.
+    ///
+    /// Always `false` on an unbounded queue
+    pub fn is_queue_full(&self) -> bool {
+        self.sender.is_full()
+    }
+
+    /// Returns `true` if the internal queue is empty.
+    ///
+    /// Always `true` on an unbounded queue
+    pub fn is_queue_empty(&self) -> bool {
+        self.sender.is_empty()
+    }
+
+    pub fn queue_size(&self) -> usize {
+        self.sender.len()
+    }
+
+    /// Returns the capacity of the internal queue.
+    ///
+    /// `None` on an unbounded queue
+    pub fn queue_capacity(&self) -> Option<usize> {
+        self.sender.capacity()
+    }
+}
+
+impl<L: Send + 'static> TransmitsTelemetryData<L> for TelemetryTransmitter<L> {
+    fn transmit(&self, observation: Observation<L>) -> &Self {
+        self.send(TelemetryMessage::Observation(observation))
+    }
+
+    fn add_handler<H: HandlesObservations<Label = L>>(&self, handler: H) -> &Self {
+        self.send(TelemetryMessage::AddHandler(Box::new(handler)))
     }
 
     fn add_cockpit(&self, cockpit: Cockpit<L>) -> &Self {
-        if let Err(err) = self.sender.send(TelemetryMessage::AddCockpit(cockpit)) {
-            util::log_error(format!("Failed to add cockpit: {}", err));
-        };
-        self
+        self.send(TelemetryMessage::AddCockpit(cockpit))
     }
 
     fn remove_cockpit<T: Into<String>>(&self, name: T) -> &Self {
-        if let Err(err) = self
-            .sender
-            .send(TelemetryMessage::RemoveCockpit(name.into()))
-        {
-            util::log_error(format!("Failed to remove cockpit: {}", err));
-        };
-        self
+        self.send(TelemetryMessage::RemoveCockpit(name.into()))
     }
 
     fn add_panel_to_cockpit<T: Into<String>>(&self, cockpit_name: T, panel: Panel<L>) -> &Self {
-        if let Err(err) = self.sender.send(TelemetryMessage::AddPanelToCockpit {
+        self.send(TelemetryMessage::AddPanelToCockpit {
             cockpit_name: cockpit_name.into(),
             panel,
-        }) {
-            util::log_error(format!("Failed to add panel to cockpit: {}", err));
-        };
-        self
+        })
     }
 
     fn remove_panel_from_cockpit<U: Into<String>, V: Into<String>>(
@@ -345,13 +363,10 @@ impl<L> TransmitsTelemetryData<L> for TelemetryTransmitter<L> {
         cockpit_name: U,
         panel_name: V,
     ) -> &Self {
-        if let Err(err) = self.sender.send(TelemetryMessage::RemovePanelFromCockpit {
+        self.send(TelemetryMessage::RemovePanelFromCockpit {
             cockpit_name: cockpit_name.into(),
             panel_name: panel_name.into(),
-        }) {
-            util::log_error(format!("Failed to add panel to cockpit: {}", err));
-        };
-        self
+        })
     }
 }
 

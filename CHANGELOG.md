@@ -1,4 +1,6 @@
 ## CHANGELOG:
+* 0.13.0
+    * `TelemetryProcessor` can have a bounded channel
 * 0.12.0
     * Removed all deprecated items
 * 0.11.0
