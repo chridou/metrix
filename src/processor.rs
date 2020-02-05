@@ -188,8 +188,8 @@ where
     /// The `name` will cause a grouping in the `Snapshot`.
     ///
     /// The message queue will be bound to `cap` elements.
-    /// If `block_on_full` is `false` messages will if `cap`
-    /// was reached.
+    /// If `block_on_full` is `false` messages will be dropped if `cap`
+    /// elements are in the queue.
     pub fn new_pair_bounded<T: Into<String>>(
         name: T,
         cap: usize,
@@ -216,8 +216,8 @@ where
     /// The `name` will cause a grouping in the `Snapshot`.
     ///
     /// The message queue will be bound to `cap` elements.
-    /// If `block_on_full` is `false` messages will if `cap`
-    /// was reached.
+    /// If `block_on_full` is `false` messages will be dropped if `cap`
+    /// elements are in the queue.
     pub fn new_pair_bounded_without_name(
         cap: usize,
         block_on_full: bool,
