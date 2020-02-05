@@ -114,8 +114,6 @@
 #[macro_use]
 extern crate log;
 
-use std::error::Error;
-
 use std::time::{Duration, Instant};
 
 use snapshot::Snapshot;
@@ -310,14 +308,14 @@ impl<L: Send> TelemetryTransmitter<L> {
         self
     }
 
-    /// Returns true if the internal queue is full.
+    /// Returns `true` if the internal queue is full.
     ///
     /// Always `false` on an unbounded queue
     pub fn is_queue_full(&self) -> bool {
         self.sender.is_full()
     }
 
-    /// Returns true if the internal queue is empty.
+    /// Returns `true` if the internal queue is empty.
     ///
     /// Always `true` on an unbounded queue
     pub fn is_queue_empty(&self) -> bool {
