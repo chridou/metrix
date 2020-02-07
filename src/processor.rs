@@ -60,6 +60,7 @@ pub struct ProcessingOutcome {
     pub processed: usize,
     pub dropped: usize,
     pub instruments_updated: usize,
+    pub observations_enqueued: usize,
 }
 
 impl ProcessingOutcome {
@@ -68,6 +69,7 @@ impl ProcessingOutcome {
         self.processed += other.processed;
         self.dropped += other.dropped;
         self.instruments_updated += other.instruments_updated;
+        self.observations_enqueued += other.observations_enqueued;
     }
 
     pub fn something_happened(&self) -> bool {
@@ -81,6 +83,7 @@ impl Default for ProcessingOutcome {
             processed: 0,
             dropped: 0,
             instruments_updated: 0,
+            observations_enqueued: 0,
         }
     }
 }
@@ -510,6 +513,7 @@ where
             processed,
             dropped,
             instruments_updated,
+            observations_enqueued: self.receiver.len(),
         };
 
         if outcome.something_happened() {

@@ -10,17 +10,10 @@ use crossbeam_channel::{
 };
 
 #[cfg(feature = "futures01")]
-use futures01::{
-    Future as Future01,
-    sync::oneshot as oneshot01,
-};
+use futures01::{sync::oneshot as oneshot01, Future as Future01};
 
 #[cfg(feature = "futures")]
-use futures::{
-    Future as Future,
-    TryFutureExt,
-    channel::oneshot as oneshot,
-};
+use futures::{channel::oneshot, Future, TryFutureExt};
 
 use crate::instruments::switches::*;
 use crate::instruments::*;
@@ -644,6 +637,7 @@ struct DriverInstruments {
     observations_processed_per_collection: Histogram,
     observations_dropped_per_second: Meter,
     observations_dropped_per_collection: Histogram,
+    observations_enqueued: Gauge,
     instruments_updated_per_second: Meter,
     snapshots_per_second: Meter,
     snapshots_times_us: Histogram,
@@ -668,6 +662,7 @@ impl Default for DriverInstruments {
             observations_dropped_per_collection: Histogram::new_with_defaults(
                 "observations_dropped_per_collection",
             ),
+            observations_enqueued: Gauge::new_with_defaults("observations_enqueued"),
             instruments_updated_per_second: Meter::new_with_defaults(
                 "instruments_updated_per_second",
             ),
@@ -701,6 +696,11 @@ impl DriverInstruments {
             self.observations_processed_per_collection
                 .update(&Update::ObservationWithValue(outcome.processed.into(), now));
         }
+        self.observations_enqueued
+            .update(&Update::ObservationWithValue(
+                outcome.observations_enqueued.into(),
+                now,
+            ));
         if outcome.dropped > 0 {
             self.observations_dropped_per_second
                 .update(&Update::Observations(outcome.dropped as u64, now));
@@ -742,6 +742,8 @@ impl DriverInstruments {
         self.observations_dropped_per_second
             .put_snapshot(&mut container, descriptive);
         self.observations_dropped_per_collection
+            .put_snapshot(&mut container, descriptive);
+        self.observations_enqueued
             .put_snapshot(&mut container, descriptive);
         self.instruments_updated_per_second
             .put_snapshot(&mut container, descriptive);

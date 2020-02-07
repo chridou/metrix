@@ -1,4 +1,6 @@
 ## CHANGELOG:
+* 0.13.1
+    * Added driver metrics to report all enqueued observations
 * 0.13.0
     * `TelemetryProcessor` can have a bounded channel
 * 0.12.0
