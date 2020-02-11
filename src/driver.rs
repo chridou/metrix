@@ -662,7 +662,7 @@ impl Default for DriverInstruments {
             observations_dropped_per_collection: Histogram::new_with_defaults(
                 "observations_dropped_per_collection",
             ),
-            observations_enqueued: Gauge::new_with_defaults("observations_enqueued"),
+            observations_enqueued: Gauge::new_with_defaults("observations_enqueued").tracking(60),
             instruments_updated_per_second: Meter::new_with_defaults(
                 "instruments_updated_per_second",
             ),
