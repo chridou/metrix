@@ -154,7 +154,7 @@ pub struct IncrementBy(pub u32);
 pub struct Decrement;
 /// Decrements a value by the given amount (e.g. in a `Gauge`)
 #[derive(Debug, Copy, Clone)]
-pub struct DecrementBy(u32);
+pub struct DecrementBy(pub u32);
 /// Changes a value by the given amount (e.g. in a `Gauge`)
 #[derive(Debug, Copy, Clone)]
 pub struct ChangeBy(pub i64);

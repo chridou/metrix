@@ -1,4 +1,6 @@
 ## CHANGELOG:
+* 0.13.4
+    * Make field in tuple struct `DecreaseBy` public
 * 0.13.3
     * The `Gauge` is able to group its values into a `Snapshot` with its own name if desired
 * 0.13.2
