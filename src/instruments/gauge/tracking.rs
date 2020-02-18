@@ -83,24 +83,30 @@ impl BucketsStats {
         }
     }
 
-    pub fn add_to_snapshot(self, snapshot: &mut Snapshot, name: &str) {
-        let peak_name = format!("{}_peak", name);
+    pub fn add_to_snapshot(self, snapshot: &mut Snapshot, prefix: Option<&str>) {
+        use std::borrow::Cow;
+        let prefix = if let Some(prefix) = prefix {
+            Cow::Owned(format!("{}_", prefix))
+        } else {
+            Cow::Borrowed("")
+        };
+        let peak_name = format!("{}peak", prefix);
         snapshot.items.push((peak_name, self.peak.into()));
-        let peak_min_name = format!("{}_peak_min", name);
+        let peak_min_name = format!("{}peak_min", prefix);
         snapshot.items.push((peak_min_name, self.peak_min.into()));
-        let peak_avg_name = format!("{}_peak_avg", name);
+        let peak_avg_name = format!("{}peak_avg", prefix);
         snapshot.items.push((peak_avg_name, self.peak_avg.into()));
-        let bottom_name = format!("{}_bottom", name);
+        let bottom_name = format!("{}bottom", prefix);
         snapshot.items.push((bottom_name, self.bottom.into()));
-        let bottom_max_name = format!("{}_bottom_max", name);
+        let bottom_max_name = format!("{}bottom_max", prefix);
         snapshot
             .items
             .push((bottom_max_name, self.bottom_max.into()));
-        let bottom_avg_name = format!("{}_bottom_avg", name);
+        let bottom_avg_name = format!("{}bottom_avg", prefix);
         snapshot
             .items
             .push((bottom_avg_name, self.bottom_avg.into()));
-        let avg_name = format!("{}_avg", name);
+        let avg_name = format!("{}avg", prefix);
         snapshot.items.push((avg_name, self.avg.into()));
     }
 }
