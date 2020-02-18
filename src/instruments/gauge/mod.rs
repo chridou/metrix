@@ -64,6 +64,7 @@ pub struct Gauge {
     value: Option<i64>,
     tracking: Option<RefCell<SecondsBuckets<Bucket>>>,
     display_time_unit: TimeUnit,
+    group_values: bool,
 }
 
 impl Gauge {
@@ -75,6 +76,7 @@ impl Gauge {
             value: None,
             tracking: None,
             display_time_unit: TimeUnit::default(),
+            group_values: false,
         }
     }
 
@@ -92,6 +94,16 @@ impl Gauge {
 
     pub fn name<T: Into<String>>(mut self, name: T) -> Self {
         self.set_name(name);
+        self
+    }
+
+    /// If set to true, this instrument will form
+    /// a group with its name.
+    ///
+    /// The current value will be named `current` and other values
+    /// will not be prefixed with the name of the instrument
+    pub fn group_values(mut self, group_values: bool) -> Self {
+        self.group_values = group_values;
         self
     }
 
@@ -347,6 +359,28 @@ impl Gauge {
             x => x.convert_to_i64().or_else(|| current),
         }
     }
+
+    fn put_values_into_snapshot(&self, into: &mut Snapshot) {
+        if let Some(value) = self.value {
+            let prefix = if self.group_values {
+                into.items.push(("current".into(), value.into()));
+                None
+            } else {
+                into.items.push((self.name.clone(), value.into()));
+                Some(&*self.name)
+            };
+            if let Some(ref buckets) = self.tracking {
+                match buckets.try_borrow_mut() {
+                    Ok(mut borrowed) => BucketsStats::from_buckets(&mut *borrowed)
+                        .into_iter()
+                        .for_each(|stats| stats.add_to_snapshot(into, prefix)),
+                    Err(_err) => {
+                        crate::util::log_error("borrow mut in gauge::put_snapshot failed!")
+                    }
+                }
+            }
+        }
+    }
 }
 
 impl Instrument for Gauge {}
@@ -354,19 +388,13 @@ impl Instrument for Gauge {}
 impl PutsSnapshot for Gauge {
     fn put_snapshot(&self, into: &mut Snapshot, descriptive: bool) {
         util::put_postfixed_descriptives(self, &self.name, into, descriptive);
-        if let Some(value) = self.value {
-            into.items.push((self.name.clone(), value.into()));
-            if let Some(ref buckets) = self.tracking {
-                match buckets.try_borrow_mut() {
-                    Ok(mut borrowed) => BucketsStats::from_buckets(&mut *borrowed)
-                        .into_iter()
-                        .for_each(|stats| stats.add_to_snapshot(into, &self.name)),
-                    Err(_err) => {
-                        crate::util::log_error("borrow mut in gauge::put_snapshot failed!")
-                    }
-                }
-            }
-        }
+        if self.group_values {
+            let mut new_level = Snapshot::default();
+            self.put_values_into_snapshot(&mut new_level);
+            into.push(self.name.to_string(), new_level);
+        } else {
+            self.put_values_into_snapshot(into)
+        };
     }
 }
 
