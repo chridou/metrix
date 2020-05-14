@@ -296,6 +296,7 @@ where
         self
     }
 
+    /*
     /// Returns all contained `Cockpit`s
     #[deprecated(
         since = "0.10.6",
@@ -304,6 +305,7 @@ where
     pub fn cockpits(&self) -> Vec<&Cockpit<L>> {
         self.get_cockpits()
     }
+    */
 
     /// Returns all contained `Cockpit`s
     pub fn get_cockpits(&self) -> Vec<&Cockpit<L>> {
@@ -321,6 +323,7 @@ where
         self
     }
 
+    /*
     /// Returns all the handlers
     #[deprecated(
         since = "0.10.6",
@@ -328,7 +331,7 @@ where
     )]
     pub fn handlers(&self) -> Vec<&dyn HandlesObservations<Label = L>> {
         self.get_handlers()
-    }
+    }*/
 
     /// Returns all the handlers
     pub fn get_handlers(&self) -> Vec<&dyn HandlesObservations<Label = L>> {
@@ -350,25 +353,27 @@ where
         self
     }
 
+    /*
     #[deprecated(
         since = "0.10.6",
         note = "use get_snapshooters. this method will change its signature"
     )]
     pub fn snapshooters(&self) -> Vec<&dyn PutsSnapshot> {
         self.get_snapshooters()
-    }
+    }*/
 
     pub fn get_snapshooters(&self) -> Vec<&dyn PutsSnapshot> {
         self.snapshooters.iter().map(|p| &**p).collect()
     }
 
+    /*
     #[deprecated(
         since = "0.10.6",
         note = "use get_name. this method will change its signature"
     )]
     pub fn name(&self) -> Option<&str> {
         self.get_name()
-    }
+    }*/
 
     pub fn get_name(&self) -> Option<&str> {
         self.name.as_ref().map(|n| &**n)

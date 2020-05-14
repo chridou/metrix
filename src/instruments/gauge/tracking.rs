@@ -33,7 +33,10 @@ pub struct BucketsStats {
 }
 
 impl BucketsStats {
-    pub fn from_buckets<C: Clock>(buckets: &mut SecondsBuckets<Bucket, C>) -> Option<Self> {
+    pub fn from_buckets<C: Clock>(
+        buckets: &mut SecondsBuckets<Bucket, C>,
+        current_value: Option<i64>,
+    ) -> Option<Self> {
         let mut peak = std::i64::MIN;
         let mut peak_min = std::i64::MAX;
         let mut bottom = std::i64::MAX;
@@ -79,7 +82,19 @@ impl BucketsStats {
                 avg,
             })
         } else {
-            None
+            if let Some(current_value) = current_value {
+                Some(BucketsStats {
+                    peak: current_value,
+                    peak_min: current_value,
+                    peak_avg: current_value as f64,
+                    bottom: current_value,
+                    bottom_max: current_value,
+                    bottom_avg: current_value as f64,
+                    avg: current_value as f64,
+                })
+            } else {
+                None
+            }
         }
     }
 
@@ -124,7 +139,7 @@ mod test {
         let clock = ManualOffsetClock::default();
         let mut buckets = SecondsBuckets::<Bucket, _>::with_clock(1, clock);
 
-        assert!(BucketsStats::from_buckets(&mut buckets).is_none());
+        assert!(BucketsStats::from_buckets(&mut buckets, None).is_none());
     }
 
     #[test]
@@ -133,7 +148,7 @@ mod test {
         let mut buckets = SecondsBuckets::<Bucket, _>::with_clock(1, clock);
         buckets.current_mut().update(1);
 
-        assert!(BucketsStats::from_buckets(&mut buckets).is_some());
+        assert!(BucketsStats::from_buckets(&mut buckets, None).is_some());
     }
 
     #[test]
@@ -142,7 +157,7 @@ mod test {
         let mut buckets = SecondsBuckets::<Bucket, _>::with_clock(1, clock);
         buckets.current_mut().update(1);
 
-        let stats = BucketsStats::from_buckets(&mut buckets).unwrap();
+        let stats = BucketsStats::from_buckets(&mut buckets, None).unwrap();
         assert_eq!(stats.peak, 1);
         assert_eq!(stats.peak_min, 1);
         assert_eq!(stats.peak_avg, 1.0);
@@ -159,7 +174,7 @@ mod test {
         buckets.current_mut().update(1);
         buckets.current_mut().update(2);
 
-        let stats = BucketsStats::from_buckets(&mut buckets).unwrap();
+        let stats = BucketsStats::from_buckets(&mut buckets, None).unwrap();
         assert_eq!(stats.peak, 2, "peak");
         assert_eq!(stats.peak_min, 2, "peak_min");
         assert_eq!(stats.peak_avg, 2.0, "peak_avg");
@@ -177,7 +192,7 @@ mod test {
         clock.advance_a_second();
         buckets.current_mut().update(1);
 
-        let stats = BucketsStats::from_buckets(&mut buckets).unwrap();
+        let stats = BucketsStats::from_buckets(&mut buckets, None).unwrap();
         assert_eq!(stats.peak, 1, "peak");
         assert_eq!(stats.peak_min, 1, "peak_min");
         assert_eq!(stats.peak_avg, 1.0, "peak_avg");
@@ -195,7 +210,7 @@ mod test {
         clock.advance_a_second();
         buckets.current_mut().update(2);
 
-        let stats = BucketsStats::from_buckets(&mut buckets).unwrap();
+        let stats = BucketsStats::from_buckets(&mut buckets, None).unwrap();
         assert_eq!(stats.peak, 2, "peak");
         assert_eq!(stats.peak_min, 2, "peak_min");
         assert_eq!(stats.peak_avg, 2.0, "peak_avg");
@@ -213,7 +228,7 @@ mod test {
         clock.advance_a_second();
         buckets.current_mut().update(1);
 
-        let stats = BucketsStats::from_buckets(&mut buckets).unwrap();
+        let stats = BucketsStats::from_buckets(&mut buckets, None).unwrap();
         assert_eq!(stats.peak, 1, "peak");
         assert_eq!(stats.peak_min, 1, "peak_min");
         assert_eq!(stats.peak_avg, 1.0, "peak_avg");
@@ -231,7 +246,7 @@ mod test {
         clock.advance_a_second();
         buckets.current_mut().update(2);
 
-        let stats = BucketsStats::from_buckets(&mut buckets).unwrap();
+        let stats = BucketsStats::from_buckets(&mut buckets, None).unwrap();
         assert_eq!(stats.peak, 2, "peak");
         assert_eq!(stats.peak_min, 1, "peak_min");
         assert_eq!(stats.peak_avg, 1.5, "peak_avg");
@@ -251,7 +266,7 @@ mod test {
         buckets.current_mut().update(4);
         buckets.current_mut().update(7);
 
-        let stats = BucketsStats::from_buckets(&mut buckets).unwrap();
+        let stats = BucketsStats::from_buckets(&mut buckets, None).unwrap();
         assert_eq!(stats.peak, 7, "peak");
         assert_eq!(stats.peak_min, 5, "peak_min");
         assert_eq!(stats.peak_avg, 6.0, "peak_avg");

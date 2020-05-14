@@ -46,6 +46,7 @@ where
         Cockpit::default()
     }
 
+    /*
     /// Returns the name of this cockpit.
     ///
     /// If there is a name set, this will group the inner components in the
@@ -56,7 +57,7 @@ where
     )]
     pub fn name(&self) -> Option<&str> {
         self.get_name()
-    }
+    }*/
 
     /// Returns the name of this cockpit.
     ///
@@ -152,6 +153,7 @@ where
         self.handlers.push(Box::new(handler))
     }
 
+    /*
     /// Returns all the handlers.
     #[deprecated(
         since = "0.10.6",
@@ -159,7 +161,7 @@ where
     )]
     pub fn handlers(&self) -> Vec<&dyn HandlesObservations<Label = L>> {
         self.get_handlers()
-    }
+    }*/
 
     /// Returns all the handlers.
     pub fn get_handlers(&self) -> Vec<&dyn HandlesObservations<Label = L>> {
@@ -188,6 +190,7 @@ where
         self
     }
 
+    /*
     /// Returns all snapshooters.
     #[deprecated(
         since = "0.10.6",
@@ -195,7 +198,7 @@ where
     )]
     pub fn snapshooters(&self) -> Vec<&dyn PutsSnapshot> {
         self.get_snapshooters()
-    }
+    }*/
 
     /// Returns all snapshooters.
     pub fn get_snapshooters(&self) -> Vec<&dyn PutsSnapshot> {
