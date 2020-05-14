@@ -35,7 +35,7 @@ pub struct BucketsStats {
 impl BucketsStats {
     pub fn from_buckets<C: Clock>(
         buckets: &mut SecondsBuckets<Bucket, C>,
-        current_value: Option<i64>,
+        current_value: Option<i64>, // we take an option to make this configurable later
     ) -> Option<Self> {
         let mut peak = std::i64::MIN;
         let mut peak_min = std::i64::MAX;
