@@ -95,13 +95,6 @@ where
         panel
     }
 
-    /// Create a new `Panel` with the given name which dispatches observations
-    /// with the given label
-    #[deprecated(since = "0.9.24", note = "use 'named'")]
-    pub fn with_name<T: Into<String>>(label: L, name: T) -> Panel<L> {
-        Self::named(label, name)
-    }
-
     /// Create a new `Panel` without a name which dispatches observations
     /// with the given labels
     pub fn accept<F: Into<LabelFilter<L>>>(accept: F) -> Self {
@@ -126,11 +119,6 @@ where
         Self::new(AcceptAllLabels)
     }
 
-    #[deprecated(since = "0.10.9", note = "use 'add_histogram'")]
-    pub fn set_counter<I: Into<InstrumentAdapter<L, Counter>>>(&mut self, counter: I) {
-        self.counter = Some(counter.into());
-    }
-
     pub fn add_counter<I: Into<InstrumentAdapter<L, Counter>>>(&mut self, counter: I) {
         if self.counter.is_none() {
             self.counter = Some(counter.into());
@@ -142,11 +130,6 @@ where
     pub fn counter<I: Into<InstrumentAdapter<L, Counter>>>(mut self, counter: I) -> Self {
         self.add_counter(counter);
         self
-    }
-
-    #[deprecated(since = "0.10.9", note = "use 'add_gauge'")]
-    pub fn set_gauge<I: Into<GaugeAdapter<L>>>(&mut self, gauge: I) {
-        self.gauge = Some(gauge.into());
     }
 
     pub fn gauge<I: Into<GaugeAdapter<L>>>(mut self, gauge: I) -> Self {
@@ -162,11 +145,6 @@ where
         }
     }
 
-    #[deprecated(since = "0.10.9", note = "use 'add_meter'")]
-    pub fn set_meter<I: Into<InstrumentAdapter<L, Meter>>>(&mut self, meter: I) {
-        self.meter = Some(meter.into());
-    }
-
     pub fn meter<I: Into<InstrumentAdapter<L, Meter>>>(mut self, meter: I) -> Self {
         self.add_meter(meter);
         self
@@ -178,11 +156,6 @@ where
         } else {
             self.add_handler(meter.into())
         }
-    }
-
-    #[deprecated(since = "0.10.9", note = "use 'add_histogram'")]
-    pub fn set_histogram<I: Into<InstrumentAdapter<L, Histogram>>>(&mut self, histogram: I) {
-        self.histogram = Some(histogram.into());
     }
 
     pub fn add_histogram<I: Into<InstrumentAdapter<L, Histogram>>>(&mut self, histogram: I) {

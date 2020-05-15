@@ -1,4 +1,8 @@
 ## CHANGELOG:
+* 0.13.5
+    * Removed deprecated methods
+    * `Gauge` has builder method for initial value
+    * If `Gauge` has tracking enabled and the buckets are empty the current value will be displayed for all tracking values
 * 0.13.4
     * Make field in tuple struct `DecreaseBy` public
 * 0.13.3

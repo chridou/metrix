@@ -1,5 +1,4 @@
 use std::cell::RefCell;
-use std::time::Duration;
 
 use crate::instruments::{
     fundamentals::buckets::SecondsBuckets, AcceptAllLabels, Instrument, LabelFilter,
@@ -97,6 +96,13 @@ impl Gauge {
         self
     }
 
+    /// Sets the initial value and returns `self`
+    pub fn value<V: Into<i64>>(mut self, value: V) -> Self {
+        let value: i64 = value.into();
+        self.set(ObservedValue::SignedInteger(value.into()));
+        self
+    }
+
     /// If set to true, this instrument will form
     /// a group with its name.
     ///
@@ -122,17 +128,6 @@ impl Gauge {
 
     pub fn description<T: Into<String>>(mut self, description: T) -> Self {
         self.set_description(description);
-        self
-    }
-
-    #[deprecated(since = "0.10.5", note = "use method `set_tracking`")]
-    pub fn set_memorize_extrema(&mut self, d: Duration) {
-        self.set_tracking(std::cmp::max(1, d.as_secs() as usize));
-    }
-
-    #[deprecated(since = "0.10.5", note = "use method `tracking`")]
-    pub fn memorize_extrema(mut self, d: Duration) -> Self {
-        self.set_tracking(std::cmp::max(1, d.as_secs() as usize));
         self
     }
 
@@ -371,7 +366,7 @@ impl Gauge {
             };
             if let Some(ref buckets) = self.tracking {
                 match buckets.try_borrow_mut() {
-                    Ok(mut borrowed) => BucketsStats::from_buckets(&mut *borrowed)
+                    Ok(mut borrowed) => BucketsStats::from_buckets(&mut *borrowed, Some(value))
                         .into_iter()
                         .for_each(|stats| stats.add_to_snapshot(into, prefix)),
                     Err(_err) => {

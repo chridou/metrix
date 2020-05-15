@@ -281,7 +281,7 @@ pub struct GetSnapshotError;
 
 impl ::std::error::Error for GetSnapshotError {
     fn description(&self) -> &str {
-        "Could not create a snapshot"
+        "could not create a snapshot"
     }
 
     fn cause(&self) -> Option<&dyn ::std::error::Error> {
@@ -291,7 +291,7 @@ impl ::std::error::Error for GetSnapshotError {
 
 impl fmt::Display for GetSnapshotError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", ::std::error::Error::description(self))
+        write!(f, "could not create a snapshot")
     }
 }
 
