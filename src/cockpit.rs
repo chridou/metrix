@@ -21,6 +21,7 @@ pub struct Cockpit<L> {
     snapshooters: Vec<Box<dyn PutsSnapshot>>,
     last_activity_at: Instant,
     max_inactivity_duration: Option<Duration>,
+    show_activity_state: bool,
 }
 
 impl<L> Cockpit<L>
@@ -88,6 +89,25 @@ where
     /// inactive until no more snapshots are taken
     pub fn set_inactivity_limit(&mut self, limit: Duration) {
         self.max_inactivity_duration = Some(limit);
+    }
+
+    /// Set whether to show if the cockpit is inactive or not
+    /// if `inactivity_limit` is set.
+    ///
+    /// The default is `true`. Only has an effect if a `inactivity_limit`
+    /// is set.
+    pub fn set_show_activity_state(&mut self, show: bool) {
+        self.show_activity_state = show;
+    }
+
+    /// Set whether to show if the cockpit is inactive or not
+    /// if `inactivity_limit` is set.
+    ///
+    /// The default is `true`. Only has an effect if a `inactivity_limit`
+    /// is set.
+    pub fn show_activity_state(mut self, show: bool) -> Self {
+        self.set_show_activity_state(show);
+        self
     }
 
     /// Add a `Panel` to this cockpit.
@@ -209,17 +229,19 @@ where
         util::put_default_descriptives(self, into, descriptive);
 
         if let Some(d) = self.max_inactivity_duration {
-            if self.last_activity_at.elapsed() > d {
-                into.items
-                    .push(("_inactive".to_string(), ItemKind::Boolean(true)));
-                into.items
-                    .push(("_active".to_string(), ItemKind::Boolean(false)));
-                return;
-            } else {
-                into.items
-                    .push(("_inactive".to_string(), ItemKind::Boolean(false)));
-                into.items
-                    .push(("_active".to_string(), ItemKind::Boolean(true)));
+            if self.show_activity_state {
+                if self.last_activity_at.elapsed() > d {
+                    into.items
+                        .push(("_inactive".to_string(), ItemKind::Boolean(true)));
+                    into.items
+                        .push(("_active".to_string(), ItemKind::Boolean(false)));
+                    return;
+                } else {
+                    into.items
+                        .push(("_inactive".to_string(), ItemKind::Boolean(false)));
+                    into.items
+                        .push(("_active".to_string(), ItemKind::Boolean(true)));
+                }
             }
         };
 
@@ -267,6 +289,7 @@ where
             snapshooters: Vec::new(),
             last_activity_at: Instant::now(),
             max_inactivity_duration: None,
+            show_activity_state: true,
         }
     }
 }

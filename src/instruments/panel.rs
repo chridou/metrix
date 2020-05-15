@@ -61,6 +61,7 @@ pub struct Panel<L> {
     snapshooters: Vec<Box<dyn PutsSnapshot>>,
     last_update: Instant,
     max_inactivity_duration: Option<Duration>,
+    show_activity_state: bool,
 }
 
 impl<L> Panel<L>
@@ -84,6 +85,7 @@ where
             snapshooters: Vec::new(),
             last_update: Instant::now(),
             max_inactivity_duration: None,
+            show_activity_state: true,
         }
     }
 
@@ -243,12 +245,32 @@ where
         self
     }
 
-    /// Sets the maximum amount of time this panel may be
-    /// inactive until no more snapshots are taken
+    /// Set whether to show if the panel is inactive or not
+    /// if `inactivity_limit` is set.
     ///
-    /// Default is no inactivity tracking.
+    /// The default is `true`. Only has an effect if a `inactivity_limit`
+    /// is set.
     pub fn set_inactivity_limit(&mut self, limit: Duration) {
         self.max_inactivity_duration = Some(limit);
+    }
+
+    /// Set whether to show if the panel is inactive or not
+    /// if `inactivity_limit` is set.
+    ///
+    /// The default is `true`. Only has an effect if a `inactivity_limit`
+    /// is set.
+    pub fn set_show_activity_state(&mut self, show: bool) {
+        self.show_activity_state = show;
+    }
+
+    /// Set whether to show if the instrument is inactive are not
+    /// if `inactivity_limit` is set.
+    ///
+    /// The default is `true`. Only has an effect if a `inactivity_limit`
+    /// is set.
+    pub fn show_activity_state(mut self, show: bool) -> Self {
+        self.set_show_activity_state(show);
+        self
     }
 
     pub fn accepts_label(&self, label: &L) -> bool {
@@ -258,17 +280,19 @@ where
     fn put_values_into_snapshot(&self, into: &mut Snapshot, descriptive: bool) {
         util::put_default_descriptives(self, into, descriptive);
         if let Some(d) = self.max_inactivity_duration {
-            if self.last_update.elapsed() > d {
-                into.items
-                    .push(("_inactive".to_string(), ItemKind::Boolean(true)));
-                into.items
-                    .push(("_active".to_string(), ItemKind::Boolean(false)));
-                return;
-            } else {
-                into.items
-                    .push(("_inactive".to_string(), ItemKind::Boolean(false)));
-                into.items
-                    .push(("_active".to_string(), ItemKind::Boolean(true)));
+            if self.show_activity_state {
+                if self.last_update.elapsed() > d {
+                    into.items
+                        .push(("_inactive".to_string(), ItemKind::Boolean(true)));
+                    into.items
+                        .push(("_active".to_string(), ItemKind::Boolean(false)));
+                    return;
+                } else {
+                    into.items
+                        .push(("_inactive".to_string(), ItemKind::Boolean(false)));
+                    into.items
+                        .push(("_active".to_string(), ItemKind::Boolean(true)));
+                }
             }
         };
         self.counter
