@@ -1,4 +1,7 @@
 ## CHANGELOG:
+
+* 0.13.6
+    * Instruments can define whether they want to show their state of activity in snapshots if they support disabling by inactivity
 * 0.13.5
     * Removed deprecated methods
     * `Gauge` has builder method for initial value

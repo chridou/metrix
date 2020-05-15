@@ -18,6 +18,7 @@ pub struct Histogram {
     last_update: Instant,
     max_inactivity_duration: Option<Duration>,
     reset_after_inactivity: bool,
+    show_activity_state: bool,
     display_time_unit: TimeUnit,
 }
 
@@ -32,6 +33,7 @@ impl Histogram {
             last_update: Instant::now(),
             max_inactivity_duration: None,
             reset_after_inactivity: true,
+            show_activity_state: true,
             display_time_unit: TimeUnit::default(),
         }
     }
@@ -107,6 +109,25 @@ impl Histogram {
         self
     }
 
+    /// Set whether to show if the histogram is inactive or not
+    /// if `inactivity_limit` is set.
+    ///
+    /// The default is `true`. Only has an effect if a `inactivity_limit`
+    /// is set.
+    pub fn set_show_activity_state(&mut self, show: bool) {
+        self.show_activity_state = show;
+    }
+
+    /// Set whether to show if the histogram is inactive or not
+    /// if `inactivity_limit` is set.
+    ///
+    /// The default is `true`. Only has an effect if a `inactivity_limit`
+    /// is set.
+    pub fn show_activity_state(mut self, show: bool) -> Self {
+        self.set_show_activity_state(show);
+        self
+    }
+
     pub fn set_display_time_unit(&mut self, display_time_unit: TimeUnit) {
         self.display_time_unit = display_time_unit
     }
@@ -160,17 +181,19 @@ impl Histogram {
 
     fn put_values_into_snapshot(&self, into: &mut Snapshot) {
         if let Some(d) = self.max_inactivity_duration {
-            if self.last_update.elapsed() > d {
-                into.items
-                    .push(("_inactive".to_string(), ItemKind::Boolean(true)));
-                into.items
-                    .push(("_active".to_string(), ItemKind::Boolean(false)));
-                return;
-            } else {
-                into.items
-                    .push(("_inactive".to_string(), ItemKind::Boolean(false)));
-                into.items
-                    .push(("_active".to_string(), ItemKind::Boolean(true)));
+            if self.show_activity_state {
+                if self.last_update.elapsed() > d {
+                    into.items
+                        .push(("_inactive".to_string(), ItemKind::Boolean(true)));
+                    into.items
+                        .push(("_active".to_string(), ItemKind::Boolean(false)));
+                    return;
+                } else {
+                    into.items
+                        .push(("_inactive".to_string(), ItemKind::Boolean(false)));
+                    into.items
+                        .push(("_active".to_string(), ItemKind::Boolean(true)));
+                }
             }
         };
 
@@ -178,6 +201,7 @@ impl Histogram {
 
         let histo_snapshot = if snapshot.count() > 0 {
             let quantiles = vec![
+                (25u16, snapshot.value(0.25)),
                 (50u16, snapshot.value(0.5)),
                 (75u16, snapshot.value(0.75)),
                 (95u16, snapshot.value(0.95)),

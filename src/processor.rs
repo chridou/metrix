@@ -166,6 +166,7 @@ pub struct TelemetryProcessor<L> {
     snapshooters: Vec<Box<dyn PutsSnapshot>>,
     last_activity_at: Instant,
     max_inactivity_duration: Option<Duration>,
+    show_activity_state: bool,
     is_disconnected: bool,
 }
 
@@ -257,6 +258,7 @@ where
             receiver,
             last_activity_at,
             max_inactivity_duration,
+            show_activity_state: true,
             is_disconnected: false,
         };
 
@@ -397,21 +399,42 @@ where
         self
     }
 
+    /// Set whether to show if the processor is inactive or not
+    /// if `inactivity_limit` is set.
+    ///
+    /// The default is `true`. Only has an effect if a `inactivity_limit`
+    /// is set.
+    pub fn set_show_activity_state(&mut self, show: bool) {
+        self.show_activity_state = show;
+    }
+
+    /// Set whether to show if the processor is inactive or not
+    /// if `inactivity_limit` is set.
+    ///
+    /// The default is `true`. Only has an effect if a `inactivity_limit`
+    /// is set.
+    pub fn show_activity_state(mut self, show: bool) -> Self {
+        self.set_show_activity_state(show);
+        self
+    }
+
     fn put_values_into_snapshot(&self, into: &mut Snapshot, descriptive: bool) {
         util::put_default_descriptives(self, into, descriptive);
 
         if let Some(d) = self.max_inactivity_duration {
-            if self.last_activity_at.elapsed() > d {
-                into.items
-                    .push(("_inactive".to_string(), ItemKind::Boolean(true)));
-                into.items
-                    .push(("_active".to_string(), ItemKind::Boolean(false)));
-                return;
-            } else {
-                into.items
-                    .push(("_inactive".to_string(), ItemKind::Boolean(false)));
-                into.items
-                    .push(("_active".to_string(), ItemKind::Boolean(true)));
+            if self.show_activity_state {
+                if self.last_activity_at.elapsed() > d {
+                    into.items
+                        .push(("_inactive".to_string(), ItemKind::Boolean(true)));
+                    into.items
+                        .push(("_active".to_string(), ItemKind::Boolean(false)));
+                    return;
+                } else {
+                    into.items
+                        .push(("_inactive".to_string(), ItemKind::Boolean(false)));
+                    into.items
+                        .push(("_active".to_string(), ItemKind::Boolean(true)));
+                }
             }
         };
 
