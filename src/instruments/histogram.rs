@@ -346,3 +346,30 @@ impl HistogramSnapshot {
         }
     }
 }
+
+#[test]
+fn histogram_without_inactivity_accepts_future_timestamp() {
+    let mut histogram = Histogram::new("test");
+
+    let t1 = Instant::now();
+    let t2 = t1 + Duration::from_secs(10);
+
+    let update_1 = Update::ObservationWithValue(10.into(), t2);
+    histogram.update(&update_1);
+    let update_2 = Update::ObservationWithValue(11.into(), t1);
+    histogram.update(&update_2);
+}
+
+#[test]
+fn histogram_with_inactivity_accepts_future_timestamp() {
+    let mut histogram = Histogram::new("test");
+    histogram.set_inactivity_limit(Duration::from_secs(1));
+
+    let t1 = Instant::now();
+    let t2 = t1 + Duration::from_secs(10);
+
+    let update_1 = Update::ObservationWithValue(10.into(), t2);
+    histogram.update(&update_1);
+    let update_2 = Update::ObservationWithValue(11.into(), t1);
+    histogram.update(&update_2);
+}
