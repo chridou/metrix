@@ -1,5 +1,7 @@
 ## CHANGELOG:
 
+* 0.13.7
+    * fixed inactivity behaviour for histograms
 * 0.13.6
     * Instruments can define whether they want to show their state of activity in snapshots if they support disabling by inactivity
 * 0.13.5

@@ -180,23 +180,31 @@ impl Histogram {
     }
 
     fn put_values_into_snapshot(&self, into: &mut Snapshot) {
-        if let Some(d) = self.max_inactivity_duration {
-            if self.show_activity_state {
-                if self.last_update.elapsed() > d {
-                    into.items
-                        .push(("_inactive".to_string(), ItemKind::Boolean(true)));
-                    into.items
-                        .push(("_active".to_string(), ItemKind::Boolean(false)));
-                    return;
-                } else {
-                    into.items
-                        .push(("_inactive".to_string(), ItemKind::Boolean(false)));
-                    into.items
-                        .push(("_active".to_string(), ItemKind::Boolean(true)));
-                }
-            }
-        };
+        let is_active = self
+            .max_inactivity_duration
+            .map(|max_inactivity_duration| self.last_update.elapsed() < max_inactivity_duration)
+            .unwrap_or(true);
 
+        if self.max_inactivity_duration.is_some() && self.show_activity_state {
+            if is_active {
+                into.items
+                    .push(("_inactive".to_string(), ItemKind::Boolean(false)));
+                into.items
+                    .push(("_active".to_string(), ItemKind::Boolean(true)));
+            } else {
+                into.items
+                    .push(("_inactive".to_string(), ItemKind::Boolean(true)));
+                into.items
+                    .push(("_active".to_string(), ItemKind::Boolean(false)));
+            }
+        }
+
+        if is_active {
+            self.put_histogram_values_into_snapshot(into);
+        }
+    }
+
+    fn put_histogram_values_into_snapshot(&self, into: &mut Snapshot) {
         let snapshot = self.inner_histogram.snapshot();
 
         let histo_snapshot = if snapshot.count() > 0 {
@@ -239,8 +247,8 @@ impl PutsSnapshot for Histogram {
 
 impl Updates for Histogram {
     fn update(&mut self, with: &Update) -> usize {
-        if let Some(d) = self.max_inactivity_duration {
-            if self.reset_after_inactivity && self.last_update.elapsed() > d {
+        if let Some(max_inactivity_duration) = self.max_inactivity_duration {
+            if self.reset_after_inactivity && self.last_update.elapsed() > max_inactivity_duration {
                 self.inner_histogram = ExponentialDecayHistogram::new()
             }
         };
