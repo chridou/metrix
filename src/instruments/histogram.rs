@@ -253,8 +253,6 @@ impl Updates for Histogram {
             }
         };
 
-        self.last_update = Instant::now();
-
         match *with {
             Update::ObservationWithValue(ObservedValue::Duration(time, time_unit), timestamp) => {
                 let d = super::duration_to_display_value(time, time_unit, self.display_time_unit);
