@@ -1,5 +1,8 @@
 ## CHANGELOG:
 
+* 0.13.8
+    * fixed a panic caused by using the timestamp from observations to track inactivity
+    * temporarily disable updating the histogram with timestamps because the histagram **may panic**
 * 0.13.7
     * fixed inactivity behaviour for histograms
 * 0.13.6

@@ -254,32 +254,22 @@ impl Updates for Histogram {
         };
 
         match *with {
-            Update::ObservationWithValue(ObservedValue::Duration(time, time_unit), timestamp) => {
+            Update::ObservationWithValue(ObservedValue::Duration(time, time_unit), _timestamp) => {
                 let d = super::duration_to_display_value(time, time_unit, self.display_time_unit);
-                if timestamp > self.last_update {
-                    self.inner_histogram.update_at(timestamp, d as i64);
-                    self.last_update = timestamp
-                } else {
-                    self.inner_histogram.update(d as i64);
-                    self.last_update = Instant::now();
-                }
+                self.inner_histogram.update(d as i64);
+                self.last_update = Instant::now();
+
                 1
             }
-            Update::ObservationWithValue(v, timestamp) => {
+            Update::ObservationWithValue(v, _timestamp) => {
                 if let Some(v) = v.convert_to_i64() {
-                    if timestamp > self.last_update {
-                        self.inner_histogram.update_at(timestamp, v);
-                        self.last_update = timestamp
-                    } else {
-                        self.inner_histogram.update(v);
-                        self.last_update = Instant::now();
-                    }
+                    self.inner_histogram.update(v);
+                    self.last_update = Instant::now();
                     1
                 } else {
                     0
                 }
             }
-
             _ => 0,
         }
     }
@@ -345,4 +335,31 @@ impl HistogramSnapshot {
                 .push(("quantiles".to_string(), ItemKind::Snapshot(quantiles)));
         }
     }
+}
+
+#[test]
+fn histogram_without_inactivity_accepts_future_timestamp() {
+    let mut histogram = Histogram::new("test");
+
+    let t1 = Instant::now();
+    let t2 = t1 + Duration::from_secs(10);
+
+    let update_1 = Update::ObservationWithValue(10.into(), t2);
+    histogram.update(&update_1);
+    let update_2 = Update::ObservationWithValue(11.into(), t1);
+    histogram.update(&update_2);
+}
+
+#[test]
+fn histogram_with_inactivity_accepts_future_timestamp() {
+    let mut histogram = Histogram::new("test");
+    histogram.set_inactivity_limit(Duration::from_secs(1));
+
+    let t1 = Instant::now();
+    let t2 = t1 + Duration::from_secs(10);
+
+    let update_1 = Update::ObservationWithValue(10.into(), t2);
+    histogram.update(&update_1);
+    let update_2 = Update::ObservationWithValue(11.into(), t1);
+    histogram.update(&update_2);
 }
