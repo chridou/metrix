@@ -15,13 +15,16 @@ use futures01::{sync::oneshot as oneshot01, Future as Future01};
 #[cfg(feature = "futures")]
 use futures::{channel::oneshot, Future, TryFutureExt};
 
-use crate::instruments::switches::*;
-use crate::instruments::*;
-use crate::processor::{
-    AggregatesProcessors, ProcessesTelemetryMessages, ProcessingOutcome, ProcessingStrategy,
-};
 use crate::snapshot::{ItemKind, Snapshot};
 use crate::util;
+use crate::{attached_mount::AttachedMount, instruments::*};
+use crate::{
+    attached_mount::InternalAttachedMount,
+    processor::{
+        AggregatesProcessors, ProcessesTelemetryMessages, ProcessingOutcome, ProcessingStrategy,
+    },
+};
+use crate::{instruments::switches::*, processor::ProcessorMount};
 use crate::{Descriptive, PutsSnapshot};
 
 /// A Builder for a `TelemetryDriver`
@@ -218,9 +221,22 @@ impl TelemetryDriver {
         driver
     }
 
+    pub fn attached_mount(&mut self, mount: ProcessorMount) -> AttachedMount {
+        let (sender, receiver) = crossbeam_channel::unbounded();
+
+        let attached = InternalAttachedMount {
+            receiver: Some(receiver),
+            inner: mount,
+        };
+
+        self.add_processor(attached);
+
+        AttachedMount { sender }
+    }
+
     /// Gets the name of this driver
     pub fn name(&self) -> Option<&str> {
-        self.descriptives.name.as_ref().map(|n| &**n)
+        self.descriptives.name.as_deref()
     }
 
     /// Changes the `ProcessingStrategy`

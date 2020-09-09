@@ -125,6 +125,7 @@ use processor::TelemetryMessage;
 pub use observation::*;
 pub use processor::AggregatesProcessors;
 
+pub mod attached_mount;
 pub mod cockpit;
 pub mod driver;
 pub mod instruments;

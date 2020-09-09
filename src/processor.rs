@@ -3,11 +3,13 @@ use std::time::{Duration, Instant};
 
 use crossbeam_channel::{self as channel, Receiver, TryRecvError};
 
-use crate::cockpit::Cockpit;
 use crate::instruments::Panel;
 use crate::snapshot::{ItemKind, Snapshot};
 use crate::util;
 use crate::Descriptive;
+use crate::{
+    attached_mount::AttachedMount, attached_mount::InternalAttachedMount, cockpit::Cockpit,
+};
 use crate::{
     HandlesObservations, Observation, ObservationLike, PutsSnapshot, TelemetryTransmitter,
 };
@@ -627,6 +629,14 @@ impl ProcessorMount {
         self.snapshooters.iter().map(|s| &**s).collect()
     }
 
+    pub fn add_processor_dyn(&mut self, processor: Box<dyn ProcessesTelemetryMessages>) {
+        self.processors.push(processor);
+    }
+
+    pub fn add_snapshooter_dyn(&mut self, snapshooter: Box<dyn PutsSnapshot>) {
+        self.snapshooters.push(snapshooter);
+    }
+
     fn put_values_into_snapshot(&self, into: &mut Snapshot, descriptive: bool) {
         util::put_default_descriptives(self, into, descriptive);
 
@@ -652,6 +662,19 @@ impl ProcessorMount {
         self.snapshooters
             .iter()
             .for_each(|s| s.put_snapshot(into, descriptive));
+    }
+
+    pub fn attached_mount(&mut self, mount: ProcessorMount) -> AttachedMount {
+        let (sender, receiver) = crossbeam_channel::unbounded();
+
+        let attached = InternalAttachedMount {
+            receiver: Some(receiver),
+            inner: mount,
+        };
+
+        self.add_processor(attached);
+
+        AttachedMount { sender }
     }
 }
 
