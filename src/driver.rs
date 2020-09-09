@@ -221,19 +221,6 @@ impl TelemetryDriver {
         driver
     }
 
-    pub fn attached_mount(&mut self, mount: ProcessorMount) -> AttachedMount {
-        let (sender, receiver) = crossbeam_channel::unbounded();
-
-        let attached = InternalAttachedMount {
-            receiver: Some(receiver),
-            inner: mount,
-        };
-
-        self.add_processor(attached);
-
-        AttachedMount { sender }
-    }
-
     /// Gets the name of this driver
     pub fn name(&self) -> Option<&str> {
         self.descriptives.name.as_deref()

@@ -24,6 +24,19 @@ pub trait AggregatesProcessors {
     fn add_processor<P: ProcessesTelemetryMessages>(&mut self, processor: P);
     /// Add a snapshooter.
     fn add_snapshooter<S: PutsSnapshot>(&mut self, snapshooter: S);
+
+    fn attached_mount(&mut self, mount: ProcessorMount) -> AttachedMount {
+        let (sender, receiver) = crossbeam_channel::unbounded();
+
+        let attached = InternalAttachedMount {
+            receiver: Some(receiver),
+            inner: mount,
+        };
+
+        self.add_processor(attached);
+
+        AttachedMount { sender }
+    }
 }
 
 /// A message that can be handled by a `ReceivesTelemetryData`
@@ -662,19 +675,6 @@ impl ProcessorMount {
         self.snapshooters
             .iter()
             .for_each(|s| s.put_snapshot(into, descriptive));
-    }
-
-    pub fn attached_mount(&mut self, mount: ProcessorMount) -> AttachedMount {
-        let (sender, receiver) = crossbeam_channel::unbounded();
-
-        let attached = InternalAttachedMount {
-            receiver: Some(receiver),
-            inner: mount,
-        };
-
-        self.add_processor(attached);
-
-        AttachedMount { sender }
     }
 }
 

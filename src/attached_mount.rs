@@ -16,7 +16,10 @@ pub struct AttachedMount {
 }
 
 impl AttachedMount {
-    pub fn attached_mount(&mut self, mount: ProcessorMount) -> AttachedMount {
+    pub fn attach_mount<P: ProcessesTelemetryMessages>(
+        &self,
+        mount: ProcessorMount,
+    ) -> AttachedMount {
         let (sender, receiver) = crossbeam_channel::unbounded();
 
         let attached = InternalAttachedMount {
@@ -24,18 +27,18 @@ impl AttachedMount {
             inner: mount,
         };
 
-        self.add_processor(attached);
+        self.put_processor(attached);
 
         AttachedMount { sender }
     }
 
-    fn put_processor<P: ProcessesTelemetryMessages>(&self, processor: P) {
+    pub fn put_processor<P: ProcessesTelemetryMessages>(&self, processor: P) {
         let _ = self
             .sender
             .send(ScopedMountMessage::Processor(Box::new(processor)));
     }
 
-    fn put_snapshooter<S: PutsSnapshot>(&self, snapshooter: S) {
+    pub fn put_snapshooter<S: PutsSnapshot>(&self, snapshooter: S) {
         let _ = self
             .sender
             .send(ScopedMountMessage::Snapshooter(Box::new(snapshooter)));
