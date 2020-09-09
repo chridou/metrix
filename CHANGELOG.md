@@ -1,6 +1,7 @@
 ## CHANGELOG:
 * 0.13.9
     * added `AttachedMount` which can be shared and adds other processors to the backend
+    * [BREAKING] MSRV=1.40
 * 0.13.8
     * fixed a panic caused by using the timestamp from observations to track inactivity
     * temporarily disable updating the histogram with timestamps because the histagram **may panic**
