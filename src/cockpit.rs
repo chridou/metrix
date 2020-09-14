@@ -65,7 +65,7 @@ where
     /// If there is a name set, this will group the inner components in the
     /// snapshot.
     pub fn get_name(&self) -> Option<&str> {
-        self.name.as_ref().map(|n| &**n)
+        self.name.as_deref()
     }
 
     /// Sets a name for this `Cockpit`. This will also enable grouping.
@@ -319,10 +319,10 @@ where
 
 impl<L> crate::Descriptive for Cockpit<L> {
     fn title(&self) -> Option<&str> {
-        self.title.as_ref().map(|n| &**n)
+        self.title.as_deref()
     }
 
     fn description(&self) -> Option<&str> {
-        self.description.as_ref().map(|n| &**n)
+        self.description.as_deref()
     }
 }

@@ -212,7 +212,7 @@ where
 
     /// Gets the name of this `Panel`
     pub fn name(&self) -> Option<&str> {
-        self.name.as_ref().map(|n| &**n)
+        self.name.as_deref()
     }
 
     /// Set the name if this `Panel`.
@@ -377,10 +377,10 @@ where
 
 impl<L> Descriptive for Panel<L> {
     fn title(&self) -> Option<&str> {
-        self.title.as_ref().map(|n| &**n)
+        self.title.as_deref()
     }
 
     fn description(&self) -> Option<&str> {
-        self.description.as_ref().map(|n| &**n)
+        self.description.as_deref()
     }
 }

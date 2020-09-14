@@ -99,7 +99,7 @@ impl Gauge {
     /// Sets the initial value and returns `self`
     pub fn value<V: Into<i64>>(mut self, value: V) -> Self {
         let value: i64 = value.into();
-        self.set(ObservedValue::SignedInteger(value.into()));
+        self.set(ObservedValue::SignedInteger(value));
         self
     }
 
@@ -407,11 +407,11 @@ impl Updates for Gauge {
 
 impl Descriptive for Gauge {
     fn title(&self) -> Option<&str> {
-        self.title.as_ref().map(|n| &**n)
+        self.title.as_deref()
     }
 
     fn description(&self) -> Option<&str> {
-        self.description.as_ref().map(|n| &**n)
+        self.description.as_deref()
     }
 }
 

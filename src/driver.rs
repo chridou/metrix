@@ -15,16 +15,13 @@ use futures01::{sync::oneshot as oneshot01, Future as Future01};
 #[cfg(feature = "futures")]
 use futures::{channel::oneshot, Future, TryFutureExt};
 
+use crate::instruments::switches::*;
+use crate::instruments::*;
+use crate::processor::{
+    AggregatesProcessors, ProcessesTelemetryMessages, ProcessingOutcome, ProcessingStrategy,
+};
 use crate::snapshot::{ItemKind, Snapshot};
 use crate::util;
-use crate::{attached_mount::AttachedMount, instruments::*};
-use crate::{
-    attached_mount::InternalAttachedMount,
-    processor::{
-        AggregatesProcessors, ProcessesTelemetryMessages, ProcessingOutcome, ProcessingStrategy,
-    },
-};
-use crate::{instruments::switches::*, processor::ProcessorMount};
 use crate::{Descriptive, PutsSnapshot};
 
 /// A Builder for a `TelemetryDriver`
@@ -338,11 +335,11 @@ impl AggregatesProcessors for TelemetryDriver {
 
 impl Descriptive for TelemetryDriver {
     fn title(&self) -> Option<&str> {
-        self.descriptives.title.as_ref().map(|n| &**n)
+        self.descriptives.title.as_deref()
     }
 
     fn description(&self) -> Option<&str> {
-        self.descriptives.description.as_ref().map(|n| &**n)
+        self.descriptives.description.as_deref()
     }
 }
 
@@ -592,11 +589,11 @@ impl Default for Descriptives {
 
 impl Descriptive for Descriptives {
     fn title(&self) -> Option<&str> {
-        self.title.as_ref().map(|n| &**n)
+        self.title.as_deref()
     }
 
     fn description(&self) -> Option<&str> {
-        self.description.as_ref().map(|n| &**n)
+        self.description.as_deref()
     }
 }
 

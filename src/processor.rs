@@ -393,7 +393,7 @@ where
     }*/
 
     pub fn get_name(&self) -> Option<&str> {
-        self.name.as_ref().map(|n| &**n)
+        self.name.as_deref()
     }
 
     /// Sets the name which will cause a grouoing in the `Snapshot`
@@ -536,11 +536,7 @@ where
                 }
                 Err(TryRecvError::Empty) => {}
                 Err(TryRecvError::Disconnected) => {
-                    let name = self
-                        .name
-                        .as_ref()
-                        .map(|n| &**n)
-                        .unwrap_or_else(|| "<no name>");
+                    let name = self.name.as_deref().unwrap_or_else(|| "<no name>");
                     util::log_warning(format!(
                         "Processor '{}' failed to receive message. Channel disconnected. Exiting",
                         name
@@ -585,11 +581,11 @@ where
 
 impl<L> Descriptive for TelemetryProcessor<L> {
     fn title(&self) -> Option<&str> {
-        self.title.as_ref().map(|n| &**n)
+        self.title.as_deref()
     }
 
     fn description(&self) -> Option<&str> {
-        self.description.as_ref().map(|n| &**n)
+        self.description.as_deref()
     }
 }
 
@@ -618,7 +614,7 @@ impl ProcessorMount {
 
     /// Returns the name
     pub fn name(&self) -> Option<&str> {
-        self.name.as_ref().map(|n| &**n)
+        self.name.as_deref()
     }
 
     /// Sets the name of this `ProcessorMount`
@@ -733,11 +729,11 @@ impl PutsSnapshot for ProcessorMount {
 
 impl Descriptive for ProcessorMount {
     fn title(&self) -> Option<&str> {
-        self.title.as_ref().map(|n| &**n)
+        self.title.as_deref()
     }
 
     fn description(&self) -> Option<&str> {
-        self.description.as_ref().map(|n| &**n)
+        self.description.as_deref()
     }
 }
 
