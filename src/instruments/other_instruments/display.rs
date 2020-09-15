@@ -9,7 +9,6 @@ use crate::{Descriptive, PutsSnapshot};
 
 /// A `DataDisplay` simply displays the value of an observation
 ///
-///
 /// The `DataDisplay` has the capability to reset its value
 /// after a given time. This can be useful if manually resetting the
 /// value after a finished "task" is not desired or possible.
@@ -204,10 +203,10 @@ impl Updates for DataDisplay {
 
 impl Descriptive for DataDisplay {
     fn title(&self) -> Option<&str> {
-        self.title.as_ref().map(|n| &**n)
+        self.title.as_deref()
     }
 
     fn description(&self) -> Option<&str> {
-        self.description.as_ref().map(|n| &**n)
+        self.description.as_deref()
     }
 }

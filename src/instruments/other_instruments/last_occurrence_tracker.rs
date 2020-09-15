@@ -188,10 +188,10 @@ impl Updates for LastOccurrenceTracker {
 
 impl Descriptive for LastOccurrenceTracker {
     fn title(&self) -> Option<&str> {
-        self.title.as_ref().map(|n| &**n)
+        self.title.as_deref()
     }
 
     fn description(&self) -> Option<&str> {
-        self.description.as_ref().map(|n| &**n)
+        self.description.as_deref()
     }
 }

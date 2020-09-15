@@ -1,5 +1,3 @@
-use std::time::{Duration, Instant};
-
 use crossbeam_channel::{
     self, Receiver as CrossbeamReceiver, Sender as CrossbeamSender, TryRecvError,
 };

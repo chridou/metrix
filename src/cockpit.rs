@@ -47,19 +47,6 @@ where
         Cockpit::default()
     }
 
-    /*
-    /// Returns the name of this cockpit.
-    ///
-    /// If there is a name set, this will group the inner components in the
-    /// snapshot.
-    #[deprecated(
-        since = "0.10.6",
-        note = "use get_name. this method will change its signature"
-    )]
-    pub fn name(&self) -> Option<&str> {
-        self.get_name()
-    }*/
-
     /// Returns the name of this cockpit.
     ///
     /// If there is a name set, this will group the inner components in the
@@ -115,7 +102,7 @@ where
     /// A `Panel` will receive only those `Observation`s where
     /// labels match.
     ///
-    /// There can **not** be multiple `Panel`s for the same label.
+    /// There can **not** be multiple `Panel`s for the same name.
     /// If one already exists, the new one will not be added.
     pub fn add_panel(&mut self, panel: Panel<L>) {
         if let Some(name) = panel.name() {

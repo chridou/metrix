@@ -4,11 +4,12 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Mutex;
-use std::sync::{
-    atomic::{AtomicUsize, Ordering},
-    Arc,
-};
+
+#[cfg(test)]
+use std::sync::Arc;
+
 use std::time::{Duration, Instant};
 
 const NANOS_PER_SEC: u64 = 1_000_000_000;

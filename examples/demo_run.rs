@@ -95,8 +95,8 @@ fn create_foo_metrics() -> (TelemetryTransmitter<FooLabel>, ProcessorMount) {
 }
 
 fn create_bar_metrics() -> (TelemetryTransmitter<BarLabel>, ProcessorMount) {
-    let mut bar_a_panel = Panel::named(BarLabel::A, "bar_a_panel");
-    bar_a_panel.add_counter(Counter::new_with_defaults("bar_a_counter"));
+    let mut bar_a_panel = Panel::named(BarLabel::A, "bar_a_panel")
+        .counter(Counter::new_with_defaults("bar_a_counter"));
     bar_a_panel.add_gauge(Gauge::new_with_defaults("bar_a_gauge"));
     bar_a_panel.add_meter(Meter::new_with_defaults("bar_a_meter"));
     bar_a_panel.add_histogram(Histogram::new_with_defaults("bar_a_histogram"));
@@ -184,7 +184,7 @@ fn main() {
     let _ = driver.snapshot(true).unwrap();
 
     let handle2 = {
-        let foo_transmitter = foo_transmitter.clone();
+        let foo_transmitter = foo_transmitter;
         let bar_transmitter = bar_transmitter.clone();
 
         thread::spawn(move || {
@@ -199,7 +199,7 @@ fn main() {
     let _ = driver.snapshot(true).unwrap();
 
     let handle3 = {
-        let bar_transmitter = bar_transmitter.clone();
+        let bar_transmitter = bar_transmitter;
 
         thread::spawn(move || {
             for i in 0..5_000_000 {

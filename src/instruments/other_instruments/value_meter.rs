@@ -196,8 +196,8 @@ impl ValueMeter {
 
         let meter_snapshot = MeterSnapshot {
             name: &self.name,
-            title: self.title.as_ref().map(|x| &**x),
-            description: self.description.as_ref().map(|x| &**x),
+            title: self.title.as_deref(),
+            description: self.description.as_deref(),
             count: snapshot.count as u64,
             one_minute: if self.one_minute_rate_enabled {
                 Some(MeterRate {
@@ -278,10 +278,10 @@ impl Updates for ValueMeter {
 
 impl Descriptive for ValueMeter {
     fn title(&self) -> Option<&str> {
-        self.title.as_ref().map(|n| &**n)
+        self.title.as_deref()
     }
 
     fn description(&self) -> Option<&str> {
-        self.description.as_ref().map(|n| &**n)
+        self.description.as_deref()
     }
 }
