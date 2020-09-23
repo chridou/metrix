@@ -1,6 +1,7 @@
 ## CHANGELOG:
 * 0.13.10
     * Fixed `NonOccurenceTracker`
+    * track the proportion of time spend with updating instruments
 * 0.13.9
     * added `AttachedMount` which can be shared and adds other processors to the backend
     * [BREAKING] MSRV=1.40
