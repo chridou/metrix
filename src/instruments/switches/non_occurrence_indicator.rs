@@ -208,8 +208,8 @@ impl NonOccurrenceIndicator {
 
     /// Returns the current state
     pub fn state(&self) -> bool {
-        let must_have_happened_after = Instant::now() - self.if_not_happened_within;
-        let current_state = self.happened_last > must_have_happened_after;
+        let must_not_have_happened_after = Instant::now() - self.if_not_happened_within;
+        let current_state = self.happened_last <= must_not_have_happened_after;
 
         if self.invert {
             !current_state

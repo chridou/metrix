@@ -203,7 +203,8 @@ impl OccurrenceIndicator {
 
     /// Returns the current state
     pub fn state(&self) -> bool {
-        let current_state = self.happened_last + self.if_happened_within >= Instant::now();
+        let must_have_happened_after = Instant::now() - self.if_happened_within;
+        let current_state = self.happened_last > must_have_happened_after;
 
         if self.invert {
             !current_state

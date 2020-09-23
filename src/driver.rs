@@ -399,6 +399,8 @@ fn telemetry_loop(
             break;
         }
 
+        let iteration_started = Instant::now();
+
         match receiver.try_recv() {
             Ok(message) => match message {
                 DriverMessage::AddProcessor(processor) => processors.push(processor),
@@ -467,8 +469,9 @@ fn telemetry_loop(
             continue;
         }
 
-        let started = Instant::now();
+        let run_started = Instant::now();
         let outcome = do_a_run(&mut processors, 1_000, processing_stragtegy);
+        let run_time = run_started.elapsed();
 
         dropped_since_last_logged += outcome.dropped;
 
@@ -479,7 +482,7 @@ fn telemetry_loop(
         }
 
         if let Some(ref mut driver_metrics) = driver_metrics {
-            driver_metrics.update_post_collection(&outcome, started);
+            driver_metrics.update_post_collection(&outcome, run_started);
         }
 
         if outcome.dropped > 0 || outcome.processed > 100 {
@@ -487,9 +490,12 @@ fn telemetry_loop(
         }
 
         let finished = Instant::now();
-        let elapsed = finished - started;
+        let elapsed = finished - run_started;
         if elapsed < Duration::from_millis(10) {
-            thread::sleep(Duration::from_millis(10) - elapsed)
+            thread::sleep(Duration::from_millis(10) - elapsed);
+            report_elapsed_stats(iteration_started, run_time, driver_metrics.as_mut());
+        } else {
+            report_elapsed_stats(iteration_started, run_time, driver_metrics.as_mut());
         }
     }
 
@@ -508,6 +514,22 @@ fn do_a_run(
     }
 
     outcome
+}
+
+fn report_elapsed_stats(
+    iteration_started: Instant,
+    run_time: Duration,
+    metrics: Option<&mut DriverMetrics>,
+) {
+    if let Some(metrics) = metrics {
+        let iteration_time = iteration_started.elapsed().as_secs_f64();
+        let run_time = run_time.as_secs_f64();
+
+        if iteration_time > 0.0 {
+            let ratio = run_time / iteration_time;
+            metrics.update_run_ratio(ratio);
+        }
+    }
 }
 
 fn put_values_into_snapshot(
@@ -628,6 +650,17 @@ impl DriverMetrics {
     pub fn put_snapshot(&mut self, into: &mut Snapshot, descriptive: bool) {
         self.instruments.put_snapshot(into, descriptive);
     }
+    pub fn update_run_ratio(&mut self, ratio: f64) {
+        let now = Instant::now();
+        let per_mille = (ratio * 1_000f64) as u64;
+
+        self.instruments
+            .iteration_update_per_mille_ratio_histo
+            .update(&Update::ObservationWithValue(per_mille.into(), now));
+        self.instruments
+            .iteration_update_per_mille_ratio
+            .update(&Update::ObservationWithValue(per_mille.into(), now));
+    }
 }
 
 struct DriverInstruments {
@@ -643,6 +676,8 @@ struct DriverInstruments {
     snapshots_times_us: Histogram,
     dropped_observations_alarm: StaircaseTimer,
     inactivity_alarm: NonOccurrenceIndicator,
+    iteration_update_per_mille_ratio_histo: Histogram,
+    iteration_update_per_mille_ratio: Gauge,
 }
 
 impl Default for DriverInstruments {
@@ -662,7 +697,9 @@ impl Default for DriverInstruments {
             observations_dropped_per_collection: Histogram::new_with_defaults(
                 "observations_dropped_per_collection",
             ),
-            observations_enqueued: Gauge::new_with_defaults("observations_enqueued").tracking(60),
+            observations_enqueued: Gauge::new_with_defaults("observations_enqueued")
+                .tracking(60)
+                .group_values(true),
             instruments_updated_per_second: Meter::new_with_defaults(
                 "instruments_updated_per_second",
             ),
@@ -672,6 +709,14 @@ impl Default for DriverInstruments {
                 "dropped_observations_alarm",
             ),
             inactivity_alarm: NonOccurrenceIndicator::new_with_defaults("inactivity_alarm"),
+            iteration_update_per_mille_ratio_histo: Histogram::new_with_defaults(
+                "iteration_update_ratio_per_mille_histo",
+            ),
+            iteration_update_per_mille_ratio: Gauge::new_with_defaults(
+                "iteration_update_ratio_per_mille",
+            )
+            .tracking(60)
+            .group_values(true),
         }
     }
 }
