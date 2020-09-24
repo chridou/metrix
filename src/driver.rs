@@ -800,6 +800,10 @@ impl DriverInstruments {
             .put_snapshot(&mut container, descriptive);
         self.inactivity_alarm
             .put_snapshot(&mut container, descriptive);
+        self.iteration_update_per_mille_ratio
+            .put_snapshot(&mut container, descriptive);
+        self.iteration_update_per_mille_ratio_histo
+            .put_snapshot(&mut container, descriptive);
 
         into.items
             .push(("_metrix".into(), ItemKind::Snapshot(container)));

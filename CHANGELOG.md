@@ -1,4 +1,6 @@
 ## CHANGELOG:
+* 0.13.11
+    * Fix: Publish the metrics for time spent in updates
 * 0.13.10
     * Fixed `NonOccurenceTracker`
     * track the proportion of time spend with updating instruments

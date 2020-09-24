@@ -1,5 +1,5 @@
 [package]
-version = "0.13.10"
+version = "0.13.11"
 authors = ["Christian Douven <chridou@users.noreply.github.com>"]
 description = "metrics for application monitoring"
 documentation = "https://docs.rs/metrix"
