@@ -9,10 +9,6 @@ use crossbeam_channel::{
     self, Receiver as CrossbeamReceiver, Sender as CrossbeamSender, TryRecvError,
 };
 
-#[cfg(feature = "futures01")]
-use futures01::{sync::oneshot as oneshot01, Future as Future01};
-
-#[cfg(feature = "futures")]
 use futures::{channel::oneshot, Future, TryFutureExt};
 
 use crate::instruments::switches::*;
@@ -249,20 +245,6 @@ impl TelemetryDriver {
         rx.recv().map_err(|_err| GetSnapshotError)
     }
 
-    #[cfg(feature = "futures01")]
-    pub fn snapshot_async01(
-        &self,
-        descriptive: bool,
-    ) -> impl Future01<Item = Snapshot, Error = GetSnapshotError> + Send + 'static {
-        let snapshot = Snapshot::default();
-        let (tx, rx) = oneshot01::channel();
-        let _ = self
-            .sender
-            .send(DriverMessage::GetSnapshotAsync01(snapshot, tx, descriptive));
-        rx.map_err(|_| GetSnapshotError)
-    }
-
-    #[cfg(feature = "futures")]
     pub fn snapshot_async(
         &self,
         descriptive: bool,
@@ -368,9 +350,6 @@ enum DriverMessage {
     AddProcessor(Box<dyn ProcessesTelemetryMessages>),
     AddSnapshooter(Box<dyn PutsSnapshot>),
     GetSnapshotSync(Snapshot, CrossbeamSender<Snapshot>, bool),
-    #[cfg(feature = "futures01")]
-    GetSnapshotAsync01(Snapshot, oneshot01::Sender<Snapshot>, bool),
-    #[cfg(feature = "futures")]
     GetSnapshotAsync(Snapshot, oneshot::Sender<Snapshot>, bool),
     SetProcessingStrategy(ProcessingStrategy),
     Pause,
@@ -416,19 +395,6 @@ fn telemetry_loop(
                     );
                     let _ = back_channel.send(snapshot);
                 }
-                #[cfg(feature = "futures01")]
-                DriverMessage::GetSnapshotAsync01(mut snapshot, back_channel, descriptive) => {
-                    put_values_into_snapshot(
-                        &mut snapshot,
-                        &processors,
-                        &snapshooters,
-                        driver_metrics.as_mut(),
-                        &descriptives,
-                        descriptive,
-                    );
-                    let _ = back_channel.send(snapshot);
-                }
-                #[cfg(feature = "futures")]
                 DriverMessage::GetSnapshotAsync(mut snapshot, back_channel, descriptive) => {
                     put_values_into_snapshot(
                         &mut snapshot,
@@ -491,12 +457,10 @@ fn telemetry_loop(
 
         let finished = Instant::now();
         let elapsed = finished - run_started;
-        if elapsed < Duration::from_millis(10) {
+        if outcome.dropped == 0 && elapsed < Duration::from_millis(10) {
             thread::sleep(Duration::from_millis(10) - elapsed);
-            report_elapsed_stats(iteration_started, run_time, driver_metrics.as_mut());
-        } else {
-            report_elapsed_stats(iteration_started, run_time, driver_metrics.as_mut());
         }
+        report_elapsed_stats(iteration_started, run_time, driver_metrics.as_mut());
     }
 
     util::log_info("Metrix driver stopped");

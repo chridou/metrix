@@ -113,7 +113,10 @@ pub enum ProcessingStrategy {
     /// Process only observations that are not older
     /// than the given `Durations` by the time
     /// messages are processed.
-    DropOlderThan(Duration),
+    DropOlderThan {
+        max_age: Duration,
+        drop_deltas: bool,
+    },
 }
 
 impl ProcessingStrategy {
@@ -121,23 +124,34 @@ impl ProcessingStrategy {
         match *self {
             ProcessingStrategy::ProcessAll => ProcessingDecider::ProcessAll,
             ProcessingStrategy::DropAll => ProcessingDecider::DropAll,
-            ProcessingStrategy::DropOlderThan(max_age) => {
-                ProcessingDecider::DropBeforeDeadline(Instant::now() - max_age)
-            }
+            ProcessingStrategy::DropOlderThan {
+                max_age,
+                drop_deltas,
+            } => ProcessingDecider::DropBeforeDeadline {
+                drop_if_older_than: Instant::now() - max_age,
+                drop_deltas,
+            },
         }
     }
 }
 
 impl Default for ProcessingStrategy {
     fn default() -> Self {
-        ProcessingStrategy::DropOlderThan(Duration::from_secs(60))
+        ProcessingStrategy::DropOlderThan {
+            max_age: Duration::from_secs(30),
+            drop_deltas: false,
+        }
     }
 }
 
 pub enum ProcessingDecider {
     ProcessAll,
     DropAll,
-    DropBeforeDeadline(Instant),
+    // Drop all before the deadline. If bool is true, also drop delta observations
+    DropBeforeDeadline {
+        drop_if_older_than: Instant,
+        drop_deltas: bool,
+    },
 }
 
 impl ProcessingDecider {
@@ -145,8 +159,17 @@ impl ProcessingDecider {
         match self {
             ProcessingDecider::ProcessAll => true,
             ProcessingDecider::DropAll => false,
-            ProcessingDecider::DropBeforeDeadline(drop_deadline) => {
-                observation.timestamp() > *drop_deadline
+            ProcessingDecider::DropBeforeDeadline {
+                drop_if_older_than,
+                drop_deltas,
+            } => {
+                if observation.timestamp() >= *drop_if_older_than {
+                    true
+                } else if *drop_deltas {
+                    false
+                } else {
+                    observation.is_delta()
+                }
             }
         }
     }
