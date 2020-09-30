@@ -1,4 +1,9 @@
 ## CHANGELOG:
+* 0.13.12
+    * Always do a new collection run immediately if there were dropped observations
+    * Do not drop deltas since this might break the metrics when observations are dropped
+    * Lowered default of max observation age before drop to 30s
+    * Removed futures01 support
 * 0.13.11
     * Fix: Publish the metrics for time spent in updates
 * 0.13.10

@@ -100,6 +100,18 @@ impl ObservedValue {
             Self::ChangedBy(_) => None,
         }
     }
+
+    /// Deltas should never be skipped
+    pub fn is_delta(&self) -> bool {
+        match self {
+            Self::SignedInteger(_) => false,
+            Self::UnsignedInteger(_) => false,
+            Self::Float(_) => false,
+            Self::Bool(_) => false,
+            Self::Duration(_, _) => false,
+            Self::ChangedBy(_) => true,
+        }
+    }
 }
 
 impl From<i64> for ObservedValue {
@@ -317,6 +329,8 @@ impl<L> Observation<L> {
 
 pub trait ObservationLike {
     fn timestamp(&self) -> Instant;
+    /// Observations which are deltas should not be skipped when there are too many incoming metrics
+    fn is_delta(&self) -> bool;
 }
 
 impl<L> ObservationLike for Observation<L> {
@@ -325,6 +339,14 @@ impl<L> ObservationLike for Observation<L> {
             Observation::Observed { timestamp, .. } => timestamp,
             Observation::ObservedOne { timestamp, .. } => timestamp,
             Observation::ObservedOneValue { timestamp, .. } => timestamp,
+        }
+    }
+
+    fn is_delta(&self) -> bool {
+        match self {
+            Observation::ObservedOneValue { value, .. } => value.is_delta(),
+            Observation::Observed { .. } => false,
+            Observation::ObservedOne { .. } => false,
         }
     }
 }

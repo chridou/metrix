@@ -1,5 +1,5 @@
 [package]
-version = "0.13.11"
+version = "0.13.12"
 authors = ["Christian Douven <chridou@users.noreply.github.com>"]
 description = "metrics for application monitoring"
 documentation = "https://docs.rs/metrix"
@@ -19,8 +19,7 @@ repository = "chridou/metrix"
 [dependencies]
 crossbeam-channel = "0.4"
 exponential-decay-histogram = "0.1"
-futures = { package = "futures", version = "0.3", optional = true }
-futures01 = { package = "futures", version = "0.1", optional = true }
+futures = { package = "futures", version = "0.3" }
 jemalloc-ctl = { version = "0.3.3", optional = true }
 json = "0.12"
 log = { version = "0.4", optional = true }
