@@ -35,7 +35,8 @@ pub struct DriverBuilder {
     /// Default is `None`
     pub description: Option<String>,
     /// Sets the `ProcessingStrategy`
-    /// dropped. The default is **30 seconds**.
+    /// dropped. The default is to drop observations older
+    /// than **30 seconds** but not delta observations.
     pub processing_strategy: ProcessingStrategy,
     /// If true metrics for the `TelemetryDriver` will be added to the
     /// generated `Snapshot`
