@@ -1,4 +1,6 @@
 ## CHANGELOG:
+* 0.13.13
+    * Bump dependencies
 * 0.13.12
     * Always do a new collection run immediately if there were dropped observations
     * Do not drop deltas since this might break the metrics when observations are dropped
